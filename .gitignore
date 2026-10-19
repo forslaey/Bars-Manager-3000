@@ -1,0 +1,25 @@
+# Generated files and local settings
+bin/
+obj/
+work/
+signed/
+.vs/
+*.exe
+*.dll
+*.pdb
+*.zip
+*.7z
+*.tmp
+*.log
+*.InstallLog
+*.InstallState
+services.xml
+install-profiles.xml
+theme.txt
+signing.json
+.env
+.env.*
+*.pfx
+*.p12
+*.key
+*.snk
