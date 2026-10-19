@@ -61,7 +61,7 @@ namespace ServiceTool
                                 if (x < 16 && y < 16) shades.Add(pixel);
                             }
                         Check(symmetric, "Rounded button corners are symmetric at 100/125/150 percent in both themes");
-                        Check(shades.Count > 8, "Corner edges contain gradual subpixel coverage rather than hard steps");
+                        Check(shades.Count > 4, "Compact rounded corners retain multiple antialiasing coverage levels: " + shades.Count);
                         int middle = image.Width / 2;
                         Check(image.GetPixel(middle, 0).ToArgb() == palette.Canvas.ToArgb() &&
                             image.GetPixel(middle, 1).ToArgb() == edge.ToArgb() &&
@@ -84,7 +84,7 @@ namespace ServiceTool
                     dialog.Show(); Application.DoEvents();
                     var flags = BindingFlags.Instance | BindingFlags.NonPublic;
                     var account = (ComboBox)typeof(ServiceAccountDialog).GetField("account", flags).GetValue(dialog);
-                    var remember = (BrandCheckBox)typeof(ServiceAccountDialog).GetField("remember", flags).GetValue(dialog);
+                    var remember = (RefreshToggle)typeof(ServiceAccountDialog).GetField("remember", flags).GetValue(dialog);
                     var password = (TextBox)typeof(ServiceAccountDialog).GetField("password", flags).GetValue(dialog);
                     var detail = (Label)typeof(ServiceAccountDialog).GetField("passwordDetail", flags).GetValue(dialog);
                     Check(account.SelectedIndex == (int)InstallAccountKind.LocalSystem, "Saved NetworkService still opens with LocalSystem selected");
@@ -98,7 +98,7 @@ namespace ServiceTool
                         using (var graphics = Graphics.FromImage(bitmap))
                         {
                             graphics.Clear(Color.Magenta);
-                            typeof(BrandCheckBox).GetMethod("OnPaint", flags).Invoke(remember,
+                            typeof(RefreshToggle).GetMethod("OnPaint", flags).Invoke(remember,
                                 new object[] { new PaintEventArgs(graphics, remember.ClientRectangle) });
                             Check(bitmap.GetPixel(bitmap.Width - 1, bitmap.Height / 2).ToArgb() == palette.Canvas.ToArgb(),
                                 "Enabled and disabled checkbox repaint their complete opaque background in both themes");

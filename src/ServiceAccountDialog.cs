@@ -14,8 +14,8 @@ namespace ServiceTool
         private readonly ComboBox mode = new BrandComboBox();
         private readonly ComboBox account = new BrandComboBox();
         private readonly ComboBox username = new BrandComboBox();
-        private readonly TextBox password = new TextBox();
-        private readonly BrandCheckBox remember = new BrandCheckBox();
+        private readonly TextBox password = new BrandTextBox();
+        private readonly RefreshToggle remember = new RefreshToggle();
         private readonly Label accountDetail = new FlushLabel();
         private readonly Label passwordDetail = new FlushLabel();
         private readonly Label error = new FlushLabel();
@@ -143,6 +143,7 @@ namespace ServiceTool
             box.Dock = DockStyle.Fill; box.Margin = new Padding(0, 5, 0, 5);
             box.BackColor = colors.Surface; box.ForeColor = colors.Text;
             box.BorderStyle = BorderStyle.FixedSingle;
+            BrandTextBox input = box as BrandTextBox; if (input != null) input.Palette = colors;
         }
 
         private void ForgetChangedIdentity()

@@ -28,8 +28,8 @@ namespace ServiceTool
             } : new ThemePalette
             {
                 Dark = false,
-                Canvas = Hex("F3F6F2"), Surface = Color.White, SurfaceAlt = Hex("E9F2EC"),
-                Text = Hex("37352F"), Muted = Hex("506359"), Border = Hex("B2C4B8"),
+                Canvas = Hex("F7F9F8"), Surface = Color.White, SurfaceAlt = Hex("E9F2EC"),
+                Text = Hex("37352F"), Muted = Hex("506359"), Border = Hex("83958E"),
                 Accent = Hex("00824C"), AccentText = Color.White, Good = Hex("006B3F"),
                 Warning = Hex("775011"), Danger = Hex("A52B2B"),
                 Selection = Hex("CEE9D9"), SelectionText = Hex("243B2D"),
@@ -95,9 +95,40 @@ namespace ServiceTool
         }
     }
 
-    internal sealed class BrandCheckBox : CheckBox
+    internal sealed class BrandMotion : IDisposable
+    {
+        private readonly Control owner;
+        private readonly Timer timer = new Timer { Interval = 15 };
+        private float target;
+        public float Value { get; private set; }
+        public BrandMotion(Control control)
+        {
+            owner = control;
+            timer.Tick += delegate {
+                float delta = target - Value;
+                Value = Math.Abs(delta) < .015F ? target : Value + delta * .28F;
+                owner.Invalidate();
+                if (Value == target) timer.Stop();
+            };
+        }
+        public void Move(float value)
+        {
+            target = value;
+            if (!owner.Visible || !owner.IsHandleCreated || !SystemInformation.IsMenuAnimationEnabled)
+            { Value = target; timer.Stop(); owner.Invalidate(); }
+            else timer.Start();
+        }
+        public void Dispose() { timer.Dispose(); }
+        public static Color Mix(Color a, Color b, float t)
+        {
+            return Color.FromArgb((int)(a.R+(b.R-a.R)*t), (int)(a.G+(b.G-a.G)*t), (int)(a.B+(b.B-a.B)*t));
+        }
+    }
+
+    internal class BrandCheckBox : CheckBox
     {
         public ThemePalette Palette;
+        private bool hovered;
 
         public BrandCheckBox()
         {
@@ -108,47 +139,8 @@ namespace ServiceTool
         protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
         protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
 
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            ThemePalette p = Palette ?? ThemePalette.Create(false);
-            // ButtonBase can skip background painting for disabled themed checkboxes.
-            // Always paint the whole surface so pixels from the owner cannot show through.
-            e.Graphics.Clear(BackColor);
-            int size = Math.Max(13, (int)Math.Round(13 * e.Graphics.DpiX / 96F));
-            var box = new Rectangle(0, (Height - size) / 2, size, size);
-            using (var fill = new SolidBrush(Enabled ? p.SurfaceAlt : p.DisabledSurface)) e.Graphics.FillRectangle(fill, box);
-            using (var border = new Pen(p.Border)) e.Graphics.DrawRectangle(border, box);
-            if (!Enabled)
-                using (var pen = new Pen(p.Danger, Math.Max(1.5F, size / 8F)))
-                {
-                    int inset = Math.Max(3, size / 4);
-                    e.Graphics.DrawLine(pen, box.Left + inset, box.Top + inset, box.Right - inset, box.Bottom - inset);
-                    e.Graphics.DrawLine(pen, box.Left + inset, box.Bottom - inset, box.Right - inset, box.Top + inset);
-                }
-            else if (Checked)
-                using (var pen = new Pen(Enabled ? p.Text : p.DisabledText, 2))
-                    e.Graphics.DrawLines(pen, new Point[] {
-                        new Point(box.Left + size / 5, box.Top + size / 2),
-                        new Point(box.Left + size * 2 / 5, box.Top + size * 3 / 4),
-                        new Point(box.Left + size * 4 / 5, box.Top + size / 4) });
-            var text = new Rectangle(size + 6, 0, Math.Max(0, Width - size - 6), Height);
-            TextRenderer.DrawText(e.Graphics, Text, Font, text, Enabled ? p.Text : p.DisabledText,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
-            if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, text, p.Text, BackColor);
-        }
-    }
-
-    internal sealed class RefreshToggle : CheckBox
-    {
-        public ThemePalette Palette;
-        public RefreshToggle()
-        {
-            AutoSize = false;
-            Cursor = Cursors.Hand;
-            AccessibleRole = AccessibleRole.CheckButton;
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        }
-        protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
+        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; Invalidate(); }
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; Invalidate(); }
         protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
         protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
         protected override void OnPaint(PaintEventArgs e)
@@ -157,18 +149,60 @@ namespace ServiceTool
             e.Graphics.Clear(BackColor);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             float scale = e.Graphics.DpiX / 96F;
-            int width = (int)Math.Round(32 * scale), height = (int)Math.Round(18 * scale);
+            int size = Math.Min((int)(20 * scale), Math.Max(1, Height - 4));
+            Rectangle box = new Rectangle(1, (Height - size) / 2, size, size);
+            Color fill = !Enabled ? p.DisabledSurface : (Checked ? p.Accent : p.Surface);
+            using (Brush brush = new SolidBrush(fill)) e.Graphics.FillEllipse(brush, box);
+            using (Pen pen = new Pen(Enabled && (Checked || Focused || hovered) ? p.Accent : p.Border, Math.Max(1, scale)))
+                e.Graphics.DrawEllipse(pen, box);
+            if (Checked)
+            {
+                int inset = Math.Max(3, size / 3);
+                using (Brush brush = new SolidBrush(Enabled ? p.AccentText : p.DisabledText))
+                    e.Graphics.FillEllipse(brush, Rectangle.Inflate(box, -inset, -inset));
+            }
+            Rectangle label = new Rectangle(box.Right + (int)(9 * scale), 0, Math.Max(0, Width - box.Right - (int)(9 * scale)), Height);
+            TextRenderer.DrawText(e.Graphics, Text, Font, label, Enabled ? p.Text : p.Muted,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            if (Enabled && Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, label, p.Text, BackColor);
+        }
+    }
+
+    internal sealed class RefreshToggle : CheckBox
+    {
+        public ThemePalette Palette;
+        private readonly BrandMotion motion;
+        public RefreshToggle()
+        {
+            motion = new BrandMotion(this);
+            AutoSize = false;
+            Cursor = Cursors.Hand;
+            AccessibleRole = AccessibleRole.CheckButton;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        }
+        protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); if (motion != null) motion.Move(Checked ? 1 : 0); Invalidate(); }
+        protected override void Dispose(bool disposing) { if (disposing) motion.Dispose(); base.Dispose(disposing); }
+        protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            ThemePalette p = Palette ?? ThemePalette.Create(false);
+            e.Graphics.Clear(BackColor);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            float scale = e.Graphics.DpiX / 96F;
+            int width = (int)Math.Round(42 * scale), height = (int)Math.Round(22 * scale);
             Rectangle track = new Rectangle(1, (Height - height) / 2, width, height);
             using (var shape = BrandButton.RoundRect(track, height / 2F))
-            using (var fill = new SolidBrush(Checked ? p.Accent : p.SurfaceAlt))
-            using (var edge = new Pen(p.Border))
+            using (var fill = new SolidBrush(!Enabled ? p.DisabledSurface : BrandMotion.Mix(p.Surface, p.Accent, motion.Value)))
+            using (var edge = new Pen(Enabled && (Checked || Focused) ? p.Accent : p.Border))
             { e.Graphics.FillPath(fill, shape); e.Graphics.DrawPath(edge, shape); }
             int inset = Math.Max(2, (int)(3 * scale)), diameter = height - 2 * inset;
-            using (var thumb = new SolidBrush(Checked ? p.AccentText : p.Muted))
-                e.Graphics.FillEllipse(thumb, Checked ? track.Right - inset - diameter : track.Left + inset,
+            using (var thumb = new SolidBrush(!Enabled ? p.DisabledText : BrandMotion.Mix(p.Muted, Color.White, motion.Value)))
+                e.Graphics.FillEllipse(thumb, track.Left + inset + (track.Width - inset * 2 - diameter) * motion.Value,
                     track.Top + inset, diameter, diameter);
             TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(track.Right + (int)(8 * scale), 0,
-                Math.Max(1, Width - track.Right - (int)(8 * scale)), Height), p.Text,
+                Math.Max(1, Width - track.Right - (int)(8 * scale)), Height), Enabled ? p.Text : p.DisabledText,
                 TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
             if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle, p.Text, BackColor);
         }
@@ -178,10 +212,11 @@ namespace ServiceTool
     {
         public ThemePalette Palette;
         public bool Dark;
-        private bool hovered;
+        private readonly BrandMotion hoverMotion, pressMotion;
 
         public ThemeToggleButton()
         {
+            hoverMotion = new BrandMotion(this); pressMotion = new BrandMotion(this);
             Text = String.Empty;
             AccessibleRole = AccessibleRole.PushButton;
             Cursor = Cursors.Hand;
@@ -191,11 +226,17 @@ namespace ServiceTool
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         }
 
-        protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovered = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseEnter(EventArgs e) { hoverMotion.Move(1); Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hoverMotion.Move(0); pressMotion.Move(0); Invalidate(); base.OnMouseLeave(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
         protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
 
+        protected override void Dispose(bool disposing) { if (disposing) { hoverMotion.Dispose(); pressMotion.Dispose(); } base.Dispose(disposing); }
+        protected override void OnMouseDown(MouseEventArgs e) { if (Enabled && e.Button == MouseButtons.Left) pressMotion.Move(1); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { pressMotion.Move(0); base.OnMouseUp(e); }
+        protected override void OnMouseCaptureChanged(EventArgs e) { if (!Capture) pressMotion.Move(0); base.OnMouseCaptureChanged(e); }
+        protected override void OnKeyDown(KeyEventArgs e) { if (Enabled && e.KeyCode == Keys.Space) pressMotion.Move(1); base.OnKeyDown(e); }
+        protected override void OnKeyUp(KeyEventArgs e) { if (e.KeyCode == Keys.Space) pressMotion.Move(0); base.OnKeyUp(e); }
         protected override void OnPaint(PaintEventArgs e)
         {
             ThemePalette p = Palette ?? ThemePalette.Create(false);
@@ -203,7 +244,8 @@ namespace ServiceTool
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             float scale = e.Graphics.DpiX / 96F;
             Rectangle bounds = new Rectangle(1, 1, Math.Max(2, Width - 3), Math.Max(2, Height - 3));
-            Color track = hovered ? p.Selection : p.SurfaceAlt;
+            Color track = BrandMotion.Mix(p.SurfaceAlt, p.Selection, hoverMotion.Value);
+            if (Enabled) track = BrandMotion.Mix(track, Color.Black, .12F * pressMotion.Value);
             using (GraphicsPath path = BrandButton.RoundRect(bounds, bounds.Height / 2F))
             using (Brush fill = new SolidBrush(track))
             using (Pen edge = new Pen(p.Border))
@@ -249,7 +291,7 @@ namespace ServiceTool
         public ThemePalette Palette;
         public bool Primary, Destructive;
         public bool Selected { get; set; }
-        private bool hovered;
+        private readonly BrandMotion hoverMotion, pressMotion;
         private Font boldFont;
         private Bitmap surface;
         private Color surfaceFill, surfaceEdge, surfaceBackground;
@@ -257,6 +299,7 @@ namespace ServiceTool
 
         public BrandButton()
         {
+            hoverMotion = new BrandMotion(this); pressMotion = new BrandMotion(this);
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
@@ -278,16 +321,22 @@ namespace ServiceTool
 
         protected override void Dispose(bool disposing)
         {
+            if (disposing) { hoverMotion.Dispose(); pressMotion.Dispose(); }
             base.Dispose(disposing);
             if (disposing && boldFont != null) { boldFont.Dispose(); boldFont = null; }
             if (disposing && surface != null) { surface.Dispose(); surface = null; }
         }
 
-        protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovered = false; Invalidate(); base.OnMouseLeave(e); }
-        protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
+        protected override void OnMouseEnter(EventArgs e) { hoverMotion.Move(1); Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hoverMotion.Move(0); pressMotion.Move(0); Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnEnabledChanged(EventArgs e) { if (!Enabled) { hoverMotion.Move(0); pressMotion.Move(0); } Invalidate(); base.OnEnabledChanged(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
-        protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+        protected override void OnLostFocus(EventArgs e) { pressMotion.Move(0); Invalidate(); base.OnLostFocus(e); }
+        protected override void OnMouseDown(MouseEventArgs e) { if (e.Button == MouseButtons.Left && Enabled) pressMotion.Move(1); base.OnMouseDown(e); }
+        protected override void OnMouseUp(MouseEventArgs e) { pressMotion.Move(0); base.OnMouseUp(e); }
+        protected override void OnMouseCaptureChanged(EventArgs e) { if (!Capture) pressMotion.Move(0); base.OnMouseCaptureChanged(e); }
+        protected override void OnKeyDown(KeyEventArgs e) { if (e.KeyCode == Keys.Space && Enabled) pressMotion.Move(1); base.OnKeyDown(e); }
+        protected override void OnKeyUp(KeyEventArgs e) { if (e.KeyCode == Keys.Space) pressMotion.Move(0); base.OnKeyUp(e); }
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -301,12 +350,18 @@ namespace ServiceTool
                 text = p.AccentText;
                 edge = fill;
             }
-            if (hovered && Enabled) fill = Blend(fill, p.Text, 0.07F);
+            if (Enabled)
+            {
+                fill = Blend(fill, Color.White, .05F * hoverMotion.Value);
+                fill = Blend(fill, Color.Black, .20F * pressMotion.Value);
+                if (Primary || Selected || !p.Dark) edge = fill;
+            }
             Rectangle bounds = new Rectangle(1, 1, Math.Max(1, Width - 2), Math.Max(1, Height - 2));
             Color background = Parent == null ? p.Canvas : Parent.BackColor;
             EnsureSurface(fill, edge, background, e.Graphics.DpiX);
             e.Graphics.DrawImageUnscaled(surface, 0, 0);
-            Rectangle textBounds = new Rectangle(8, 3, Math.Max(1, Width - 16), Math.Max(1, Height - 6));
+            int offset = (int)Math.Round(pressMotion.Value * 2 * e.Graphics.DpiX / 96F);
+            Rectangle textBounds = new Rectangle(8, 3 + offset, Math.Max(1, Width - 16), Math.Max(1, Height - 6));
             TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, text,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
             if (Focused && ShowFocusCues)
@@ -321,7 +376,7 @@ namespace ServiceTool
             int width = Math.Max(1, Width), height = Math.Max(1, Height);
             var outer = new Rectangle(1, 1, Math.Max(0, width - 2), Math.Max(0, height - 2));
             var inner = Rectangle.Inflate(outer, -1, -1);
-            float radius = Math.Min(10F * dpi / 96F, Math.Min(outer.Width, outer.Height) / 2F);
+            float radius = Math.Min(6F * dpi / 96F, Math.Min(outer.Width, outer.Height) / 2F);
             int[] pixels = new int[width * height];
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
@@ -382,8 +437,37 @@ namespace ServiceTool
 
 namespace ServiceTool
 {
-    // Keeps the native ComboBox keyboard and popup behavior while painting its
-    // closed-state border and arrow in the same palette as owner-drawn items.
+    // Retain the native edit behavior, selection and password masking; paint only its border.
+    internal sealed class BrandTextBox : TextBox
+    {
+        public ThemePalette Palette;
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetWindowDC(IntPtr handle);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr handle, IntPtr dc);
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); PaintBorder(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); PaintBorder(); }
+        protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
+        protected override void WndProc(ref Message message)
+        {
+            base.WndProc(ref message);
+            if (message.Msg == 0x000F || message.Msg == 0x0085 || message.Msg == 0x0317 || message.Msg == 0x0318) PaintBorder();
+        }
+        private void PaintBorder()
+        {
+            if (!IsHandleCreated || IsDisposed || BorderStyle != BorderStyle.FixedSingle) return;
+            ThemePalette p = Palette ?? ThemePalette.Create(false);
+            IntPtr dc = GetWindowDC(Handle);
+            if (dc == IntPtr.Zero) return;
+            try
+            {
+                using (Graphics graphics = Graphics.FromHdc(dc))
+                using (Pen edge = new Pen(Enabled && Focused ? p.Accent : p.Border))
+                    graphics.DrawRectangle(edge, 0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
+            }
+            finally { ReleaseDC(Handle, dc); }
+        }
+    }
+
+    // Keep the native popup and keyboard behavior with a palette-aware border.
     internal sealed class BrandComboBox : ComboBox
     {
         public ThemePalette Palette;

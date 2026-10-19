@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
@@ -218,7 +218,7 @@ namespace ServiceTool
         }
 
         private ThemePalette CurrentPalette { get { return palette ?? ThemePalette.Create(false); } }
-        private float DpiScale { get { return DeviceDpi / 96F; } }
+        private float DpiScale { get { using (Graphics graphics = CreateGraphics()) return graphics.DpiX / 96F; } }
 
         internal Rectangle TrackBounds
         {

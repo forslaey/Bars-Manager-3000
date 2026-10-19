@@ -176,61 +176,8 @@ namespace ServiceTool
 
     // Native disabled CheckBox text can ignore ForeColor and become black in a dark theme.
     // Retain CheckBox interaction/accessibility and paint every state with the current palette.
-    internal sealed class LogDateCheckBox : CheckBox
+    internal sealed class LogDateCheckBox : BrandCheckBox
     {
-        internal ThemePalette Palette;
-        private bool hovered;
-
-        internal LogDateCheckBox()
-        {
-            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        }
-
-        protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
-        protected override void OnCheckedChanged(EventArgs e) { base.OnCheckedChanged(e); Invalidate(); }
-        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; Invalidate(); }
-        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; Invalidate(); }
-        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
-        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
         protected override void OnClick(EventArgs e) { if (Enabled) base.OnClick(e); }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            ThemePalette p = Palette ?? ThemePalette.Create(false);
-            e.Graphics.Clear(BackColor);
-            float scale = e.Graphics.DpiX / 96F;
-            int edge = Math.Max(12, (int)Math.Round(14F * scale));
-            edge = Math.Min(edge, Math.Max(1, ClientSize.Height - 4));
-            Rectangle box = new Rectangle(1, (ClientSize.Height - edge) / 2, edge, edge);
-            Color text = Enabled ? p.Text : p.Muted;
-            Color fill = Checked ? (Enabled ? p.Accent : p.Selection) : p.SurfaceAlt;
-            Color border = Enabled && (hovered || Focused) ? p.Accent : p.Muted;
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using (var path = BrandButton.RoundRect(box, 2F * scale))
-            using (Brush brush = new SolidBrush(fill))
-            using (Pen pen = new Pen(border, Math.Max(1F, scale)))
-            {
-                e.Graphics.FillPath(brush, path);
-                e.Graphics.DrawPath(pen, path);
-            }
-            if (Checked)
-            {
-                using (Pen pen = new Pen(Enabled ? p.AccentText : p.SelectionText, Math.Max(1.5F, 1.7F * scale)))
-                {
-                    pen.StartCap = pen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
-                    e.Graphics.DrawLines(pen, new PointF[] {
-                        new PointF(box.Left + edge * .23F, box.Top + edge * .51F),
-                        new PointF(box.Left + edge * .43F, box.Top + edge * .71F),
-                        new PointF(box.Left + edge * .78F, box.Top + edge * .29F) });
-                }
-            }
-            int left = box.Right + (int)Math.Round(8F * scale);
-            Rectangle label = new Rectangle(left, 0, Math.Max(0, ClientSize.Width - left), ClientSize.Height);
-            TextRenderer.DrawText(e.Graphics, Text, Font, label, text,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-            if (Enabled && Focused && ShowFocusCues)
-                ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(label, -1, -2), p.Text, BackColor);
-        }
     }
 }

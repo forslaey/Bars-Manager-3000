@@ -1,4 +1,4 @@
-﻿param([string] $BuildDirectory, [switch] $Sign)
+﻿param([string] $BuildDirectory, [switch] $Sign, [string] $ReferenceAssemblies)
 $ErrorActionPreference = 'Stop'
 $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $taskCompiler)) {
@@ -15,7 +15,7 @@ $taskBuild = if ([String]::IsNullOrWhiteSpace($BuildDirectory)) {
 }
 New-Item -ItemType Directory -Path $taskBuild -Force | Out-Null
 $taskPackage = Join-Path $taskBuild 'package'
-& (Join-Path $PSScriptRoot 'Build.ps1') -OutputDirectory $taskPackage -Sign:$Sign
+& (Join-Path $PSScriptRoot 'Build.ps1') -OutputDirectory $taskPackage -Sign:$Sign -ReferenceAssemblies $ReferenceAssemblies
 $taskPackageAssembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $taskPackage 'Bars Service Manager 3000.exe')))
 foreach ($taskArchitecture in @('x86','x64')) {
     $taskResource = $taskPackageAssembly.GetManifestResourceStream("BARS.Helper.$taskArchitecture")
@@ -43,8 +43,14 @@ $taskUiSources += Join-Path $taskSource 'EmbeddedHelpers.cs'
 $taskUiSources += Join-Path $taskSource 'AssemblyInfo.cs'
 $taskUiSources += Join-Path $taskSource 'ApplicationStorage.cs'
 $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
+$taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs') | ForEach-Object { Join-Path $taskSource $_ }
 Invoke-TaskTests 'UiTests' 'ServiceTool.UiTests' ($taskUiSources + (Join-Path $taskTests 'UiTests.cs'))
 Invoke-TaskTests 'ThemeTests' 'ServiceTool.ThemeTests' ($taskUiSources + (Join-Path $taskTests 'ThemeTests.cs'))
+Invoke-TaskTests 'BrandInteractionTests' 'ServiceTool.BrandInteractionTests' ($taskUiSources + (Join-Path $taskTests 'BrandInteractionTests.cs'))
+Invoke-TaskTests 'LibraryManagerTests' 'ServiceTool.LibraryManagerTests' ($taskUiSources + (Join-Path $taskTests 'LibraryManagerTests.cs'))
+Invoke-TaskTests 'UiPolishTests' 'ServiceTool.UiPolishTests' ($taskUiSources + (Join-Path $taskTests 'UiPolishTests.cs'))
+Invoke-TaskTests 'LibraryMaintenanceTests' 'ServiceTool.LibraryMaintenanceTests' ($taskUiSources + (Join-Path $taskTests 'LibraryMaintenanceTests.cs'))
+Invoke-TaskTests 'LibraryCancellationTests' 'ServiceTool.LibraryCancellationTests' ($taskUiSources + (Join-Path $taskTests 'LibraryCancellationTests.cs'))
 Invoke-TaskTests 'ManagedCatalogUiTests' 'ServiceTool.ManagedCatalogUiTests' ($taskUiSources + (Join-Path $taskTests 'ManagedCatalogUiTests.cs'))
 Invoke-TaskTests 'JournalScrollTests' 'ServiceTool.JournalScrollTests' ($taskUiSources + (Join-Path $taskTests 'JournalScrollTests.cs'))
 Invoke-TaskTests 'LogArchiveTests' 'ServiceTool.LogArchiveTests' @((Join-Path $taskSource 'ServiceLogArchive.cs'), (Join-Path $taskTests 'LogArchiveTests.cs'))

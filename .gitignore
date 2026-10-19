@@ -1,4 +1,4 @@
-# Generated files and local settings
+﻿# Generated files and local settings
 bin/
 obj/
 work/
@@ -23,3 +23,12 @@ signing.json
 *.p12
 *.key
 *.snk
+
+# Local installer payloads and catalog cache
+Библиотеки/
+library-catalog.xml
+library-source.txt
+LibraryReports/
+
+# Approved portable unsigned release
+!releases/v2.1.0/Bars Manager 3000.exe

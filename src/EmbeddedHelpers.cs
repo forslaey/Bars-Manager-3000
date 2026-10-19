@@ -18,7 +18,7 @@ namespace ServiceTool
         private static FileStream owner;
         // Installing a user-selected assembly already executes its installer with full trust.
         // Scope web-origin assembly loading to this private helper, without removing file zone marks.
-        private const string Configuration = "<?xml version=\"1.0\" encoding=\"utf-8\"?><configuration><startup useLegacyV2RuntimeActivationPolicy=\"true\"><supportedRuntime version=\"v4.0\" sku=\".NETFramework,Version=v4.8\"/></startup><runtime><loadFromRemoteSources enabled=\"true\"/></runtime></configuration>";
+        private const string Configuration = "<?xml version=\"1.0\" encoding=\"utf-8\"?><configuration><startup useLegacyV2RuntimeActivationPolicy=\"true\"><supportedRuntime version=\"v4.0\" sku=\".NETFramework,Version=v4.6\"/></startup><runtime><loadFromRemoteSources enabled=\"true\"/></runtime></configuration>";
 
         internal static string Prepare(string architecture)
         {

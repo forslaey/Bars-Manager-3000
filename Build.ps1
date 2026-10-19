@@ -1,9 +1,9 @@
-﻿param([string] $OutputDirectory = $PSScriptRoot, [switch] $Sign, [string] $CertificateThumbprint, [string] $TimestampServer = 'http://timestamp.digicert.com')
+﻿param([string] $OutputDirectory = $PSScriptRoot, [switch] $Sign, [string] $CertificateThumbprint, [string] $TimestampServer = 'http://timestamp.digicert.com', [string] $ReferenceAssemblies)
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) { $OutputDirectory = $PSScriptRoot }
 $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $taskCompiler)) { $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
-if (-not (Test-Path -LiteralPath $taskCompiler)) { throw 'Не найден компилятор .NET Framework. Нужен .NET Framework 4.8.' }
+if (-not (Test-Path -LiteralPath $taskCompiler)) { throw 'Не найден компилятор .NET Framework. Нужен компилятор .NET Framework 4.x.' }
 $taskSource = Join-Path $PSScriptRoot 'src'
 $taskAssets = Join-Path $PSScriptRoot 'assets'
 $taskOutput = [IO.Path]::GetFullPath($OutputDirectory)
@@ -12,7 +12,11 @@ $taskBuild = Join-Path ([IO.Path]::GetTempPath()) ('bars-build-' + [Guid]::NewGu
 New-Item -ItemType Directory -Path $taskBuild | Out-Null
 $taskReferences = @('System.dll','System.Core.dll','System.Xml.dll','System.Drawing.dll','System.Windows.Forms.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll','System.Configuration.Install.dll','System.ServiceProcess.dll','System.Security.dll')
 $taskCommon = @('/nologo','/target:winexe','/optimize+','/utf8output','/codepage:65001', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/win32icon:$(Join-Path $taskAssets 'Bars.ico')")
-$taskCommon += @($taskReferences | ForEach-Object { '/reference:' + $_ })
+if ([String]::IsNullOrWhiteSpace($ReferenceAssemblies)) { $ReferenceAssemblies = & (Join-Path $PSScriptRoot 'tools\Prepare-References.ps1') }
+$taskReferenceRoot = [IO.Path]::GetFullPath($ReferenceAssemblies)
+if (-not (Test-Path -LiteralPath (Join-Path $taskReferenceRoot 'mscorlib.dll'))) { throw 'Нет reference assemblies .NET Framework 4.6.' }
+$taskCommon += @('/noconfig','/nostdlib+',('/reference:' + (Join-Path $taskReferenceRoot 'mscorlib.dll')))
+$taskCommon += @($taskReferences | ForEach-Object { '/reference:' + (Join-Path $taskReferenceRoot $_) })
 try {
     $taskHelperSources = @('ServiceCore.cs','ServiceInstallProfile.cs','ServiceProfileInstaller.cs','WindowsAccountInfo.cs','EmbeddedHelpers.cs','ApplicationStorage.cs','AssemblyInfo.cs','Helpers\HelperProgram.cs') | ForEach-Object { Join-Path $taskSource $_ }
     foreach ($taskArchitecture in @('x86','x64')) {

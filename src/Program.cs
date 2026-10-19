@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -19,6 +19,7 @@ namespace ServiceTool
         [STAThread]
         private static int Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--library-worker") return LibrarySession.RunWorker(args);
             if (args.Length > 0 && args[0] == "--cleanup-helpers")
                 return args.Length == 2 ? EmbeddedHelpers.RunCleanupWatcher(args[1]) : 87;
             EmbeddedHelpers.CleanupStale();
@@ -48,8 +49,24 @@ namespace ServiceTool
                     }
                     return 0;
                 }
+                if ((args.Length == 2 || args.Length == 3) && (args[0] == "--preview-hub" || args[0] == "--preview-libraries"))
+                {
+                    using (ManagerModuleForm form = args[0] == "--preview-hub" ? (ManagerModuleForm)new ManagerHub() : new LibraryManagerForm(true))
+                    {
+                        form.SetTheme(args.Length == 3 && args[2] == "dark", false); form.ShowInTaskbar = false;
+                        form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-20000, -20000); form.Show(); Application.DoEvents();
+                        using (Bitmap bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.GetFullPath(args[1]), System.Drawing.Imaging.ImageFormat.Png); }
+                        form.Close();
+                    }
+                    return 0;
+                }
                 ApplicationStorage.MigrateLegacy();
-                Application.Run(new MainForm(args.Length == 1 ? args[0] : null, false));
+                if (args.Length == 1 && (args[0] == "--services" || File.Exists(args[0])))
+                {
+                    using (var services = new MainForm(args[0] == "--services" ? null : args[0], false))
+                    { Application.Run(services); if (services.MenuRequested) Application.Run(new ManagerHub()); }
+                }
+                else Application.Run(new ManagerHub());
                 return 0;
             }
             catch (Exception ex)
@@ -76,7 +93,8 @@ namespace ServiceTool
         {
             base.OnPaint(e);
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            e.Graphics.Clear(Parent == null ? BackColor : Parent.BackColor);
+            using (var background = new SolidBrush(Parent == null ? BackColor : Parent.BackColor))
+                e.Graphics.FillRectangle(background, e.ClipRectangle);
             using (var path = BrandButton.RoundRect(new Rectangle(1, 1, Math.Max(1, Width - 3), Math.Max(1, Height - 3)), 10F * e.Graphics.DpiX / 96F))
             using (Pen pen = new Pen(BorderColor))
             using (Brush brush = new SolidBrush(BackColor))
@@ -89,12 +107,14 @@ namespace ServiceTool
 
     internal sealed class MainForm : Form
     {
+        internal bool MenuRequested { get; private set; }
         [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
         [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
         private readonly Color ink = Color.FromArgb(26, 39, 60);
         private readonly Color muted = Color.FromArgb(91, 107, 128);
         private readonly Color blue = Color.FromArgb(37, 99, 235);
-        private readonly TextBox pathBox = new TextBox();
+        private readonly Font serviceHeaderFont = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+        private readonly TextBox pathBox = new BrandTextBox();
         private readonly Label fileTitle = new FlushLabel();
         private readonly Label statusTitle = new FlushLabel();
         private readonly Label statusDetail = new FlushLabel();
@@ -166,6 +186,7 @@ namespace ServiceTool
                 toolTips.Dispose();
             }
             base.Dispose(disposing);
+            if (disposing) serviceHeaderFont.Dispose();
         }
 
         public MainForm(string initialPath, bool previewMode)
@@ -206,7 +227,7 @@ namespace ServiceTool
 
             TableLayoutPanel layout = new BufferedLayoutPanel();
             layout.Dock = DockStyle.Fill;
-            layout.MinimumSize = new Size(940, 750);
+            layout.MinimumSize = new Size(940, 700);
             layout.Padding = new Padding(26, 12, 26, 12);
             layout.ColumnCount = 1;
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -307,8 +328,8 @@ namespace ServiceTool
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             registered.Controls.Add(serviceLayout);
             TableLayoutPanel statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
-            statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 80));
-            statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
+            statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 240));
             statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             statusTitle.Text = "Службы BARS";
@@ -327,7 +348,7 @@ namespace ServiceTool
             statusLayout.Controls.Add(statusTitle, 0, 0);
             statusLayout.Controls.Add(statusDetail, 0, 1);
             statusLayout.SetColumnSpan(statusDetail, 2);
-            autoRefreshToggle.Text = "Автообновление · 10 с";
+            autoRefreshToggle.Text = "Проверять каждый 10с.";
             autoRefreshToggle.AccessibleName = "Автообновление каждые 10 секунд";
             autoRefreshToggle.AccessibleDescription = "По умолчанию включено; обновление каждые 10 секунд";
             autoRefreshToggle.Checked = true;
@@ -335,10 +356,22 @@ namespace ServiceTool
             autoRefreshToggle.Anchor = AnchorStyles.None;
             autoRefreshToggle.Margin = Padding.Empty;
             autoRefreshToggle.Font = new Font("Segoe UI", 8.5F);
-            autoRefreshToggle.Size = new Size(40 + TextRenderer.MeasureText(autoRefreshToggle.Text, autoRefreshToggle.Font,
+            autoRefreshToggle.Size = new Size(54 + TextRenderer.MeasureText(autoRefreshToggle.Text, autoRefreshToggle.Font,
                 new Size(Int32.MaxValue, Int32.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width, 28);
             autoRefreshToggle.CheckedChanged += delegate { UpdateRefreshTimer(); UpdateRefreshActivity(); };
             statusLayout.Controls.Add(autoRefreshToggle, 1, 0);
+            statusLayout.Layout += delegate
+            {
+                using (Graphics graphics = autoRefreshToggle.CreateGraphics())
+                {
+                    int textWidth = TextRenderer.MeasureText(graphics, autoRefreshToggle.Text, autoRefreshToggle.Font,
+                        Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+                    int desired = (int)Math.Ceiling(54 * graphics.DpiX / 96F) + textWidth;
+                    int available = statusLayout.GetColumnWidths()[1];
+                    int width = Math.Max(1, Math.Min(desired, available));
+                    if (autoRefreshToggle.Width != width) autoRefreshToggle.Width = width;
+                }
+            };
             serviceLayout.Controls.Add(statusLayout, 0, 0);
 
             Panel actions = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty, Padding = new Padding(0, 7, 0, 7) };
@@ -370,6 +403,14 @@ namespace ServiceTool
             actionButtons.Controls.Add(installProfileButton, 2, 0);
             actionButtons.Controls.Add(refreshButton, 3, 0);
             actionButtons.Controls.Add(servicesButton, 4, 0);
+            // Match the right header slot to the actual last action column, including DPI rounding.
+            EventHandler alignRefresh = delegate
+            {
+                if (servicesButton.Width > 0 && statusLayout.ColumnStyles[1].Width != servicesButton.Width)
+                    statusLayout.ColumnStyles[1].Width = servicesButton.Width;
+            };
+            servicesButton.SizeChanged += alignRefresh;
+            actionButtons.Layout += delegate { alignRefresh(null, EventArgs.Empty); };
             actions.Controls.Add(actionButtons);
             serviceLayout.Controls.Add(actions, 0, 2);
             hint.Dock = DockStyle.Fill;
@@ -401,9 +442,10 @@ namespace ServiceTool
             servicesGrid.RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.DisableResizing;
             servicesGrid.ColumnHeadersHeight = 42;
             servicesGrid.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
-            servicesGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            servicesGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            servicesGrid.ColumnHeadersDefaultCellStyle.Font = serviceHeaderFont;
             servicesGrid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
-            servicesGrid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            servicesGrid.CellBorderStyle = DataGridViewCellBorderStyle.Single;
             servicesGrid.EnableHeadersVisualStyles = false;
             servicesGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(237, 242, 249);
             servicesGrid.ColumnHeadersDefaultCellStyle.ForeColor = ink;
@@ -458,10 +500,10 @@ namespace ServiceTool
             management.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 135));
             management.RowStyles.Add(new RowStyle(SizeType.Absolute, 20));
             management.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            Label managementLabel = new FlushLabel { Text = "Действия для выбранной службы", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(20, 0, 0, 0) };
+            Label managementLabel = new FlushLabel { Text = "Действия для выбранной службы", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(12, 0, 0, 0) };
             management.Controls.Add(managementLabel, 0, 0);
             management.SetColumnSpan(managementLabel, 3);
-            Label startupLabel = new FlushLabel { Text = "Режим запуска", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(8, 0, 0, 0) };
+            Label startupLabel = new FlushLabel { Text = "Режим запуска", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(12, 0, 0, 0) };
             management.Controls.Add(startupLabel, 3, 0);
             startButton = MakeButton("Запустить", false);
             stopButton = MakeButton("Остановить", false);
@@ -528,20 +570,25 @@ namespace ServiceTool
             activity.Tag = "muted";
             activity.ForeColor = muted;
             activity.Text = "Локальный компьютер • автообновление: 10 с";
-            TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0, 14, 0, 0) };
+            TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(activity, 0, 0);
             aboutButton = MakeButton("О программе", false);
-            aboutButton.Font = new Font("Segoe UI", 8.5F);
+            aboutButton.Font = new Font("Segoe UI", 10F);
             aboutButton.Dock = DockStyle.Fill;
-            aboutButton.Margin = new Padding(0);
+            aboutButton.Margin = new Padding(0, 0, 10, 0);
             aboutButton.Click += delegate
             {
                 using (AboutDialog dialog = new AboutDialog(palette, Icon)) dialog.ShowDialog(this);
             };
             footer.Controls.Add(aboutButton, 1, 0);
+            Button menuButton = MakeButton("В меню", false);
+            menuButton.Dock = DockStyle.Fill; menuButton.Margin = Padding.Empty;
+            menuButton.Click += delegate { MenuRequested = true; Close(); if (Visible) MenuRequested = false; };
+            footer.Controls.Add(menuButton, 2, 0);
             layout.Controls.Add(footer, 0, 4);
 
             timer.Interval = 10000;
@@ -674,6 +721,8 @@ namespace ServiceTool
                 button.BackColor = button.Primary || button.Selected ? palette.Accent : background;
                 button.ForeColor = button.Primary || button.Selected ? palette.AccentText : palette.Text;
             }
+            BrandTextBox input = control as BrandTextBox;
+            if (input != null) input.Palette = palette;
             if (control == pathBox) control.BackColor = palette.SurfaceAlt;
             foreach (Control child in control.Controls) ApplyThemeTree(child, background);
         }

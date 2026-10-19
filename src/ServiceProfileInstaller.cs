@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.ComponentModel;
 using System.Configuration.Install;
@@ -239,7 +239,7 @@ namespace ServiceTool
             finally { Array.Clear(bytes, 0, bytes.Length); }
         }
 
-        private static byte[] ReadFrame(PipeStream pipe, int milliseconds)
+        internal static byte[] ReadFrame(PipeStream pipe, int milliseconds)
         {
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(milliseconds);
             byte[] size = new byte[4]; ReadExact(pipe, size, deadline);
@@ -267,7 +267,7 @@ namespace ServiceTool
             }
         }
 
-        private static void WriteFrame(PipeStream pipe, byte[] bytes, int milliseconds)
+        internal static void WriteFrame(PipeStream pipe, byte[] bytes, int milliseconds)
         {
             if (bytes.Length > MaxMessageBytes) throw new InvalidDataException("Слишком большое сообщение установщика.");
             byte[] frame = new byte[bytes.Length + 4];
