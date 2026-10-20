@@ -1,4 +1,4 @@
-﻿param([string] $BuildDirectory, [switch] $Sign, [string] $ReferenceAssemblies)
+﻿param([string] $BuildDirectory, [switch] $Sign, [string] $ReferenceAssemblies, [switch] $UtilitySmoke)
 $ErrorActionPreference = 'Stop'
 $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $taskCompiler)) {
@@ -43,7 +43,9 @@ $taskUiSources += Join-Path $taskSource 'EmbeddedHelpers.cs'
 $taskUiSources += Join-Path $taskSource 'AssemblyInfo.cs'
 $taskUiSources += Join-Path $taskSource 'ApplicationStorage.cs'
 $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
-$taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs') | ForEach-Object { Join-Path $taskSource $_ }
+$taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs') | ForEach-Object { Join-Path $taskSource $_ }
+Invoke-TaskTests 'UtilityModuleTests' 'ServiceTool.UtilityModuleTests' ($taskUiSources + (Join-Path $taskTests 'UtilityModuleTests.cs'))
+if ($UtilitySmoke) { Invoke-TaskTests 'UtilitySmokeTests' 'ServiceTool.UtilitySmokeTests' ($taskUiSources + (Join-Path $taskTests 'UtilitySmokeTests.cs')) }
 Invoke-TaskTests 'UiTests' 'ServiceTool.UiTests' ($taskUiSources + (Join-Path $taskTests 'UiTests.cs'))
 Invoke-TaskTests 'ThemeTests' 'ServiceTool.ThemeTests' ($taskUiSources + (Join-Path $taskTests 'ThemeTests.cs'))
 Invoke-TaskTests 'BrandInteractionTests' 'ServiceTool.BrandInteractionTests' ($taskUiSources + (Join-Path $taskTests 'BrandInteractionTests.cs'))

@@ -81,6 +81,7 @@ namespace ServiceTool
                     int error = Marshal.GetLastWin32Error();
                     throw new Win32Exception(error, "Не удалось запустить " + start.FileName + "; Win32 " + error + ": " + new Win32Exception(error).Message + "; рабочая папка: " + (String.IsNullOrWhiteSpace(start.WorkingDirectory) ? "наследуется от менеджера" : start.WorkingDirectory));
                 }
+                InstallerRebootGuard.Apply(process.Process);
                 if (!AssignProcessToJobObject(job, process.Process)) throw new Win32Exception(Marshal.GetLastWin32Error(), "Не удалось организовать контроль дочерних процессов. Установка не запускалась.");
                 if (ResumeThread(process.Thread) == UInt32.MaxValue) throw new Win32Exception(Marshal.GetLastWin32Error());
                 resumed = true;
@@ -212,6 +213,17 @@ namespace ServiceTool
             if (!Enum.IsDefined(typeof(LibraryOperation), operation)) throw new ArgumentException("Неизвестная операция");
             if (cancelSignal.WaitOne(0)) throw new OperationCanceledException("Очередь отменена до запуска следующего компонента");
             Send(pipe, operation.ToString().ToLowerInvariant(), LibraryCatalog.Serialize(package), root ?? "");
+            return Receive(progress);
+        }
+        internal LibraryInstallResult ExecuteSystem(string action, string data, string path, Action<string> progress)
+        {
+            if (!ManagerSystemActions.Known(action)) throw new InvalidDataException("Неизвестное действие");
+            if (cancelSignal.WaitOne(0)) throw new OperationCanceledException();
+            Send(pipe, action, data ?? "", path ?? "");
+            return Receive(progress);
+        }
+        private LibraryInstallResult Receive(Action<string> progress)
+        {
             while (true)
             {
                 string[] response = ReadMessage(pipe, 5);
@@ -247,16 +259,17 @@ namespace ServiceTool
                     {
                         string[] request = ReadMessage(pipe, 3);
                         if (request[0] == "close") return 0;
-                        LibraryOperation operation;
-                        if (!Enum.TryParse<LibraryOperation>(request[0], true, out operation) || !Enum.IsDefined(typeof(LibraryOperation), operation)) return 87;
-                        LibraryPackage package = LibraryCatalog.Deserialize(request[1]);
+                        LibraryOperation operation = LibraryOperation.Install;
+                        bool system = ManagerSystemActions.Known(request[0]);
+                        if (!system && (!Enum.TryParse<LibraryOperation>(request[0], true, out operation) || !Enum.IsDefined(typeof(LibraryOperation), operation))) return 87;
+                        LibraryPackage package = system ? new LibraryPackage { Id = "system", Name = request[0] } : LibraryCatalog.Deserialize(request[1]);
                         int connected = 1;
                         Action<string> progress = text => { if (Volatile.Read(ref connected) == 1) try { Send(pipe, "progress", "", text, "", ""); } catch (IOException) { Interlocked.Exchange(ref connected, 0); } catch (TimeoutException) { Interlocked.Exchange(ref connected, 0); } };
                         LibraryCancellation.Current = () => cancel.WaitOne(0) || owner.HasExited || Volatile.Read(ref connected) == 0;
                         LibraryInstallResult result;
                         using (var heartbeat = new LibraryHeartbeat(progress, 1000))
                         {
-                            try { result = InstallVerified(package, request[2], pipeName.Substring(13), heartbeat.SetPhase, () => Volatile.Read(ref connected) == 1, operation); }
+                            try { result = system ? ManagerSystemActions.Execute(request[0], request[1], request[2], heartbeat.SetPhase) : InstallVerified(package, request[2], pipeName.Substring(13), heartbeat.SetPhase, () => Volatile.Read(ref connected) == 1, operation); }
                             catch (Exception ex)
                             {
                                 string failure = "";

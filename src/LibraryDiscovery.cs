@@ -76,7 +76,7 @@ namespace ServiceTool
                 try { files = Directory.GetFiles(directory); children = Directory.GetDirectories(directory); }
                 catch (UnauthorizedAccessException) { progress("Каталог недоступен: " + directory); continue; }
                 catch (IOException) { progress("Каталог недоступен: " + directory); continue; }
-                foreach (string child in children) if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) pending.Push(child);
+                foreach (string child in children) if (!Path.GetFileName(child).Equals("_tools", StringComparison.OrdinalIgnoreCase) && (File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) pending.Push(child);
                 foreach (string file in files)
                 {
                     if (++count > 4096) throw new InvalidDataException("В папке больше 4096 файлов. Выбери непосредственно папку библиотек.");

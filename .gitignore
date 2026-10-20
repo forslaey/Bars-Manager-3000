@@ -32,3 +32,6 @@ LibraryReports/
 
 # Approved portable unsigned release
 !releases/v2.1.0/Bars Manager 3000.exe
+
+# User-requested preview of the four-module manager
+!releases/v2.2.0/Bars Manager 3000.exe

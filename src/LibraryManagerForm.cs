@@ -31,6 +31,8 @@ namespace ServiceTool
         private LibrarySession activeSession;
         private volatile bool cancelRequested;
         private bool closeAfterCancel;
+        private bool rebootRequired, pendingRestart;
+        private readonly BrandButton restart;
         private Func<bool, DialogResult> confirmCancellation = null;
         internal const string CancelWarning = "Отменить очередь и завершить процессы текущего установщика?\r\n\r\nСначала отправим запрос закрытия; через 2 секунды завершим оставшиеся процессы этой очереди. Принудительное прерывание может оставить компонент установленным частично. Полный откат не гарантирован; после отмены нужна проверка.\r\n\r\nСистемную службу Windows Installer и посторонние установки не завершаем. Windows может продолжить завершение своей операции или откат.";
         internal bool MenuRequested { get; private set; }
@@ -79,11 +81,12 @@ namespace ServiceTool
             var logTitle = Label("Журнал проверки и установки", true); logTitle.Dock = DockStyle.Top; logTitle.Height = 24; logTitle.Font = new Font("Segoe UI", 9);
             journal.Dock = DockStyle.Fill; journal.Font = new Font("Consolas", 9); journalScroll.Dock = DockStyle.Right; journalScroll.Width = 14; journalScroll.Bind(journal);
             logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(logCard, 0, 2);
-            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            restart = Button("Перезагрузить…", false); restart.Margin = Padding.Empty; restart.Enabled = false; restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 4, 0);
             activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0);
             report = Button("Сохранить отчёт", false); report.Click += delegate { ExportReport(); }; footer.Controls.Add(report, 2, 0);
-            BrandButton back = Button("В меню", false); back.Margin = Padding.Empty; back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 3, 0);
+            BrandButton back = Button("В меню", false); back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 3, 0);
             BrandButton about = Button("О программе", false); about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon, "Bars Component Manager 3000")) dialog.ShowDialog(this); }; footer.Controls.Add(about, 1, 0); body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false); UpdateSource();
             timer.Tick += async delegate { if (!installing && !checking && Visible) await RefreshAsync(false); };
@@ -266,7 +269,11 @@ namespace ServiceTool
                 List<LibraryCheck> found = await Task.Run(() => LibraryDetection.Scan());
                 if (IsDisposed || Disposing) return;
                 checks.Clear(); foreach (LibraryCheck check in found) checks[check.Package.Id] = check;
-                if (firstScan) { SelectMissing(); firstScan = false; }
+                if (firstScan) {
+                    SelectMissing(); firstScan = false;
+                    if (!preview) try { var saved = PausedLibraryQueue.Load(); if (saved.Count > 0) { selection.Clear(); foreach (var id in saved) if (checks.ContainsKey(id) && checks[id].State != LibraryState.NotApplicable) selection.Add(id); Log("Восстановлен выбор приостановленной очереди. Проверь состояния и выбери действие заново; автоматически ничего не запускается."); } } catch (Exception ex) { Log("Не удалось восстановить выбор: " + ex.Message); }
+                }
+                restart.Enabled = !installing && (pendingRestart || LibraryDetection.RebootPending());
                 RenderRows(); Log("Проверка завершена. Подходящих компонентов: " + checks.Values.Count(c => c.State == LibraryState.Installed) + " из " + checks.Count + "; нужно обновить: " + checks.Values.Count(c => c.Relation == LibraryRelation.Older) + "; нужна проверка: " + checks.Values.Count(c => c.State == LibraryState.Unknown) + ".");
                 activity.Text = "Проверка работает без папки установщиков";
             }
@@ -319,7 +326,7 @@ namespace ServiceTool
                     catch (Exception ex) { Log("Не удалось выбрать папку: " + ex.Message); return; } }
             }
             }
-            UpdateSource(); installing = true; stopRequested = cancelRequested = closeAfterCancel = false; timer.Stop(); install.Enabled = refresh.Enabled = selectAll.Enabled = false; stop.Enabled = true;
+            UpdateSource(); installing = true; stopRequested = cancelRequested = closeAfterCancel = false; timer.Stop(); install.Enabled = refresh.Enabled = selectAll.Enabled = restart.Enabled = false; stop.Enabled = true;
             foreach (DataGridViewRow row in grid.Rows) row.Cells[0].ReadOnly = true;
             try
             {
@@ -362,6 +369,7 @@ namespace ServiceTool
                     }
                 }
                 if (stopRequested || needed.Count == 0) { Log(needed.Count == 0 ? "Для выбранных компонентов нет действий в этой очереди." : "Очередь остановлена до запуска установщиков"); return; }
+                PausedLibraryQueue.Save(new string[0], operation);
                 using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => cancelRequested)))
                 {
                     activeSession = session; if (cancelRequested) session.Cancel();
@@ -376,7 +384,11 @@ namespace ServiceTool
                         if (closeAfterCancel && cancelRequested) break;
                         List<LibraryCheck> updated = await Task.Run(() => LibraryDetection.Scan()); checks.Clear(); foreach (var check in updated) checks[check.Package.Id] = check; RenderRows();
                         if (operation == LibraryOperation.Remove && checks[package.Id].State != LibraryState.Missing) Log(package.Name + ": после удаления — " + checks[package.Id].Caption + ". " + checks[package.Id].Detail);
-                        if (result.Reboot) { Log("Нужна перезагрузка. После неё снова открой модуль: установленные компоненты будут пропущены."); break; }
+                        if (result.Reboot) {
+                            rebootRequired = pendingRestart = true;
+                            PausedLibraryQueue.Save(needed.Skip(i).Select(p => p.Id), operation);
+                            Log("Нужна перезагрузка. Выбор оставшихся компонентов сохранён; после запуска проверь рекомендацию и подтверди действие заново."); break;
+                        }
                         if (!LibraryPlan.Success(result.ExitCode) || result.State != (operation == LibraryOperation.Remove ? LibraryState.Missing : LibraryState.Installed))
                         { Log("Очередь приостановлена: результат текущего компонента требует проверки. Уже выполненные шаги сохранены в журнале."); break; }
                     }
@@ -392,10 +404,11 @@ namespace ServiceTool
                 {
                     stop.Enabled = false; refresh.Enabled = install.Enabled = true; timer.Enabled = monitor.Checked && !closeAfterCancel;
                     activity.Text = cancelRequested ? "Отменено. Проверь состояние компонентов перед повторной установкой." : "Очередь завершена или приостановлена. Подробности в журнале.";
-                    RenderRows();
+                    RenderRows(); restart.Enabled = pendingRestart || LibraryDetection.RebootPending();
                     if (closeAfterCancel) BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) Close(); });
                 }
             }
+            if (rebootRequired && !closeAfterCancel && !cancelRequested && !IsDisposed) { rebootRequired = false; await RestartOffer.Show(this); }
         }
         private void ExportReport()
         {

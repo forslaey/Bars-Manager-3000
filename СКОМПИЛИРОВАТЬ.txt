@@ -1,4 +1,11 @@
-﻿BARS Manager 3000 — сборка 2.1.1
+﻿ТЕКУЩАЯ ВЕРСИЯ: 2.2.0 — четыре модуля, сборка без подписи.
+Новые функции и ограничения: RELEASE-2.2.0.md.
+Из C:\ServiceManager3000:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1 -OutputDirectory .\bin
+Результат: C:\ServiceManager3000\bin\Bars Service Manager 3000.exe
+Тесты не запускают реальные установщики. Дополнительный -UtilitySmoke требует уже повышенного сеанса и читает компоненты Windows, проверяет временные копии утилит.
+
+BARS Manager 3000 — сборка 2.1.1
 
 1. Открой PowerShell в папке проекта (обычно C:\ServiceManager3000).
 2. Обычная сборка БЕЗ подписи:

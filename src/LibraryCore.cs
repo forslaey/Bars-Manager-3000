@@ -335,7 +335,7 @@ namespace ServiceTool
         public static ProcessStartInfo Command(LibraryPackage package, string verifiedFile, string log, bool smallUpdate = false)
         {
             if (package.Kind == LibraryKind.Composite) throw new InvalidOperationException("RuntimePack Full исключён из установки");
-            string quiet = "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=" + Quote(log);
+            string quiet = "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /RESTARTEXITCODE=3010 /LOG=" + Quote(log);
             if (package.Kind == LibraryKind.Msi)
                 return new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "msiexec.exe"), "/i " + Quote(verifiedFile) + " /qn /norestart ALLUSERS=1 REBOOT=ReallySuppress /L*v " + Quote(log) + (package.Name.Contains("Native Client") ? " IACCEPTSQLNCLILICENSETERMS=YES" : "") + (smallUpdate ? " REINSTALL=ALL REINSTALLMODE=vomus" : ""));
             string args = package.Kind == LibraryKind.DotNet || package.Kind == LibraryKind.Framework ? "/install /quiet /norestart /log " + Quote(log) :
