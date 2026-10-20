@@ -76,7 +76,7 @@ namespace ServiceTool
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
             var title = Label("Инструменты BARS", false); title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleLeft; title.Margin = new Padding(12, 0, 0, 0); body.Controls.Add(title, 0, 0);
             body.Controls.Add(ModuleCard("Менеджер служб", "Установка, запуск и остановка служб, режим запуска и сбор логов", "Менеджер Служб", delegate { using (var form = new MainForm(null, false)) OpenModule(form); }), 0, 1);
-            body.Controls.Add(ModuleCard("Bars Component Manager 3000", "Проверка компонентов работает без установщиков. Папка понадобится только при установке", "Bars Component Manager 3000", delegate { using (var form = new LibraryManagerForm(false)) OpenModule(form); }), 0, 2);
+            body.Controls.Add(ModuleCard("Менеджер компонентов", "Проверка компонентов работает без установщиков. Папка понадобится только при установке", "Менеджер компонентов", delegate { using (var form = new LibraryManagerForm(false)) OpenModule(form); }), 0, 2);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(Label("Версия " + typeof(ManagerHub).Assembly.GetName().Version.ToString(3) + " · Локальные инструменты BARS", true), 0, 0);
@@ -96,8 +96,10 @@ namespace ServiceTool
         }
         private void OpenModule(Form form)
         {
-            Hide();
-            try { form.ShowDialog(); }
+            // Keep a visible owner while Windows activates the modal module. Hiding the
+            // launcher first leaves no foreground window and can activate another app.
+            if (form.StartPosition != FormStartPosition.Manual) form.StartPosition = FormStartPosition.CenterParent;
+            try { form.ShowDialog(this); }
             finally
             {
                 if (!IsDisposed)

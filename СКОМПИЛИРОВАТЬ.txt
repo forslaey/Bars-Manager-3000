@@ -1,9 +1,9 @@
-﻿BARS Manager 3000 — сборка 2.1.0
+﻿BARS Manager 3000 — сборка 2.1.1
 
 1. Открой PowerShell в папке проекта (обычно C:\ServiceManager3000).
 2. Обычная сборка БЕЗ подписи:
 
-.\Build.ps1
+.\Build.ps1 -OutputDirectory .\bin
 
 Результат: bin\Bars Service Manager 3000.exe. Это общий лаунчер с двумя модулями.
 Встроенные помощники тоже будут без подписи. Не добавляй -Sign, если подпись не нужна.

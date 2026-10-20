@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -16,10 +17,34 @@ namespace ServiceTool
         private static Button Button(Form form, string text) { foreach (Control c in Children(form)) if (c is Button && c.Text == text) return (Button)c; throw new Exception("Button absent: " + text); }
         private static void Show(Form form) { form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-22000, -22000); form.ShowInTaskbar = false; form.Show(); Application.DoEvents(); }
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")] private static extern bool IsWindowEnabled(IntPtr handle);
         private static void Click(DataGridView grid, Point point)
         {
             IntPtr xy = new IntPtr((point.Y << 16) | (point.X & 65535));
             SendMessage(grid.Handle, 0x201, new IntPtr(1), xy); SendMessage(grid.Handle, 0x202, IntPtr.Zero, xy); Application.DoEvents();
+        }
+        private static void VerifyAbout(Form owner, string title, string description)
+        {
+            Exception failure = null;
+            owner.BeginInvoke((MethodInvoker)delegate
+            {
+                AboutDialog dialog = Application.OpenForms.OfType<AboutDialog>().Last();
+                try
+                {
+                    var labels = Children(dialog).OfType<Label>().ToArray();
+                    Check(labels.Any(l => l.Text == title) && labels.Any(l => l.Text == description), "About identifies only the requested module, or both modules for launcher");
+                    Label author = labels.Single(l => l.Text.StartsWith("Создано мной"));
+                    string[] lines = author.Text.Split(new[] { "\r\n" }, StringSplitOptions.None);
+                    Check(lines.Length == 2 && lines[0] == "Создано мной с использованием вражеской нейросети," &&
+                        lines[1] == "C# и Windows Powershell. 2024-2026.", "Author text has exactly the two requested lines");
+                    Check(lines.All(line => TextRenderer.MeasureText(line, author.Font).Width <= author.Width) &&
+                        author.Font.Height * 2 <= author.Height, "Both author lines fit without wrapping or clipping beside close button");
+                }
+                catch (Exception ex) { failure = ex; }
+                finally { dialog.Close(); }
+            });
+            Button(owner, "О программе").PerformClick();
+            if (failure != null) throw failure;
         }
         [STAThread] public static int Main()
         {
@@ -40,6 +65,7 @@ namespace ServiceTool
                             Check(TextRenderer.MeasureText(label.Text, label.Font).Width <= label.Width, "English component product name fits About dialog"); dialog.Close();
                         }
                         Button about = Button(form, "О программе"), back = Button(form, "В меню"), report = Button(form, "Сохранить отчёт");
+                        VerifyAbout(form, "Bars Component Manager 3000", "Проверка и установка компонентов BARS");
                         Check(about.Top == back.Top && back.Top == report.Top && about.Height >= 38, "Library footer buttons share baseline and useful height");
                         var all = Field<BrandButton>(form, "selectAll");
                         var allChecks = Field<Dictionary<string, LibraryCheck>>(form, "checks");
@@ -96,13 +122,15 @@ namespace ServiceTool
                         Check(Field<RefreshToggle>(form, "autoRefreshToggle").Text == "Проверять каждый 10с.", "Service toggle caption");
                         Check(Field<DataGridView>(form, "servicesGrid").CellBorderStyle == DataGridViewCellBorderStyle.Single, "Service cell borders on both axes");
                         Button back = Button(form, "В меню"), about = Button(form, "О программе");
+                        VerifyAbout(form, "Bars Service Manager 3000", "Управление службами BARS");
                         Check(back.Top == about.Top && back.Height == about.Height && back.Height >= 38, "Service footer buttons aligned");
                         back.PerformClick(); Check(!form.Visible && form.MenuRequested, "Standalone service module requests launcher on return");
                     }
                     using (var hub = new ManagerHub())
                     {
                         hub.SetTheme(dark, false); Show(hub);
-                        foreach (string title in new[] { "Менеджер Служб", "Bars Component Manager 3000" })
+                        VerifyAbout(hub, "Bars Manager 3000", "Управление службами и установка библиотек BARS");
+                        foreach (string title in new[] { "Менеджер Служб", "Менеджер компонентов" })
                         {
                             Button open = Button(hub, title); Control ancestor = open.Parent; while (!(ancestor is Card)) ancestor = ancestor.Parent;
                             Point position = ancestor.PointToClient(open.PointToScreen(Point.Empty));
@@ -124,16 +152,53 @@ namespace ServiceTool
                         Check(bitmap.GetPixel(5, 5).ToArgb() == Color.Magenta.ToArgb(), "Partial card paint leaves unrelated outline untouched");
                     }
                 }
+                foreach(bool services in new[] {true,false})
                 foreach(bool menu in new[] {true,false})
                 using(var hub=new ManagerHub())
-                using(var module=new LibraryManagerForm(true))
+                using(Form module=services ? (Form)new MainForm(null,true) : new LibraryManagerForm(true))
                 {
                     Show(hub);
                     module.StartPosition=FormStartPosition.Manual;module.Location=new Point(-22000,-22000);module.ShowInTaskbar=false;
-                    module.Shown+=delegate { module.BeginInvoke((MethodInvoker)delegate { if(menu)Button(module,"В меню").PerformClick();else module.Close(); }); };
+                    Exception navigationFailure = null;
+                    module.Shown+=delegate { module.BeginInvoke((MethodInvoker)delegate {
+                        try {
+                            Check(module.Owner == hub && module.Modal && hub.Visible && !IsWindowEnabled(hub.Handle),
+                                "Both modules open with a visible disabled launcher as explicit modal owner");
+                            Check(Form.ActiveForm == module && module.WindowState == FormWindowState.Normal,
+                                "First modal opening activates module instead of leaving launcher in front");
+                            if(services && menu) {
+                                typeof(MainForm).GetField("operationRunning",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(module,true);
+                                typeof(MainForm).GetField("confirmBusyClose",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(module,new Func<DialogResult>(()=>DialogResult.No));
+                                Button(module,"В меню").PerformClick();
+                                Check(module.Visible && !((MainForm)module).MenuRequested,"Declining busy return clears menu request and keeps service module active");
+                                typeof(MainForm).GetField("operationRunning",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(module,false);
+                            }
+                            if(menu)Button(module,"В меню").PerformClick();else module.Close();
+                        } catch(Exception ex) { navigationFailure=ex; module.Close(); }
+                    }); };
                     typeof(ManagerHub).GetMethod("OpenModule",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(hub,new object[]{module});
+                    if(navigationFailure != null)throw navigationFailure;
                     Check(menu ? hub.Visible && !hub.IsDisposed : hub.IsDisposed,"Back returns launcher; window close exits whole manager");
                     if(!hub.IsDisposed)hub.Close();
+                }
+                foreach(bool dark in new[] {false,true})
+                using(var hub=new ManagerHub())
+                {
+                    hub.SetTheme(dark,false); Show(hub);
+                    for(int attempt=0;attempt<3;attempt++)
+                    using(var module=new LibraryManagerForm(true))
+                    {
+                        module.StartPosition=FormStartPosition.Manual;module.Location=new Point(-22000,-22000);module.ShowInTaskbar=false;
+                        bool activated=false;
+                        module.Shown+=delegate {module.BeginInvoke((MethodInvoker)delegate {
+                            activated=Form.ActiveForm==module && module.Owner==hub && module.WindowState==FormWindowState.Normal;
+                            Button(module,"В меню").PerformClick();
+                        });};
+                        typeof(ManagerHub).GetMethod("OpenModule",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(hub,new object[]{module});
+                        Check(activated,"First and repeated component openings activate the owned module in both themes");
+                        Check(hub.Visible && hub.Enabled && !hub.IsDisposed,"Repeated return leaves launcher available");
+                    }
+                    hub.Close();
                 }
                 Console.WriteLine("PASS: " + count + " UI rendering/input/navigation checks in both themes; no installation or SCM changes."); return 0;
             }

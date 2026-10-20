@@ -149,7 +149,7 @@ namespace ServiceTool
                         { Show(dialog); Children(dialog).OfType<BrandButton>().First(b => b.Text == "Переустановить").PerformClick(); Check(dialog.Operation == LibraryOperation.Reinstall, "Reinstall choice separate from removal"); dialog.Close(); }
                         form.Close();
                     }
-                    using (var hub = new ManagerHub()) { hub.SetTheme(dark, false); Show(hub); Check(hub.ClientSize.Width <= 840 && hub.ClientSize.Height <= 560, "Launcher compact at baseline DPI"); var headings = Children(hub).OfType<FlushLabel>().Where(c => c.Text == "Менеджер служб" || c.Text == "Bars Component Manager 3000").ToArray(); Check(headings.Length == 2 && headings[0].PointToScreen(Point.Empty).X == headings[1].PointToScreen(Point.Empty).X, "Launcher headings share exact left coordinate without native label padding"); hub.Close(); }
+                    using (var hub = new ManagerHub()) { hub.SetTheme(dark, false); Show(hub); Check(hub.ClientSize.Width <= 840 && hub.ClientSize.Height <= 560, "Launcher compact at baseline DPI"); var headings = Children(hub).OfType<FlushLabel>().Where(c => c.Text == "Менеджер служб" || c.Text == "Менеджер компонентов").ToArray(); Check(headings.Length == 2 && headings[0].PointToScreen(Point.Empty).X == headings[1].PointToScreen(Point.Empty).X, "Launcher headings share exact left coordinate without native label padding"); hub.Close(); }
                 }
                 Console.WriteLine("PASS: " + count + " maintenance command/matching/UI checks. No deinstaller, UAC, or installer started."); return 0;
             }

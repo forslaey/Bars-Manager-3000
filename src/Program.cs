@@ -582,12 +582,12 @@ namespace ServiceTool
             aboutButton.Margin = new Padding(0, 0, 10, 0);
             aboutButton.Click += delegate
             {
-                using (AboutDialog dialog = new AboutDialog(palette, Icon)) dialog.ShowDialog(this);
+                using (AboutDialog dialog = new AboutDialog(palette, Icon, "Bars Service Manager 3000", "Управление службами BARS")) dialog.ShowDialog(this);
             };
             footer.Controls.Add(aboutButton, 1, 0);
             Button menuButton = MakeButton("В меню", false);
             menuButton.Dock = DockStyle.Fill; menuButton.Margin = Padding.Empty;
-            menuButton.Click += delegate { MenuRequested = true; Close(); if (Visible) MenuRequested = false; };
+            menuButton.Click += delegate { MenuRequested = true; Close(); };
             footer.Controls.Add(menuButton, 2, 0);
             layout.Controls.Add(footer, 0, 4);
 
@@ -1546,7 +1546,7 @@ namespace ServiceTool
             }
             if (operationRunning)
             {
-                if (confirmBusyClose() != DialogResult.Yes) { e.Cancel = true; return; }
+                if (confirmBusyClose() != DialogResult.Yes) { MenuRequested = false; e.Cancel = true; return; }
             }
             closing = true;
         }

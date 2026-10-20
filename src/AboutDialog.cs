@@ -12,7 +12,7 @@ namespace ServiceTool
         private readonly Font detailFont = new Font("Segoe UI", 9.5F);
         private readonly Icon ownedIcon;
 
-        public AboutDialog(ThemePalette palette, Icon applicationIcon, string moduleName = null)
+        public AboutDialog(ThemePalette palette, Icon applicationIcon, string moduleName = null, string moduleDescription = null)
         {
             SuspendLayout();
             ThemePalette colors = palette ?? ThemePalette.Create(false);
@@ -55,7 +55,7 @@ namespace ServiceTool
             content.Controls.Add(MakeLabel("Инструменты BARS", subtitleFont, colors.Muted), 0, 1);
             string version = typeof(AboutDialog).Assembly.GetName().Version.ToString(3);
             content.Controls.Add(MakeLabel("Версия " + version, detailFont, colors.Good), 0, 2);
-            content.Controls.Add(MakeLabel(moduleName == null ? "Управление службами и установка библиотек BARS" : "Проверка и установка компонентов BARS", bodyFont, colors.Text), 0, 3);
+            content.Controls.Add(MakeLabel(moduleDescription ?? (moduleName == null ? "Управление службами и установка библиотек BARS" : "Проверка и установка компонентов BARS"), bodyFont, colors.Text), 0, 3);
             TableLayoutPanel actions = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -67,7 +67,7 @@ namespace ServiceTool
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 156F));
             actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            Label joke = MakeLabel("Создано мной с использованием вражеской нейросети, C# и Windows Powershell. 2024-2026.", detailFont, colors.Muted);
+            Label joke = MakeLabel("Создано мной с использованием вражеской нейросети,\r\nC# и Windows Powershell. 2024-2026.", detailFont, colors.Muted);
             joke.TextAlign = ContentAlignment.MiddleLeft;
             actions.Controls.Add(joke, 0, 0);
             BrandButton close = new BrandButton
