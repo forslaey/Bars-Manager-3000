@@ -136,7 +136,7 @@ namespace ServiceTool
                             Point position = ancestor.PointToClient(open.PointToScreen(Point.Empty));
                             Check(ancestor.ClientSize.Height - position.Y - open.Height >= 13, "Launcher button has bottom inset");
                             Check(ancestor.ClientSize.Width - position.X - open.Width >= 22, "Launcher button shifted left from right frame");
-                            Check(position.Y > ancestor.Height / 2 && open.Height >= 50, "Launcher button sits below description");
+                            Check(position.Y > ancestor.Height / 2 && open.Height >= 50, "Launcher button sits below description: y=" + position.Y + " card=" + ancestor.Height + " button=" + open.Height);
                             Check(open.Width >= TextRenderer.MeasureText(open.Text, open.Font).Width + 16, "Launcher action text fits");
                         }
                         hub.Close();

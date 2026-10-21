@@ -10,7 +10,7 @@ $taskOutput = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $taskOutput -Force | Out-Null
 $taskBuild = Join-Path ([IO.Path]::GetTempPath()) ('bars-build-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskBuild | Out-Null
-$taskReferences = @('System.dll','System.Core.dll','System.Xml.dll','System.Drawing.dll','System.Windows.Forms.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll','System.Configuration.Install.dll','System.ServiceProcess.dll','System.Security.dll')
+$taskReferences = @('System.dll','System.Core.dll','System.Xml.dll','System.Drawing.dll','System.Windows.Forms.dll','System.IO.Compression.dll','System.IO.Compression.FileSystem.dll','System.Configuration.Install.dll','System.ServiceProcess.dll','System.Security.dll','System.Web.Extensions.dll')
 $taskCommon = @('/nologo','/target:winexe','/optimize+','/utf8output','/codepage:65001', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/win32icon:$(Join-Path $taskAssets 'Bars.ico')")
 if ([String]::IsNullOrWhiteSpace($ReferenceAssemblies)) { $ReferenceAssemblies = & (Join-Path $PSScriptRoot 'tools\Prepare-References.ps1') }
 $taskReferenceRoot = [IO.Path]::GetFullPath($ReferenceAssemblies)

@@ -17,20 +17,22 @@ namespace ServiceTool
         protected LibrarySession Session;
         protected volatile bool CancelRequested = false;
         internal bool MenuRequested { get; private set; }
-        protected UtilityModuleForm(string title) : base(title, new Size(940, 700))
+        // Small utility modules carry no product description; only the launcher keeps About.
+        protected UtilityModuleForm(string title, Size size) : base(title, size)
         {
-            MinimumSize = new Size(900, 660);
+            // The base class already raised MinimumSize (which grows the window), so the requested
+            // compact size is re-applied after lowering the minimum.
+            MinimumSize = new Size(700, 470); ClientSize = size;
             Body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             Body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 72)); Body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 66)); Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 64));
-            var heading = Label(title, false); heading.Font = new Font("Segoe UI", 17, FontStyle.Bold); Body.Controls.Add(heading, 0, 0);
-            var footer = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 12, 0, 0), Margin = Padding.Empty };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
+            Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); Body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+            var heading = Label(title, false); heading.Font = new Font("Segoe UI", 15, FontStyle.Bold); Body.Controls.Add(heading, 0, 0);
+            var footer = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 8, 0, 0), Margin = Padding.Empty };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Activity = Label("Готово к работе", true); Activity.AutoEllipsis = false; Activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(Activity, 0, 0);
-            var about = Button("О программе", false); about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon, title, "Инструменты BARS для Windows")) dialog.ShowDialog(this); }; footer.Controls.Add(about, 1, 0);
-            Back = Button("В меню", false); Back.Margin = Padding.Empty; Back.Click += delegate { if (!Busy) { MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 2, 0);
+            Back = Button("В меню", false); Back.Margin = Padding.Empty; Back.Click += delegate { if (!Busy) { MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 1, 0);
             Body.Controls.Add(footer, 0, 3); Root.Controls.Add(Body, 0, 1);
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
@@ -49,6 +51,18 @@ namespace ServiceTool
             using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => CancelRequested)))
             { Session = session; try { return await Task.Run(() => session.ExecuteSystem(action, data, path, Progress)); } finally { Session = null; } }
         }
+        // Runs several privileged actions inside one elevation prompt.
+        protected async Task<List<LibraryInstallResult>> ExecuteAll(IList<string[]> steps)
+        {
+            var results = new List<LibraryInstallResult>();
+            using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => CancelRequested)))
+            {
+                Session = session;
+                try { foreach (var step in steps) results.Add(await Task.Run(() => session.ExecuteSystem(step[0], step[1], step[2], Progress))); }
+                finally { Session = null; }
+            }
+            return results;
+        }
         protected void Failure(Exception ex) { Activity.Text = "Не выполнено"; MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         protected async Task Restart()
         {
@@ -57,63 +71,88 @@ namespace ServiceTool
     }
     internal sealed class WindowsFeaturesForm : UtilityModuleForm
     {
-        private readonly List<BrandCheckBox> choices = new List<BrandCheckBox>();
-        private readonly List<Label> statuses = new List<Label>();
-        private readonly BrandButton check, install;
+        private sealed class Row
+        {
+            public WindowsComponent Profile;
+            public BrandCheckBox Choice;
+            public Label Status;
+        }
+        private readonly List<Row> rows = new List<Row>();
+        private readonly BrandButton check, action;
         private Dictionary<string, string> states = new Dictionary<string, string>();
         private readonly bool preview;
-        internal WindowsFeaturesForm(bool previewMode) : base("Компоненты Windows")
+        internal WindowsFeaturesForm(bool previewMode) : base("Компоненты Windows", new Size(760, 590))
         {
             preview = previewMode;
-            var list = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
+            // Telnet/TFTP first: they belong to the small fiLinn/piglet toolset and are checked
+            // far more often than the large IIS profile.
+            var list = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = WindowsComponents.GroupOrder.Length, Margin = Padding.Empty };
             list.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            list.RowStyles.Add(new RowStyle(SizeType.Percent, 44)); list.RowStyles.Add(new RowStyle(SizeType.Percent, 56));
-            for (int group = 0; group < 2; group++)
+            foreach (var group in WindowsComponents.GroupOrder)
             {
-                var card = new Card { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10), Padding = new Padding(18, 10, 18, 10) };
-                var content = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = group == 0 ? 2 : 3, Margin = Padding.Empty };
+                var members = WindowsComponents.InGroup(group);
+                var card = new Card { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 8), Padding = new Padding(16, 8, 16, 8) };
+                var content = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = members.Length + 1, Margin = Padding.Empty };
                 content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-                content.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-                var description = Label(WindowsComponents.Profiles[group == 0 ? 0 : 1].Group, true); description.AutoEllipsis = false;
-                content.Controls.Add(description, 0, 0);
-                int first = group == 0 ? 0 : 1, last = group == 0 ? 1 : 3;
-                for (int i = first; i < last; i++)
+                content.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+                var caption = Label(group, true); caption.Font = new Font("Segoe UI", 9); content.Controls.Add(caption, 0, 0);
+                for (int i = 0; i < members.Length; i++)
                 {
-                    content.RowStyles.Add(new RowStyle(SizeType.Percent, group == 0 ? 100 : 50));
+                    content.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / members.Length));
                     var row = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-                    row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 230)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-                    var choice = new BrandCheckBox { Text = WindowsComponents.Profiles[i].Name, Font = new Font("Segoe UI", 12, FontStyle.Bold), Dock = DockStyle.Fill, Margin = Padding.Empty, Enabled = false, Palette = Colors };
+                    row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                    var choice = new BrandCheckBox { Text = members[i].Name, Font = new Font("Segoe UI", 12, FontStyle.Bold), Dock = DockStyle.Fill, Margin = Padding.Empty, Enabled = false, Palette = Colors };
+                    choice.CheckedChanged += delegate { UpdateAction(); };
                     var status = Label("Не проверено", true); status.TextAlign = ContentAlignment.MiddleRight;
                     row.Controls.Add(choice, 0, 0); row.Controls.Add(status, 1, 0);
-                    choices.Add(choice); statuses.Add(status); content.Controls.Add(row, 0, i - first + 1);
+                    rows.Add(new Row { Profile = members[i], Choice = choice, Status = status });
+                    content.Controls.Add(row, 0, i + 1);
                 }
-                card.Controls.Add(content); list.Controls.Add(card, 0, group);
+                int index = list.Controls.Count;
+                card.Controls.Add(content); list.Controls.Add(card, 0, index);
             }
+            // Two short rows (Telnet, TFTP) share the upper band; the single IIS row takes the rest.
+            list.RowStyles.Clear();
+            foreach (var group in WindowsComponents.GroupOrder)
+                list.RowStyles.Add(new RowStyle(SizeType.Percent, WindowsComponents.InGroup(group).Length > 1 ? 62F : 38F));
             Body.Controls.Add(list, 0, 1);
-            var actions = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
+            var actions = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 6, 0, 0) };
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             check = Button("Проверить компоненты", false); check.Click += async delegate { await Check(); }; actions.Controls.Add(check, 0, 0);
-            install = Button("Установить выбранные", true); install.Margin = Padding.Empty; install.Enabled = false; install.Click += async delegate { await Install(); }; actions.Controls.Add(install, 1, 0);
+            action = Button("Установить выбранные", true); action.Margin = Padding.Empty; action.Enabled = false; action.Click += async delegate { await Apply(); }; actions.Controls.Add(action, 1, 0);
             Body.Controls.Add(actions, 0, 2); SetTheme(Colors.Dark, false);
-            Shown += async delegate
+            // No automatic query on open: the operator presses "Проверить компоненты".
+            Shown += delegate
             {
-                if (preview) { states = WindowsComponents.Profiles.SelectMany(p => p.Features).ToDictionary(f => f, f => "Enabled"); states["TFTP"] = "Disabled"; ApplyStates(); }
-                else await Check();
+                if (preview)
+                {
+                    states = WindowsComponents.Profiles.SelectMany(p => p.Features).ToDictionary(f => f, f => "Enabled");
+                    states["TFTP"] = "Disabled"; ApplyStates();
+                }
             };
         }
-        protected override void OnThemeChanged() { foreach (var choice in choices) choice.Palette = Colors; }
+        protected override void OnThemeChanged() { foreach (var row in rows) row.Choice.Palette = Colors; }
         private void Lock(bool busy)
-        { Busy = busy; Back.Enabled = check.Enabled = !busy; install.Enabled = !busy && choices.Any(c => c.Enabled); if (busy) foreach (var c in choices) c.Enabled = false; else ApplyStates(); }
+        { Busy = busy; Back.Enabled = check.Enabled = !busy; if (busy) foreach (var row in rows) row.Choice.Enabled = false; else ApplyStates(); }
         private void ApplyStates()
         {
-            for (int i = 0; i < choices.Count; i++)
+            foreach (var row in rows)
             {
-                string status = states.Count == 0 ? "Не проверено" : WindowsComponents.Status(WindowsComponents.Profiles[i], states);
-                statuses[i].Text = status;
-                choices[i].Enabled = !Busy && (status == "Не установлено" || status.StartsWith("Частично:", StringComparison.Ordinal));
-                if (!choices[i].Enabled) choices[i].Checked = status == "Установлено";
+                var state = states.Count == 0 ? WindowsComponents.ComponentState.Unknown : WindowsComponents.Classify(row.Profile, states);
+                row.Status.Text = states.Count == 0 ? "Не проверено" : WindowsComponents.Status(row.Profile, states);
+                // Installed rows stay selectable so the same window can remove them.
+                row.Choice.Enabled = !Busy && (state == WindowsComponents.ComponentState.Missing || state == WindowsComponents.ComponentState.Partial || state == WindowsComponents.ComponentState.Installed);
+                if (!row.Choice.Enabled) row.Choice.Checked = false;
             }
-            install.Enabled = !Busy && choices.Any(c => c.Enabled);
+            UpdateAction();
+        }
+        private void UpdateAction()
+        {
+            var selected = rows.Where(r => r.Choice.Enabled && r.Choice.Checked).ToArray();
+            bool anyInstall = selected.Any(r => WindowsComponents.Classify(r.Profile, states) != WindowsComponents.ComponentState.Installed);
+            bool anyRemove = selected.Any(r => WindowsComponents.Classify(r.Profile, states) == WindowsComponents.ComponentState.Installed);
+            action.Enabled = !Busy && selected.Length > 0;
+            action.Text = !anyRemove ? "Установить выбранные" : !anyInstall ? "Удалить выбранные" : "Установить и удалить";
         }
         private async Task Check()
         {
@@ -122,68 +161,67 @@ namespace ServiceTool
             catch (Exception ex) { states.Clear(); Failure(ex); }
             finally { Lock(false); }
         }
-        private async Task Install()
+        private async Task Apply()
         {
             if (Busy || preview) return;
-            string ids = String.Join(",", choices.Select((c, i) => c.Enabled && c.Checked ? WindowsComponents.Profiles[i].Id : null).Where(id => id != null));
-            if (ids.Length == 0) { Activity.Text = "Отметь компоненты для установки"; return; }
-            if (MessageBox.Show(this, "Установить выбранные компоненты Windows? Может потребоваться доступ к Windows Update или установочному носителю. Автоматическая перезагрузка отключена.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            Lock(true); bool reboot = false;
+            var selected = rows.Where(r => r.Choice.Enabled && r.Choice.Checked).ToArray();
+            if (selected.Length == 0) { Activity.Text = "Отметь компоненты"; return; }
+            var install = String.Join(",", selected.Where(r => WindowsComponents.Classify(r.Profile, states) != WindowsComponents.ComponentState.Installed).Select(r => r.Profile.Id));
+            var remove = String.Join(",", selected.Where(r => WindowsComponents.Classify(r.Profile, states) == WindowsComponents.ComponentState.Installed).Select(r => r.Profile.Id));
+            string question = install.Length > 0 && remove.Length > 0 ? "Установить одни и удалить другие выбранные компоненты Windows?"
+                : install.Length > 0 ? "Установить выбранные компоненты Windows? Может потребоваться доступ к Windows Update или установочному носителю."
+                : "Удалить выбранные компоненты Windows? Зависящие от них приложения перестанут работать.";
+            if (MessageBox.Show(this, question + "\r\nАвтоматическая перезагрузка не выполняется.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            Lock(true); bool changed = false, restart = false;
             try
             {
-                var result = await Execute("features-enable", ids, ""); reboot = result.Reboot;
+                var steps = new List<string[]>();
+                if (install.Length > 0) steps.Add(new[] { "features-enable", install, "" });
+                if (remove.Length > 0) steps.Add(new[] { "features-disable", remove, "" });
+                var results = await ExecuteAll(steps);
+                restart = results.Any(r => r.Reboot); changed = results.Any(r => LibraryPlan.Success(r.ExitCode));
                 var observed = await Execute("features-query", "", ""); states = WindowsComponents.Parse(observed.Message);
-                Activity.Text = reboot ? "Изменения применены. Нужна перезагрузка" : "Проверка после установки завершена";
+                Activity.Text = restart ? "Изменения применены. Нужна перезагрузка" : "Проверка после изменения завершена";
             }
             catch (Exception ex) { states.Clear(); Failure(ex); }
             finally { Lock(false); }
-            if (reboot) await Restart();
+            // Offer a restart after installation and after removal alike.
+            if (changed) await Restart();
         }
     }
     internal sealed class ToolsDeploymentForm : UtilityModuleForm
     {
-        private readonly Label sourceLabel, destination;
-        private readonly BrandComboBox drives;
-        private readonly BrandButton choose, deploy;
+        private readonly Label sourceLabel;
+        private readonly BrandTextBox destination;
+        private readonly BrandButton chooseSource, chooseTarget, deploy;
         private readonly bool preview;
         private string source;
-        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит BARS")
+        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит BARS", new Size(820, 470))
         {
             preview = previewMode;
-            var card = new Card { Dock = DockStyle.Fill, Padding = new Padding(18), Margin = new Padding(0, 0, 0, 10) };
-            var content = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty };
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            foreach (float h in new[] { 68F, 66F, 40F, 46F }) content.RowStyles.Add(new RowStyle(SizeType.Absolute, h)); content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var description = Label("fiLinn · Piglet · WinSCP\r\nЯрлыки с иконками EXE и запуском от имени администратора", false); description.Font = new Font("Segoe UI", 12); content.Controls.Add(description, 0, 0);
+            var card = new Card { Dock = DockStyle.Fill, Padding = new Padding(18), Margin = new Padding(0, 0, 0, 8) };
+            var content = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
+            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210));
+            // Two label/field pairs; the fixed rows must stay shorter than the card's content area.
+            foreach (float h in new[] { 28F, 36F, 28F, 36F }) content.RowStyles.Add(new RowStyle(SizeType.Absolute, h));
+            content.Controls.Add(Label("Комплект утилит (папка _tools)", false), 0, 0);
             sourceLabel = Label("Папка _tools будет найдена в комплекте «Библиотеки»", true); sourceLabel.AutoEllipsis = true; content.Controls.Add(sourceLabel, 0, 1);
-            content.Controls.Add(Label("Выбери диск для папки DataKrat\\_tools", false), 0, 2);
-            drives = new BrandComboBox { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 6), DropDownStyle = ComboBoxStyle.DropDownList, Palette = Colors };
-            drives.DrawMode = DrawMode.OwnerDrawFixed; drives.ItemHeight = Font.Height + 6;
-            drives.DrawItem += delegate(object sender, DrawItemEventArgs e)
-            {
-                bool selected = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0;
-                Color background = selected ? Colors.Selection : Colors.SurfaceAlt;
-                using (var brush = new SolidBrush(background)) e.Graphics.FillRectangle(brush, e.Bounds);
-                string value = e.Index >= 0 && e.Index < drives.Items.Count ? Convert.ToString(drives.Items[e.Index]) : Convert.ToString(drives.SelectedItem);
-                Rectangle text = Rectangle.Inflate(e.Bounds, -8, 0);
-                TextRenderer.DrawText(e.Graphics, value, Font, text, selected ? Colors.SelectionText : Colors.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPrefix);
-            };
-            foreach (DriveInfo drive in DriveInfo.GetDrives())
-            {
-                try { if ((drive.DriveType == DriveType.Fixed || drive.DriveType == DriveType.Removable) && drive.IsReady) drives.Items.Add(drive.RootDirectory.FullName); }
-                catch (IOException) { } catch (UnauthorizedAccessException) { }
-            }
-            if (drives.Items.Count > 0) drives.SelectedIndex = 0; content.Controls.Add(drives, 0, 3);
-            destination = Label("", true); destination.AutoEllipsis = false; content.Controls.Add(destination, 0, 4);
-            drives.SelectedIndexChanged += delegate { UpdateDestination(); }; UpdateDestination(); card.Controls.Add(content); Body.Controls.Add(card, 0, 1);
-            var actions = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
+            chooseSource = Button("Выбрать комплект…", false); chooseSource.Dock = DockStyle.Fill; chooseSource.Margin = new Padding(8, 0, 0, 6); chooseSource.Click += delegate { Choose(); };
+            content.Controls.Add(chooseSource, 1, 0); content.SetRowSpan(chooseSource, 2);
+            content.Controls.Add(Label("Куда распаковать (полный путь)", false), 0, 2);
+            destination = new BrandTextBox { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 0), Palette = Colors, Text = ToolsDeployment.DefaultTarget };
+            content.Controls.Add(destination, 0, 3);
+            chooseTarget = Button("Выбрать путь…", false); chooseTarget.Dock = DockStyle.Fill; chooseTarget.Margin = new Padding(8, 0, 0, 0); chooseTarget.Click += delegate { ChooseTarget(); };
+            content.Controls.Add(chooseTarget, 1, 3);
+            card.Controls.Add(content); Body.Controls.Add(card, 0, 1);
+            var actions = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 6, 0, 0) };
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            choose = Button("Выбрать папку _tools…", false); choose.Click += delegate { Choose(); }; actions.Controls.Add(choose, 0, 0);
-            deploy = Button("Скопировать и создать ярлыки", true); deploy.Margin = Padding.Empty; deploy.Click += async delegate { await Deploy(); }; actions.Controls.Add(deploy, 1, 0); Body.Controls.Add(actions, 0, 2);
+            var clear = Button("Путь по умолчанию", false); clear.Click += delegate { destination.Text = ToolsDeployment.DefaultTarget; }; actions.Controls.Add(clear, 0, 0);
+            deploy = Button("Скопировать и создать ярлыки", true); deploy.Margin = Padding.Empty; deploy.Click += async delegate { await Deploy(); }; actions.Controls.Add(deploy, 1, 0);
+            Body.Controls.Add(actions, 0, 2);
             if (!preview) try { source = ToolsDeployment.FindSource(); if (source != null && Directory.Exists(source)) sourceLabel.Text = source; } catch (Exception ex) { Activity.Text = ex.Message; }
             SetTheme(Colors.Dark, false);
         }
-        private void UpdateDestination() { if (destination != null) destination.Text = drives.SelectedItem == null ? "Нет доступных дисков" : "Путь: " + ToolsDeployment.Target(Convert.ToString(drives.SelectedItem)) + "\r\nСуществующие настройки сохранятся. Предыдущая папка останется в резервной копии.\r\nЧетыре основных EXE будут запускаться от имени администратора."; }
         private bool Choose()
         {
             using (var dialog = new FolderBrowserDialog { Description = "Выбери папку _tools или папку Библиотеки", ShowNewFolderButton = false })
@@ -194,22 +232,32 @@ namespace ServiceTool
                 catch (Exception ex) { Failure(ex); return false; }
             }
         }
+        private void ChooseTarget()
+        {
+            using (var dialog = new FolderBrowserDialog { Description = "Выбери папку для распаковки утилит", ShowNewFolderButton = true })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                string path = dialog.SelectedPath;
+                destination.Text = Path.GetFileName(path).Equals("_tools", StringComparison.OrdinalIgnoreCase) ? path : Path.Combine(path, "_tools");
+            }
+        }
         private async Task Deploy()
         {
-            if (Busy || preview || drives.SelectedItem == null) return;
-            if ((source == null || !Directory.Exists(source)) && !Choose()) return;
-            string drive = Convert.ToString(drives.SelectedItem);
+            if (Busy || preview) return;
+            if (!(source != null && Directory.Exists(source)) && !Choose()) return;
+            string target;
+            try { target = ToolsDeployment.TargetFolder(destination.Text); } catch (Exception ex) { Failure(ex); return; }
             try { ToolsDeployment.Discover(source); } catch (Exception ex) { Failure(ex); return; }
-            if (MessageBox.Show(this, "Скопировать утилиты в " + ToolsDeployment.Target(drive) + " и создать четыре ярлыка на твоём рабочем столе? Существующая папка будет сохранена в резервной копии.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            Busy = true; choose.Enabled = deploy.Enabled = drives.Enabled = Back.Enabled = false;
+            if (MessageBox.Show(this, "Скопировать утилиты в " + target + " и создать четыре ярлыка на твоём рабочем столе?\r\nСуществующая папка будет сохранена в резервной копии.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            Busy = true; chooseSource.Enabled = chooseTarget.Enabled = deploy.Enabled = destination.Enabled = Back.Enabled = false;
             try
             {
-                await Execute("tools-deploy", source, drive);
-                ToolsDeployment.Shortcuts(source, drive, Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+                await Execute("tools-deploy", source, target);
+                ToolsDeployment.Shortcuts(source, target, Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
                 Activity.Text = "Готово: утилиты скопированы, запуск от администратора настроен, ярлыки созданы";
             }
             catch (Exception ex) { Failure(ex); }
-            finally { Busy = false; choose.Enabled = deploy.Enabled = drives.Enabled = Back.Enabled = true; }
+            finally { Busy = false; chooseSource.Enabled = chooseTarget.Enabled = deploy.Enabled = destination.Enabled = Back.Enabled = true; }
         }
     }
     internal static class RestartOffer

@@ -49,9 +49,9 @@ namespace ServiceTool
                     }
                     return 0;
                 }
-                if ((args.Length == 2 || args.Length == 3) && (args[0] == "--preview-hub" || args[0] == "--preview-libraries" || args[0] == "--preview-windows" || args[0] == "--preview-tools"))
+                if ((args.Length == 2 || args.Length == 3) && (args[0] == "--preview-hub" || args[0] == "--preview-libraries" || args[0] == "--preview-windows" || args[0] == "--preview-tools" || args[0] == "--preview-software"))
                 {
-                    using (ManagerModuleForm form = args[0] == "--preview-hub" ? (ManagerModuleForm)new ManagerHub() : args[0] == "--preview-windows" ? (ManagerModuleForm)new WindowsFeaturesForm(true) : args[0] == "--preview-tools" ? (ManagerModuleForm)new ToolsDeploymentForm(true) : new LibraryManagerForm(true))
+                    using (ManagerModuleForm form = args[0] == "--preview-hub" ? (ManagerModuleForm)new ManagerHub() : args[0] == "--preview-windows" ? (ManagerModuleForm)new WindowsFeaturesForm(true) : args[0] == "--preview-tools" ? (ManagerModuleForm)new ToolsDeploymentForm(true) : args[0] == "--preview-software" ? (ManagerModuleForm)new SoftwareManagerForm(true) : new LibraryManagerForm(true))
                     {
                         form.SetTheme(args.Length == 3 && args[2] == "dark", false); form.ShowInTaskbar = false;
                         form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-20000, -20000); form.Show(); Application.DoEvents();

@@ -45,11 +45,31 @@ namespace ServiceTool
                 if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                     throw new IOException("Ссылки и точки подключения не поддерживаются: " + current);
         }
+        // Default location shown to the operator; the full path stays editable.
+        internal const string DefaultTarget = @"C:\DataKrat\_tools";
         internal static string Target(string drive)
         {
             string full = Path.GetFullPath(drive);
             if (!String.Equals(full, Path.GetPathRoot(full), StringComparison.OrdinalIgnoreCase) || full.StartsWith(@"\\", StringComparison.Ordinal)) throw new IOException("Выбери локальный диск");
             return Path.Combine(full, @"DataKrat\_tools");
+        }
+        // Validates an operator-chosen absolute path. UNC shares, relative paths and reparse points
+        // are refused; the folder name itself is forced to _tools.
+        internal static string TargetFolder(string path)
+        {
+            if (String.IsNullOrWhiteSpace(path)) throw new IOException("Укажи полный путь для распаковки");
+            string value = path.Trim().Trim('"');
+            // GetFullPath would silently resolve a relative value against the process directory,
+            // so the operator's input is rejected unless it already names a drive.
+            if (!Path.IsPathRooted(value)) throw new IOException("Укажи полный путь с буквой диска, например C:\\DataKrat\\_tools");
+            string full; try { full = Path.GetFullPath(value); } catch (ArgumentException) { throw new IOException("Некорректный путь"); } catch (NotSupportedException) { throw new IOException("Некорректный путь"); }
+            if (full.StartsWith(@"\\", StringComparison.Ordinal)) throw new IOException("Сетевые пути не поддерживаются: выбери локальный диск");
+            string root = Path.GetPathRoot(full);
+            if (String.IsNullOrEmpty(root) || !String.Equals(Path.GetPathRoot(root), root, StringComparison.OrdinalIgnoreCase)) throw new IOException("Укажи полный путь с буквой диска, например C:\\DataKrat\\_tools");
+            if (!Directory.Exists(root)) throw new IOException("Диск " + root + " недоступен");
+            full = Path.GetFullPath(full);
+            if (!Path.GetFileName(full.TrimEnd('\\')).Equals("_tools", StringComparison.OrdinalIgnoreCase)) full = Path.Combine(full, "_tools");
+            return full;
         }
         internal static void Copy(string source, string drive, Action<string> progress, Func<bool> cancelled)
         {
@@ -120,10 +140,10 @@ namespace ServiceTool
             foreach (string file in Directory.GetFiles(directory)) { SafePath(file); File.SetAttributes(file, FileAttributes.Normal); File.Delete(file); }
             File.SetAttributes(directory, FileAttributes.Directory); Directory.Delete(directory);
         }
-        internal static void Shortcuts(string source, string drive, string desktop)
+        internal static void Shortcuts(string source, string target, string desktop)
         {
-            EnableAdministratorLaunch(source, Target(drive));
-            ShortcutsAt(source, Target(drive), desktop);
+            EnableAdministratorLaunch(source, target);
+            ShortcutsAt(source, target, desktop);
         }
         internal const string CompatibilityKey = @"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers";
         internal static string AdministratorFlags(string current)

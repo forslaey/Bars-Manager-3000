@@ -18,7 +18,7 @@ namespace ServiceTool
         { return target.GetType().InvokeMember(name, BindingFlags.InvokeMethod, null, target, args); }
         private static string Cell(object record, int index)
         { return Convert.ToString(record.GetType().InvokeMember("StringData", BindingFlags.GetProperty, null, record, new object[] { index })); }
-        private static Dictionary<string, string> MsiProperties(string file, out string architecture)
+        internal static Dictionary<string, string> MsiProperties(string file, out string architecture)
         {
             object installer = null, db = null, view = null; architecture = "x86";
             try
@@ -76,7 +76,7 @@ namespace ServiceTool
                 try { files = Directory.GetFiles(directory); children = Directory.GetDirectories(directory); }
                 catch (UnauthorizedAccessException) { progress("Каталог недоступен: " + directory); continue; }
                 catch (IOException) { progress("Каталог недоступен: " + directory); continue; }
-                foreach (string child in children) if (!Path.GetFileName(child).Equals("_tools", StringComparison.OrdinalIgnoreCase) && (File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) pending.Push(child);
+                foreach (string child in children) if (!Path.GetFileName(child).Equals("_tools", StringComparison.OrdinalIgnoreCase) && !Path.GetFileName(child).Equals("_soft", StringComparison.OrdinalIgnoreCase) && (File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) pending.Push(child);
                 foreach (string file in files)
                 {
                     if (++count > 4096) throw new InvalidDataException("В папке больше 4096 файлов. Выбери непосредственно папку библиотек.");

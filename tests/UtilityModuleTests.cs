@@ -39,8 +39,12 @@ namespace ServiceTool
                 Reject(() => WindowsComponents.Resolve("iis,iis"), "Reject duplicate selection");
                 Reject(() => WindowsComponents.Resolve(""), "Reject empty feature installation");
                 Check(WindowsComponents.EnableScript("iis").Contains("-All -NoRestart") && !WindowsComponents.QueryScript().Contains("Enable-"), "Query read-only and servicing prohibits reboot");
+                Check(WindowsComponents.DisableScript("telnet,tftp").Contains("Disable-WindowsOptionalFeature") && WindowsComponents.DisableScript("telnet").Contains("-NoRestart") && WindowsComponents.DisableScript("telnet").Contains("'TelnetClient'") && !WindowsComponents.DisableScript("telnet").Contains("TFTP"), "Removal uses the same exact profile without reboot");
+                Reject(() => WindowsComponents.DisableScript("telnet;Remove-Item C:\\"), "Removal rejects command injection");
+                Check(ManagerSystemActions.Known("features-disable"), "Removal is an explicit whitelisted action");
+                Check(WindowsComponents.GroupOrder[0].Contains("fiLinn") && WindowsComponents.InGroup(WindowsComponents.GroupOrder[0]).Length == 2, "Telnet/TFTP group listed before IIS");
                 var profile = WindowsComponents.Profiles[0]; var states = profile.Features.ToDictionary(f => f, f => "Enabled");
-                Check(WindowsComponents.Status(profile, states) == "Установлено", "All selected features enabled");
+                Check(WindowsComponents.Status(profile, states) == "Установлено" && WindowsComponents.Classify(profile, states) == WindowsComponents.ComponentState.Installed, "All selected features enabled");
                 states[profile.Features[0]] = "EnablePending"; Check(WindowsComponents.Status(profile, states) == "Ожидает перезагрузки", "Pending isn't installed");
                 states[profile.Features[0]] = "Disabled"; Check(WindowsComponents.Status(profile, states).StartsWith("Частично: 26"), "Partial IIS described");
                 states.Remove(profile.Features[0]); Check(WindowsComponents.Status(profile, states).StartsWith("Недоступно"), "Missing OS feature isn't falsely installed");
@@ -60,6 +64,11 @@ namespace ServiceTool
                 Check(ToolsDeployment.Discover(source).Count == 3, "Discover three correct launchers");
                 Reject(() => ToolsDeployment.Target(@"C:\DataKrat"), "Target must be a drive root");
                 Reject(() => ToolsDeployment.Target(@"\\server\share\"), "UNC deployment rejected");
+                Check(ToolsDeployment.DefaultTarget == @"C:\DataKrat\_tools", "Default unpack path is C:\\DataKrat\\_tools");
+                Check(ToolsDeployment.TargetFolder(@"C:\DataKrat\_tools") == @"C:\DataKrat\_tools" && ToolsDeployment.TargetFolder(@"C:\Work\BARS") == @"C:\Work\BARS\_tools", "Operator path accepted; folder normalized to _tools");
+                Reject(() => ToolsDeployment.TargetFolder(@"\\server\share\_tools"), "UNC custom path rejected");
+                Reject(() => ToolsDeployment.TargetFolder(@"relative\_tools"), "Relative custom path rejected");
+                Reject(() => ToolsDeployment.TargetFolder(""), "Empty custom path rejected");
                 ToolsDeployment.CopyToTarget(source, target, ignored => { }, () => false);
                 for (int i = 0; i < folders.Length; i++)
                 {
@@ -134,31 +143,36 @@ namespace ServiceTool
                     foreach (var button in buttons)
                     {
                         Check(button.Height >= 35 * scale, "Useful button height at each scale");
-                        Check(button.Parent.ClientRectangle.Contains(button.Bounds), "Button stays inside parent at each scale");
-                        foreach (string line in button.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) Check(TextRenderer.MeasureText(line, button.Font).Width <= button.Width - 8, "Each action line fits horizontally");
+                        Check(button.Parent.ClientRectangle.Contains(button.Bounds), "Button '" + button.Text + "' " + button.Bounds + " stays inside " + button.Parent.ClientRectangle + " of " + button.Parent.GetType().Name + " in " + form.GetType().Name + " at " + scale);
+                        foreach (string line in button.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) Check(TextRenderer.MeasureText(line, button.Font).Width <= button.Width - 8, "Each action line fits horizontally: '" + line + "' needs " + TextRenderer.MeasureText(line, button.Font).Width + " of " + button.Width + " in " + form.GetType().Name + " at " + scale);
                     }
                     if (form is ManagerHub)
                     {
-                        var cards = Children(form).OfType<Card>().ToArray(); Check(cards.Length == 4 && cards.Max(c => c.Width) - cards.Min(c => c.Width) <= 1 && cards.Max(c => c.Height) - cards.Min(c => c.Height) <= 1, "Four equally sized launcher cards");
+                        var cards = Children(form).OfType<Card>().ToArray(); Check(cards.Length == 5 && cards.Max(c => c.Width) - cards.Min(c => c.Width) <= 1 && cards.Max(c => c.Height) - cards.Min(c => c.Height) <= 1, "Five equally sized launcher cards: heights " + String.Join(",", cards.Select(c => c.Height)));
                         var actions = cards.Select(c => Children(c).OfType<BrandButton>().Single()).ToArray();
                         Check(actions.Select(b => b.Size).Distinct().Count() == 1, "All launch actions equal size");
+                        Check(actions.Any(b => b.Text == "Установка программ"), "Programs module is its own launcher card");
+                        Check(buttons.Count(b => b.Text == "О программе") == 1, "About stays in the launcher only");
                     }
                     else
                     {
-                        var back = buttons.Single(b => b.Text == "В меню"); var about = buttons.Single(b => b.Text == "О программе");
-                        Check(back.PointToScreen(Point.Empty).Y == about.PointToScreen(Point.Empty).Y, "New module footer baseline consistent");
+                        Check(buttons.Count(b => b.Text == "В меню") == 1 && !buttons.Any(b => b.Text == "О программе"), "Utility modules have no About button");
                         Check(form.Icon != null, "Brand icon on new module");
+                    }
+                    if (form is WindowsFeaturesForm)
+                    {
+                        var labels = Children(form).OfType<Label>().ToArray();
+                        var telnet = labels.First(l => l.Text.Contains("fiLinn")); var iis = labels.First(l => l.Text.Contains("арендаторов"));
+                        Check(telnet.PointToScreen(Point.Empty).Y < iis.PointToScreen(Point.Empty).Y, "Telnet/TFTP block placed above IIS");
+                        Check(form.ClientSize.Width <= 760 * scale + 1 && form.ClientSize.Height <= 590 * scale + 1, "Components window is compact");
+                        Check(buttons.Any(b => b.Text == "Проверить компоненты") && buttons.Count(b => b.Text.StartsWith("Установить") || b.Text.StartsWith("Удалить")) == 1, "Exactly two actions: check and install/remove");
                     }
                     if (form is ToolsDeploymentForm)
                     {
-                        var combo = Children(form).OfType<BrandComboBox>().Single();
-                        Check(combo.DrawMode == DrawMode.OwnerDrawFixed, "Drive picker uses themed text/background instead of native white field");
-                        form.ActiveControl = buttons.First();
-                        using (var comboImage = new Bitmap(combo.Width, combo.Height))
-                        {
-                            combo.DrawToBitmap(comboImage, combo.ClientRectangle);
-                            Check(comboImage.GetPixel(combo.Width / 2, combo.Height / 2).ToArgb() == ThemePalette.Create(dark).SurfaceAlt.ToArgb(), "Drive picker background matches light/dark palette");
-                        }
+                        var path = Children(form).OfType<BrandTextBox>().Single();
+                        Check(path.Text == ToolsDeployment.DefaultTarget, "Unpack path prefilled with C:\\DataKrat\\_tools and editable");
+                        Check(!Children(form).OfType<Label>().Any(l => l.Text.Contains("Ярлыки с иконками EXE")), "Descriptive block removed from utilities window");
+                        Check(!Children(form).OfType<BrandComboBox>().Any(), "Drive-only picker replaced by a full path");
                     }
                     using (var image = new Bitmap(form.Width, form.Height)) form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
                     form.Close();

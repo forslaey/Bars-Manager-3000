@@ -43,11 +43,28 @@ namespace ServiceTool
         {
             return "$ErrorActionPreference='Stop'; Get-WindowsOptionalFeature -Online | Where-Object { $_.FeatureName -like 'IIS-*' -or $_.FeatureName -eq 'TelnetClient' -or $_.FeatureName -eq 'TFTP' } | ForEach-Object { $_.FeatureName + '=' + $_.State.ToString() }";
         }
+        internal const string RestartMarker = "BARS_RESTART_REQUIRED";
+        private static string FeatureList(string ids)
+        {
+            return "@(" + String.Join(",", Resolve(ids).Select(n => "'" + n + "'")) + ")";
+        }
         internal static string EnableScript(string ids)
         {
-            string[] names = Resolve(ids);
-            return "$ErrorActionPreference='Stop'; $r=Enable-WindowsOptionalFeature -Online -FeatureName @(" +
-                String.Join(",", names.Select(n => "'" + n + "'")) + ") -All -NoRestart; if(@($r | Where-Object { $_.RestartNeeded -eq $true }).Count -gt 0){'BARS_RESTART_REQUIRED'}";
+            return "$ErrorActionPreference='Stop'; $r=Enable-WindowsOptionalFeature -Online -FeatureName " + FeatureList(ids) +
+                " -All -NoRestart; if(@($r | Where-Object { $_.RestartNeeded -eq $true }).Count -gt 0){'" + RestartMarker + "'}";
+        }
+        // Removal is the exact inverse of the same profile; -All removes parent/child pairs together
+        // and -NoRestart keeps Windows servicing under the operator's control.
+        internal static string DisableScript(string ids)
+        {
+            return "$ErrorActionPreference='Stop'; $r=Disable-WindowsOptionalFeature -Online -FeatureName " + FeatureList(ids) +
+                " -All -NoRestart; if(@($r | Where-Object { $_.RestartNeeded -eq $true }).Count -gt 0){'" + RestartMarker + "'}";
+        }
+        // Groups are described for the UI; the underlying profile array keeps stable indices.
+        internal static readonly string[] GroupOrder = { "Компоненты для fiLinn, piglet", "Компоненты для модуля «Отчёты для арендаторов»" };
+        internal static WindowsComponent[] InGroup(string group)
+        {
+            return Profiles.Where(p => p.Group == group).ToArray();
         }
         // Read both pipes concurrently: DISM/PowerShell cannot deadlock on a full error pipe.
         // Windows servicing is allowed to finish; killing TrustedInstaller is never attempted.
@@ -75,6 +92,17 @@ namespace ServiceTool
             { int i = line.IndexOf('='); if (i > 0) states[line.Substring(0, i).Trim()] = line.Substring(i + 1).Trim(); }
             return states;
         }
+        internal enum ComponentState { Unknown, Missing, Partial, Installed, Pending, Unavailable }
+        internal static ComponentState Classify(WindowsComponent profile, IDictionary<string, string> states)
+        {
+            if (states == null || states.Count == 0) return ComponentState.Unknown;
+            if (profile.Features.Any(f => !states.ContainsKey(f))) return ComponentState.Unavailable;
+            if (profile.Features.Any(f => states[f].IndexOf("Pending", StringComparison.OrdinalIgnoreCase) >= 0)) return ComponentState.Pending;
+            int enabled = profile.Features.Count(f => states[f] == "Enabled");
+            if (enabled == profile.Features.Length) return ComponentState.Installed;
+            if (profile.Features.Any(f => states[f] != "Enabled" && states[f] != "Disabled" && states[f] != "DisabledWithPayloadRemoved" && states[f] != "Removed")) return ComponentState.Unknown;
+            return enabled == 0 ? ComponentState.Missing : ComponentState.Partial;
+        }
         internal static string Status(WindowsComponent profile, IDictionary<string, string> states)
         {
             if (profile.Features.Any(f => !states.ContainsKey(f))) return "Недоступно в этой Windows";
@@ -87,7 +115,7 @@ namespace ServiceTool
     }
     internal static class ManagerSystemActions
     {
-        internal static bool Known(string action) { return action == "features-query" || action == "features-enable" || action == "tools-deploy" || action == "system-restart"; }
+        internal static bool Known(string action) { return action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "system-restart" || action == "software-install" || action == "software-defaults" || action == "software-query"; }
         internal static LibraryInstallResult Execute(string action, string data, string path, Action<string> progress)
         {
             if (!Known(action)) throw new InvalidDataException("Неизвестное действие менеджера");
@@ -98,8 +126,12 @@ namespace ServiceTool
                 if (!acquired) throw new InvalidOperationException("Другая операция менеджера ещё выполняется");
                 try
                 {
+                    if (action == "software-query") return new LibraryInstallResult {ExitCode=0,State=LibraryState.Unknown,Message=SoftwareDetection.Query(data)};
+                    if (action == "software-install") return SoftwareInstaller.Install(data,path,progress);
+                    if (action == "software-defaults") return SoftwareDefaults.Apply(data,progress);
                     if (action == "features-query") return WindowsComponents.Run(WindowsComponents.QueryScript(), progress);
                     if (action == "features-enable") return WindowsComponents.Run(WindowsComponents.EnableScript(data), progress);
+                    if (action == "features-disable") return WindowsComponents.Run(WindowsComponents.DisableScript(data), progress);
                     if (action == "tools-deploy") { ToolsDeployment.Copy(data, path, progress, () => LibraryCancellation.Requested); return new LibraryInstallResult { ExitCode = 0, Message = "Утилиты скопированы", State = LibraryState.Installed }; }
                     if (data != "restart-confirmed" || path != "") throw new InvalidDataException("Перезагрузка не подтверждена");
                     var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "shutdown.exe"), "/r /t 0") { UseShellExecute = false, CreateNoWindow = true };
