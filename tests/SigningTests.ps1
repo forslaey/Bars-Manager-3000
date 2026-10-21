@@ -1,4 +1,4 @@
-﻿param([Parameter(Mandatory = $true)] [string] $SignedExecutable)
+﻿param([Parameter(Mandatory = $true)] [string] $SignedExecutable, [string] $CertificateThumbprint)
 $ErrorActionPreference = 'Stop'
 $taskProject = Split-Path $PSScriptRoot -Parent
 $taskVerify = Join-Path $taskProject 'tools\Test-FileSignature.ps1'
@@ -15,7 +15,13 @@ try {
         try { $taskResource.CopyTo($taskOutput) } finally { $taskResource.Dispose(); $taskOutput.Dispose() }
         $taskFiles += $taskHelper
     }
-    $taskExpected = (Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'BARS\Bars Service Manager 3000\signing.json') -Raw | ConvertFrom-Json).Thumbprint
+    $taskExpected = $CertificateThumbprint
+    if ([string]::IsNullOrWhiteSpace($taskExpected)) { $taskExpected = (Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'BARS\Bars Service Manager 3000\signing.json') -Raw | ConvertFrom-Json).Thumbprint }
+    $taskTrustBefore = @{}
+    foreach ($taskHive in @('CurrentUser','LocalMachine')) { foreach ($taskStore in @('Root','TrustedPublisher')) {
+        $taskStorePath = "Cert:\$taskHive\$taskStore\$taskExpected"
+        $taskTrustBefore[$taskStorePath] = Test-Path -LiteralPath $taskStorePath
+    } }
     foreach ($taskFile in $taskFiles) {
         $taskResult = & $taskVerify -FilePath $taskFile -CertificateThumbprint $taskExpected
         if (-not $taskResult.SignatureChecked -or -not $taskResult.Timestamped) { throw 'Отсутствует подпись или метка времени.' }
@@ -34,15 +40,15 @@ try {
         $taskChecks++
         Write-Output ('PASS: подпись, метка времени и отказ для повреждённого файла: ' + [IO.Path]::GetFileName($taskFile))
     }
-    foreach ($taskStore in @('Root', 'TrustedPublisher')) {
-        if (Test-Path -LiteralPath ("Cert:\CurrentUser\$taskStore\$taskExpected")) { throw 'Сертификат неожиданно оказался в доверенном хранилище.' }
+    foreach ($taskStorePath in $taskTrustBefore.Keys) {
+        if ((Test-Path -LiteralPath $taskStorePath) -ne $taskTrustBefore[$taskStorePath]) { throw 'Состояние доверенного хранилища изменилось во время проверки.' }
         $taskChecks++
     }
     Write-Output ("PASS: $taskChecks проверок подписи. Реальные службы и доверенные хранилища не изменялись.")
 }
 finally {
     # Only explicitly created fixture names inside this unique directory are deleted.
-    foreach ($taskFixture in @('Installer.x86.exe','Installer.x64.exe','tampered-Installer.x86.exe','tampered-Installer.x64.exe','tampered-Bars Service Manager 3000.exe')) {
+    foreach ($taskFixture in @('Installer.x86.exe','Installer.x64.exe','tampered-Installer.x86.exe','tampered-Installer.x64.exe',('tampered-' + [IO.Path]::GetFileName($SignedExecutable)))) {
         $taskPath = Join-Path $taskRoot $taskFixture
         if (Test-Path -LiteralPath $taskPath) { Remove-Item -LiteralPath $taskPath -Force }
     }

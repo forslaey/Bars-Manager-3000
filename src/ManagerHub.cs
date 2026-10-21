@@ -53,6 +53,7 @@ namespace ServiceTool
             if (card != null) { background = Colors.Surface; card.BorderColor = Colors.Border; }
             control.BackColor = background; control.ForeColor = Convert.ToString(control.Tag) == "muted" ? Colors.Muted : Colors.Text;
             var button = control as BrandButton; if (button != null) button.Palette = Colors;
+            var journalScroll = control as JournalScrollBar; if (journalScroll != null) journalScroll.Palette = Colors;
             var toggle = control as RefreshToggle; if (toggle != null) toggle.Palette = Colors;
             var input = control as BrandTextBox; if (input != null) { input.Palette = Colors; input.BackColor = Colors.SurfaceAlt; }
             var combo = control as BrandComboBox; if (combo != null) { combo.Palette = Colors; combo.BackColor = Colors.SurfaceAlt; }
@@ -67,27 +68,26 @@ namespace ServiceTool
     }
     internal sealed class ManagerHub : ManagerModuleForm
     {
-        public ManagerHub() : base("BARS Manager 3000", new Size(840, 680))
+        public ManagerHub() : base("BARS Manager 3000", new Size(840, 600))
         {
-            MinimumSize = new Size(800, 640); ClientSize = new Size(840, 680);
-            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 70;
-            // Three module rows of identical height; the body scrolls if the window is shorter.
+            MinimumSize = new Size(800, 580); ClientSize = new Size(840, 600);
+            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 60;
+            // Four modules in an even 2x2 grid.
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-            var title = Label("Инструменты BARS", false); title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.Margin = new Padding(18, 0, 0, 0); body.Controls.Add(title, 0, 0);
-            // Five modules in a 2x3 grid (the last cell stays empty).
-            var modules = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Margin = Padding.Empty };
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            var title = Label("Инструменты BARS", false); title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleCenter; title.Margin = new Padding(0, 0, 0, 20); body.Controls.Add(title, 0, 0);
+            // Windows components are reached from the component manager.
+            var modules = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
             modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            for (int i = 0; i < 3; i++) modules.RowStyles.Add(new RowStyle(SizeType.Absolute, ModuleRowHeight));
+            for (int i = 0; i < 2; i++) modules.RowStyles.Add(new RowStyle(SizeType.Absolute, ModuleRowHeight));
             // Percentages of an odd pixel count round to different heights, so the three rows are
             // sized explicitly to identical values whenever the panel is resized.
-            modules.SizeChanged += delegate { EqualRows(modules, 3); };
-            modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер Служб", delegate { using (var form = new MainForm(null, false)) OpenModule(form); }), 0, 0);
-            modules.Controls.Add(ModuleCard("Менеджер компонентов", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер компонентов", delegate { using (var form = new LibraryManagerForm(false)) OpenModule(form); }), 1, 0);
+            modules.SizeChanged += delegate { EqualRows(modules, 2); };
+            modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер служб", delegate { using (var form = new MainForm(null, false)) OpenModule(form); }), 0, 0);
+            modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер библиотек", delegate { using (var form = new LibraryManagerForm(false)) OpenModule(form); }), 1, 0);
             modules.Controls.Add(ModuleCard("Установка программ", "Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nАссоциации файлов и удалённый доступ", "Установка программ", delegate { using (var form = new SoftwareManagerForm(false)) OpenModule(form); }), 0, 1);
-            modules.Controls.Add(ModuleCard("Утилиты BARS", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит BARS", delegate { using (var form = new ToolsDeploymentForm(false)) OpenModule(form); }), 1, 1);
-            modules.Controls.Add(ModuleCard("Компоненты Windows", "Telnet и TFTP для fiLinn и piglet.\r\nIIS для отчётов арендаторов", "Компоненты Windows", delegate { using (var form = new WindowsFeaturesForm(false)) OpenModule(form); }), 0, 2);
+            modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { using (var form = new ToolsDeploymentForm(false)) OpenModule(form); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -108,14 +108,14 @@ namespace ServiceTool
         }
         private Card ModuleCard(string title, string description, string action, EventHandler click)
         {
-            var card = new Card { Dock = DockStyle.Fill, Padding = new Padding(18, 12, 18, 14), Margin = new Padding(0, 0, 8, 10) };
+            var card = new Card { Dock = DockStyle.Fill, Padding = new Padding(18, 12, 18, 14), Margin = new Padding(5, 0, 5, 10) };
             var layout = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             // Compact heading/action rows leave two full description lines visible.
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
-            var heading = new FlushLabel { Text = title, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty }; heading.Font = new Font("Segoe UI", 13, FontStyle.Bold); layout.Controls.Add(heading, 0, 0);
-            var detail = new FlushLabel { Text = description, Tag = "muted", Dock = DockStyle.Fill, Margin = Padding.Empty }; detail.TextAlign = ContentAlignment.TopLeft; detail.AutoEllipsis = false; layout.Controls.Add(detail, 0, 1);
-            BrandButton open = Button(action, true); open.Margin = new Padding(0, 4, 8, 8); open.Dock = DockStyle.None; open.Anchor = AnchorStyles.Right | AnchorStyles.Bottom; open.Size = new Size(280, 50); open.Click += click;
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+            var heading = new Label { Text = title, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = Padding.Empty }; heading.Font = new Font("Segoe UI", 13, FontStyle.Bold); layout.Controls.Add(heading, 0, 0);
+            var detail = new Label { Text = description, Tag = "muted", Dock = DockStyle.Fill, Margin = Padding.Empty }; detail.TextAlign = ContentAlignment.MiddleCenter; detail.AutoEllipsis = false; layout.Controls.Add(detail, 0, 1);
+            BrandButton open = Button(action, true); open.Margin = new Padding(0, 0, 0, 0); open.Dock = DockStyle.None; open.Anchor = AnchorStyles.Bottom; open.Size = new Size(280, 50); open.Click += click;
             layout.Controls.Add(open, 0, 2); card.Controls.Add(layout); return card;
         }
         private void OpenModule(Form form)

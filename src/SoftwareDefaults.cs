@@ -16,7 +16,7 @@ namespace ServiceTool
         internal static readonly string[] TextExtensions={".txt",".cfg",".json",".config"};
         // Archive/container extensions only. Executables, DLLs, installers and help files
         // retain their Windows handlers even though 7-Zip can inspect their contents.
-        internal static readonly string[] ArchiveExtensions={".7z",".zip",".rar",".001",".arj",".bz2",".bzip2",".cab",".cpio",".deb",".dmg",".gz",".gzip",".iso",".lzh",".lzma",".lzma86",".lz",".lzo",".rpm",".tar",".taz",".tbz",".tbz2",".tgz",".tlz",".txz",".tzst",".udf",".wim",".esd",".xar",".xz",".z",".zst",".zstd"};
+        internal static readonly string[] ArchiveExtensions={".7z",".zip",".zipx",".z01",".rar",".r00",".001",".arj",".bz2",".bzip2",".cab",".cpio",".deb",".dmg",".gz",".gzip",".iso",".lzh",".lha",".lzma",".lzma86",".rpm",".tar",".taz",".tbz",".tbz2",".tgz",".tpz",".txz",".tzst",".udf",".wim",".swm",".esd",".xar",".xip",".xz",".z",".zst",".zstd",".ar",".udeb",".ova",".cramfs",".squashfs",".mslz",".pmd"};
         internal const string PolicyKey=@"Software\Policies\Microsoft\Windows\System";
         internal static bool SupportsPolicy()
         {
@@ -62,6 +62,33 @@ namespace ServiceTool
                 using(var associations=key.CreateSubKey("FileAssociations")) foreach(string ext in id=="notepad" ? TextExtensions : ArchiveExtensions) associations.SetValue(ext,prog);
             }
             using(var key=machine.CreateSubKey(@"Software\RegisteredApplications")) key.SetValue("BARS."+id,capabilities);
+        }
+        internal static void RemoveRegistration(string id,Action<string> progress)
+        {
+            if(id!="notepad"&&id!="7zip")return;
+            string final=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),@"BARS\Manager\DefaultAssociations\BARS.xml");
+            using(var machine=RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,RegistryView.Registry64))
+            {
+                if(File.Exists(final))
+                {
+                    ToolsDeployment.SafePath(final);var document=Read(File.ReadAllText(final));
+                    foreach(XmlNode node in document.DocumentElement.SelectNodes("Association"))if(node.Attributes["ProgId"]!=null&&node.Attributes["ProgId"].Value==ProgId(id))document.DocumentElement.RemoveChild(node);
+                    string temporary=final+"."+Guid.NewGuid().ToString("N")+".tmp";
+                    try{document.Save(temporary);File.Replace(temporary,final,null);}finally{if(File.Exists(temporary))File.Delete(temporary);}
+                    string activePolicy;using(var policy=machine.OpenSubKey(PolicyKey))activePolicy=policy==null?"":Convert.ToString(policy.GetValue("DefaultAssociationsConfiguration"));
+                    if(activePolicy.Length==0||activePolicy.Equals(final,StringComparison.OrdinalIgnoreCase))
+                    {
+                        int code=LibraryProcess.Run(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory,"dism.exe"),"/Online "+LibraryPlan.Quote("/Import-DefaultAppAssociations:"+final)){UseShellExecute=false,CreateNoWindow=true},progress);
+                        if(code!=0)throw new IOException("Программа удалена, но профиль ассоциаций требует проверки. Код "+code);
+                    }
+                    else progress("Ассоциации управляются внешней политикой; её профиль не изменён");
+                    bool ownsOther=document.DocumentElement.SelectNodes("Association").Cast<XmlNode>().Any(n=>n.Attributes["ProgId"]!=null&&n.Attributes["ProgId"].Value.StartsWith("BARS.",StringComparison.Ordinal));
+                    if(!ownsOther)using(var policy=machine.OpenSubKey(PolicyKey,true)){if(policy!=null&&String.Equals(Convert.ToString(policy.GetValue("DefaultAssociationsConfiguration")),final,StringComparison.OrdinalIgnoreCase))policy.DeleteValue("DefaultAssociationsConfiguration",false);}
+                }
+                using(var classes=machine.OpenSubKey(@"Software\Classes",true)){if(classes!=null)classes.DeleteSubKeyTree(ProgId(id),false);}
+                using(var apps=machine.OpenSubKey(@"Software\RegisteredApplications",true)){if(apps!=null)apps.DeleteValue("BARS."+id,false);}
+                using(var own=machine.OpenSubKey(@"Software\BARS\Manager\Defaults",true)){if(own!=null)own.DeleteSubKeyTree(id,false);}
+            }
         }
         internal static LibraryInstallResult Apply(string data,Action<string> progress)
         {

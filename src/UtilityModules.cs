@@ -81,8 +81,9 @@ namespace ServiceTool
         private readonly BrandButton check, action;
         private Dictionary<string, string> states = new Dictionary<string, string>();
         private readonly bool preview;
-        internal WindowsFeaturesForm(bool previewMode) : base("Компоненты Windows", new Size(760, 590))
+        internal WindowsFeaturesForm(bool previewMode, bool returnToComponents = false) : base("Компоненты Windows", new Size(760, 590))
         {
+            if(returnToComponents) Back.Text="Назад";
             preview = previewMode;
             // Telnet/TFTP first: they belong to the small fiLinn/piglet toolset and are checked
             // far more often than the large IIS profile.
@@ -121,14 +122,13 @@ namespace ServiceTool
             check = Button("Проверить компоненты", false); check.Click += async delegate { await Check(); }; actions.Controls.Add(check, 0, 0);
             action = Button("Установить выбранные", true); action.Margin = Padding.Empty; action.Enabled = false; action.Click += async delegate { await Apply(); }; actions.Controls.Add(action, 1, 0);
             Body.Controls.Add(actions, 0, 2); SetTheme(Colors.Dark, false);
-            // No automatic query on open: the operator presses "Проверить компоненты".
-            Shown += delegate
+            Shown += async delegate
             {
                 if (preview)
                 {
                     states = WindowsComponents.Profiles.SelectMany(p => p.Features).ToDictionary(f => f, f => "Enabled");
                     states["TFTP"] = "Disabled"; ApplyStates();
-                }
+                } else await Check();
             };
         }
         protected override void OnThemeChanged() { foreach (var row in rows) row.Choice.Palette = Colors; }
@@ -149,8 +149,9 @@ namespace ServiceTool
         private void UpdateAction()
         {
             var selected = rows.Where(r => r.Choice.Enabled && r.Choice.Checked).ToArray();
-            bool anyInstall = selected.Any(r => WindowsComponents.Classify(r.Profile, states) != WindowsComponents.ComponentState.Installed);
-            bool anyRemove = selected.Any(r => WindowsComponents.Classify(r.Profile, states) == WindowsComponents.ComponentState.Installed);
+            var scope=selected.Length>0?selected:rows.Where(r=>r.Choice.Enabled).ToArray();
+            bool anyInstall = scope.Any(r => WindowsComponents.Classify(r.Profile, states) != WindowsComponents.ComponentState.Installed);
+            bool anyRemove = scope.Any(r => WindowsComponents.Classify(r.Profile, states) == WindowsComponents.ComponentState.Installed);
             action.Enabled = !Busy && selected.Length > 0;
             action.Text = !anyRemove ? "Установить выбранные" : !anyInstall ? "Удалить выбранные" : "Установить и удалить";
         }
@@ -191,73 +192,85 @@ namespace ServiceTool
     }
     internal sealed class ToolsDeploymentForm : UtilityModuleForm
     {
-        private readonly Label sourceLabel;
+        private readonly BrandTextBox sourceLabel;
         private readonly BrandTextBox destination;
-        private readonly BrandButton chooseSource, chooseTarget, deploy;
+        private readonly BrandButton chooseSource,chooseTarget,deploy,remove;
+        private readonly BrandCheckBox shortcuts=new BrandCheckBox();
         private readonly bool preview;
         private string source;
-        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит BARS", new Size(820, 470))
+        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(640,460))
         {
-            preview = previewMode;
-            var card = new Card { Dock = DockStyle.Fill, Padding = new Padding(18), Margin = new Padding(0, 0, 0, 8) };
-            var content = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210));
-            // Two label/field pairs; the fixed rows must stay shorter than the card's content area.
-            foreach (float h in new[] { 28F, 36F, 28F, 36F }) content.RowStyles.Add(new RowStyle(SizeType.Absolute, h));
-            content.Controls.Add(Label("Комплект утилит (папка _tools)", false), 0, 0);
-            sourceLabel = Label("Папка _tools будет найдена в комплекте «Библиотеки»", true); sourceLabel.AutoEllipsis = true; content.Controls.Add(sourceLabel, 0, 1);
-            chooseSource = Button("Выбрать комплект…", false); chooseSource.Dock = DockStyle.Fill; chooseSource.Margin = new Padding(8, 0, 0, 6); chooseSource.Click += delegate { Choose(); };
-            content.Controls.Add(chooseSource, 1, 0); content.SetRowSpan(chooseSource, 2);
-            content.Controls.Add(Label("Куда распаковать (полный путь)", false), 0, 2);
-            destination = new BrandTextBox { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 0), Palette = Colors, Text = ToolsDeployment.DefaultTarget };
-            content.Controls.Add(destination, 0, 3);
-            chooseTarget = Button("Выбрать путь…", false); chooseTarget.Dock = DockStyle.Fill; chooseTarget.Margin = new Padding(8, 0, 0, 0); chooseTarget.Click += delegate { ChooseTarget(); };
-            content.Controls.Add(chooseTarget, 1, 3);
-            card.Controls.Add(content); Body.Controls.Add(card, 0, 1);
-            var actions = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 6, 0, 0) };
-            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var clear = Button("Путь по умолчанию", false); clear.Click += delegate { destination.Text = ToolsDeployment.DefaultTarget; }; actions.Controls.Add(clear, 0, 0);
-            deploy = Button("Скопировать и создать ярлыки", true); deploy.Margin = Padding.Empty; deploy.Click += async delegate { await Deploy(); }; actions.Controls.Add(deploy, 1, 0);
-            Body.Controls.Add(actions, 0, 2);
-            if (!preview) try { source = ToolsDeployment.FindSource(); if (source != null && Directory.Exists(source)) sourceLabel.Text = source; } catch (Exception ex) { Activity.Text = ex.Message; }
-            SetTheme(Colors.Dark, false);
+            preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,460));ClientSize=new Size(640,460);
+            Root.RowStyles[0].Height=76;Root.Padding=new Padding(20,8,20,10);
+            Body.RowStyles[0].Height=42;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=46;
+            var card=new Card {Dock=DockStyle.Fill,Padding=new Padding(16,16,16,8),Margin=new Padding(0,0,0,8)};
+            var content=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=6,Margin=Padding.Empty};
+            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));
+            foreach(float height in new[]{26F,45F,8F,26F,45F,44F})content.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+            var sourceCaption=Label("Будет взято из:",false);content.Controls.Add(sourceCaption,0,0);content.SetColumnSpan(sourceCaption,2);
+            sourceLabel=new BrandTextBox {Text=preview?@"C:\Библиотеки\_tools":"Выбери папку с утилитами",ReadOnly=true,AutoSize=false,Palette=Colors};
+            chooseSource=Button("Выбрать папку…",false);chooseSource.Click+=delegate{Choose();};var sourceRow=new PathPickerRow(sourceLabel,chooseSource,168){Dock=DockStyle.Fill};content.Controls.Add(sourceRow,0,1);content.SetColumnSpan(sourceRow,2);
+            var targetCaption=Label("Путь распаковки:",false);content.Controls.Add(targetCaption,0,3);content.SetColumnSpan(targetCaption,2);
+            destination=new BrandTextBox {AutoSize=false,Palette=Colors,Text=ToolsDeployment.DefaultTarget};
+            chooseTarget=Button("Выбрать путь…",false);chooseTarget.Click+=delegate{ChooseTarget();};var targetRow=new PathPickerRow(destination,chooseTarget,168){Dock=DockStyle.Fill};content.Controls.Add(targetRow,0,4);content.SetColumnSpan(targetRow,2);
+            shortcuts.Text=PathFieldMetrics.ShortcutCaption;shortcuts.Checked=true;shortcuts.Dock=DockStyle.Fill;shortcuts.Margin=new Padding(0,16,0,0);shortcuts.Palette=Colors;content.Controls.Add(shortcuts,0,5);content.SetColumnSpan(shortcuts,2);
+            card.Controls.Add(content);Body.Controls.Add(card,0,1);
+            var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(0,4,0,0)};
+            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            deploy=Button("Установить",true);deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
+            remove=Button("Удалить",false);remove.Destructive=true;remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,1,0);Body.Controls.Add(actions,0,2);
+            if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=ex.Message;}
+            SetTheme(Colors.Dark,false);
         }
+        protected override void OnThemeChanged(){shortcuts.Palette=Colors;}
+        private void Lock(bool busy)
+        {Busy=busy;chooseSource.Enabled=chooseTarget.Enabled=deploy.Enabled=remove.Enabled=destination.Enabled=shortcuts.Enabled=Back.Enabled=!busy;}
         private bool Choose()
         {
-            using (var dialog = new FolderBrowserDialog { Description = "Выбери папку _tools или папку Библиотеки", ShowNewFolderButton = false })
+            using(var dialog=new FolderBrowserDialog {Description="Выбери папку _tools или папку Библиотеки",ShowNewFolderButton=false})
             {
-                if (dialog.ShowDialog(this) != DialogResult.OK) return false;
-                string path = dialog.SelectedPath; if (Directory.Exists(Path.Combine(path, "_tools"))) path = Path.Combine(path, "_tools");
-                try { ToolsDeployment.Discover(path); source = path; sourceLabel.Text = source; Activity.Text = "Комплект утилит найден"; return true; }
-                catch (Exception ex) { Failure(ex); return false; }
+                if(dialog.ShowDialog(this)!=DialogResult.OK)return false;string path=dialog.SelectedPath;if(Directory.Exists(Path.Combine(path,"_tools")))path=Path.Combine(path,"_tools");
+                try{ToolsDeployment.Discover(path);source=path;sourceLabel.Text=source;Activity.Text="Комплект утилит найден";return true;}catch(Exception ex){Failure(ex);return false;}
             }
         }
         private void ChooseTarget()
         {
-            using (var dialog = new FolderBrowserDialog { Description = "Выбери папку для распаковки утилит", ShowNewFolderButton = true })
-            {
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                string path = dialog.SelectedPath;
-                destination.Text = Path.GetFileName(path).Equals("_tools", StringComparison.OrdinalIgnoreCase) ? path : Path.Combine(path, "_tools");
-            }
+            using(var dialog=new FolderBrowserDialog {Description="Выбери папку для утилит",ShowNewFolderButton=true})
+            {if(dialog.ShowDialog(this)!=DialogResult.OK)return;string path=dialog.SelectedPath;destination.Text=Path.GetFileName(path).Equals("_tools",StringComparison.OrdinalIgnoreCase)?path:Path.Combine(path,"_tools");}
         }
         private async Task Deploy()
         {
-            if (Busy || preview) return;
-            if (!(source != null && Directory.Exists(source)) && !Choose()) return;
-            string target;
-            try { target = ToolsDeployment.TargetFolder(destination.Text); } catch (Exception ex) { Failure(ex); return; }
-            try { ToolsDeployment.Discover(source); } catch (Exception ex) { Failure(ex); return; }
-            if (MessageBox.Show(this, "Скопировать утилиты в " + target + " и создать четыре ярлыка на твоём рабочем столе?\r\nСуществующая папка будет сохранена в резервной копии.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            Busy = true; chooseSource.Enabled = chooseTarget.Enabled = deploy.Enabled = destination.Enabled = Back.Enabled = false;
+            if(Busy||preview)return;if(!(source!=null&&Directory.Exists(source))&&!Choose())return;
+            string target;try{target=ToolsDeployment.TargetFolder(destination.Text);ToolsDeployment.Discover(source);}catch(Exception ex){Failure(ex);return;}
+            if(MessageBox.Show(this,"Установить утилиты в "+target+"?\r\n"+(shortcuts.Checked?"Создадим ярлыки на рабочем столе.":"Ярлыки не создаются.")+"\r\nСуществующие настройки сохраняются, прежняя папка остаётся в резервной копии.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            Lock(true);
             try
             {
-                await Execute("tools-deploy", source, target);
-                ToolsDeployment.Shortcuts(source, target, Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
-                Activity.Text = "Готово: утилиты скопированы, запуск от администратора настроен, ярлыки созданы";
+                var result=await Execute("tools-deploy",source,target);if(result.ExitCode!=0)throw new IOException(result.Message);
+                ToolsDeployment.EnableAdministratorLaunch(source,target);
+                ToolsDeployment.ShortcutsAt(source,target,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),shortcuts.Checked);
+                Activity.Text=shortcuts.Checked?"Утилиты установлены, ярлыки созданы":"Утилиты установлены без создания ярлыков";
             }
-            catch (Exception ex) { Failure(ex); }
-            finally { Busy = false; chooseSource.Enabled = chooseTarget.Enabled = deploy.Enabled = destination.Enabled = Back.Enabled = true; }
+            catch(Exception ex){Failure(ex);}finally{Lock(false);}
+        }
+        private async Task Remove()
+        {
+            if(Busy||preview)return;string target;List<BarsTool> tools;
+            try
+            {
+                target=ToolsDeployment.TargetFolder(destination.Text);
+                if(source!=null&&Path.GetFullPath(source).TrimEnd('\\').Equals(target.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("Выбран исходный комплект. Укажи место установленных утилит");
+                tools=ToolsDeployment.Installed(target);if(tools.Count==0)throw new IOException("В выбранной папке утилиты не найдены");
+            }
+            catch(Exception ex){Failure(ex);return;}
+            if(MessageBox.Show(this,"Удалить из "+target+":\r\n"+String.Join("\r\n",tools.Select(t=>t.Directory))+"?\r\n\r\nНастройки и журналы внутри этих папок тоже будут удалены. Посторонние файлы и резервные копии сохранятся.","Удаление утилит",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            Lock(true);
+            try
+            {
+                var result=await Execute("tools-remove",String.Join("\n",tools.Select(t=>t.Directory)),target);if(result.ExitCode!=0)throw new IOException(result.Message);
+                ToolsDeployment.RemoveReferences(target,tools,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));Activity.Text="Утилиты и их ярлыки удалены";
+            }
+            catch(Exception ex){Failure(ex);}finally{Lock(false);}
         }
     }
     internal static class RestartOffer

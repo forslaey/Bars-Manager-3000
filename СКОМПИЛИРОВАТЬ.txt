@@ -1,8 +1,16 @@
-﻿ТЕКУЩАЯ ВЕРСИЯ: 2.2.0 — четыре модуля, сборка без подписи.
-Новые функции и ограничения: RELEASE-2.2.0.md.
+﻿Для этого выпуска используется прежний сертификат. Если signing.json отсутствует,
+к командам Build.ps1 -Sign и tests\SigningTests.ps1 добавь:
+-CertificateThumbprint 5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB
+Для подписи нужен его закрытый ключ в личном хранилище Windows; для проверки — не нужен.
+Новый сертификат для этого выпуска создавать не следует.
+Имя итогового файла формируется автоматически из версии: Bars Manager 3000 x.x.x.exe.
+Вторую копию под старым названием сборка больше не создаёт.
+
+ТЕКУЩИЙ ВЫПУСК: 2.3.13 — опубликована подписанная сборка. Обычный Build.ps1 без -Sign собирает без подписи.
+Новые функции, интерфейс и границы проверок: RELEASE-2.3.13.md.
 Из C:\ServiceManager3000:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1 -OutputDirectory .\bin
-Результат: C:\ServiceManager3000\bin\Bars Service Manager 3000.exe
+Результат: C:\ServiceManager3000\bin\Bars Manager 3000 2.3.13.exe
 Тесты не запускают реальные установщики. Дополнительный -UtilitySmoke требует уже повышенного сеанса и читает компоненты Windows, проверяет временные копии утилит.
 
 BARS Manager 3000 — сборка 2.1.1
@@ -12,7 +20,7 @@ BARS Manager 3000 — сборка 2.1.1
 
 .\Build.ps1 -OutputDirectory .\bin
 
-Результат: bin\Bars Service Manager 3000.exe. Это общий лаунчер с двумя модулями.
+Результат: bin\Bars Manager 3000 2.3.13.exe. Это общий лаунчер с четырьмя карточками; Компоненты Windows открываются из менеджера библиотек.
 Встроенные помощники тоже будут без подписи. Не добавляй -Sign, если подпись не нужна.
 Скрипт использует reference assemblies .NET Framework 4.6; при первой сборке нужен интернет.
 Исходники рассчитаны на встроенный компилятор C# .NET Framework, Visual Studio не требуется.
@@ -33,7 +41,7 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
 .\Build.ps1 -Sign -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB' -OutputDirectory '.\signed'
 
-Результат: signed\Bars Service Manager 3000.exe. Сначала подписываются оба встроенных
+Результат: signed\Bars Manager 3000 2.3.13.exe. Сначала подписываются оба встроенных
 помощника, затем общий EXE. Без прежнего закрытого ключа эта команда не сработает.
 Пароли и закрытые ключи в GitHub не загружай.
 

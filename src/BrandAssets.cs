@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.IO;
 using System.Reflection;
 
@@ -46,6 +46,12 @@ namespace ServiceTool
             }
         }
 
+        internal static Image LoadSoftwareIcon(string id)
+        {
+            string name=id=="anydesk"?"AnyDesk":"RuDesktop";
+            using(Stream stream=Assembly.GetExecutingAssembly().GetManifestResourceStream("BARS."+name+".png"))
+            {if(stream==null)return null;using(var bitmap=new Bitmap(stream))return new Bitmap(bitmap);}
+        }
         public static Icon LoadIcon()
         {
             using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("BARS.Icon.ico"))

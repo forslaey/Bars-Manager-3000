@@ -14,7 +14,7 @@
 
 ## Где находятся файлы и ключ
 
-- `C:\ServiceManager3000\signed\Bars Service Manager 3000.exe` — подписанная сборка.
+- `C:\ServiceManager3000\bin\Bars Manager 3000 2.3.13.exe` — текущая подписанная сборка; также опубликована в GitHub Releases.
 - `C:\ServiceManager3000\signing\Pavel-Shaklein-CodeSigning.cer` — открытый сертификат. Его можно распространять, закрытого ключа в нём нет.
 - `Cert:\CurrentUser\My\5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB` — сертификат с закрытым ключом в личном хранилище Windows текущего пользователя. `certmgr.msc` → «Личное» → «Сертификаты».
 - `%LOCALAPPDATA%\BARS\Bars Service Manager 3000\signing.json` — только отпечаток и путь к открытому сертификату. Это не резервная копия ключа.
@@ -79,7 +79,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 ## Проверить подпись
 
 ```powershell
-.\tools\Test-FileSignature.ps1 -FilePath 'C:\ServiceManager3000\signed\Bars Service Manager 3000.exe' `
+.\tools\Test-FileSignature.ps1 -FilePath 'C:\ServiceManager3000\signed\Bars Manager 3000 2.3.13.exe' `
     -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB'
 ```
 
@@ -94,7 +94,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 Встроенная команда Windows:
 
 ```powershell
-Get-AuthenticodeSignature -LiteralPath 'C:\ServiceManager3000\signed\Bars Service Manager 3000.exe' |
+Get-AuthenticodeSignature -LiteralPath 'C:\ServiceManager3000\signed\Bars Manager 3000 2.3.13.exe' |
     Format-List Status,StatusMessage,SignerCertificate,TimeStamperCertificate
 ```
 
@@ -143,7 +143,7 @@ try {
 
 ```powershell
 .\Test.ps1 -Sign -BuildDirectory C:\Temp\bars-signed-release-tests
-.\tests\SigningTests.ps1 -SignedExecutable 'C:\ServiceManager3000\signed\Bars Service Manager 3000.exe'
+.\tests\SigningTests.ps1 -SignedExecutable 'C:\ServiceManager3000\signed\Bars Manager 3000 2.3.13.exe'
 ```
 
 Пройдены 1505 проверок программы с подписанными встроенными помощниками и 11 проверок подписи: все три подписи, метки времени, отклонение другого издателя, отклонение копий с изменённым байтом и отсутствие автоматического доверия. Реальные службы в этих проверках не изменяются.

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Copies the unsigned test build and the .NET 6 installers into the lab VM (C:\Lab\Input) and verifies SHA-256 in the guest.
 .DESCRIPTION
@@ -12,7 +12,7 @@
     Folder with the vendor installers on the host. Default: the 'Biblioteki' folder in the drive root
     (path built from character codes so the script file stays ASCII-only).
 .PARAMETER BuildDirectory
-    Folder with 'Bars Service Manager 3000.exe' and 'Net6-Integration.exe' built by Build.ps1 / csc.
+    Folder with one 'Bars Manager 3000 x.x.x.exe' and 'Net6-Integration.exe' built by Build.ps1 / csc.
 #>
 [CmdletBinding()]
 param(
@@ -40,7 +40,9 @@ $net6Folder = Join-Path $LibraryRoot 'Microsoft .NET\.NET 6'
 $installers = @(Get-ChildItem -LiteralPath $net6Folder -Filter '*6.0.36*.exe' -File)
 if ($installers.Count -ne 4) { throw ('Expected 4 .NET 6.0.36 installers in ' + $net6Folder + ', found ' + $installers.Count) }
 
-$manager = Join-Path $BuildDirectory 'Bars Service Manager 3000.exe'
+$managerFiles = @(Get-ChildItem -LiteralPath $BuildDirectory -File -Filter 'Bars Manager 3000 *.exe' | Where-Object { $_.Name -match '^Bars Manager 3000 [0-9]+\.[0-9]+\.[0-9]+\.exe$' })
+if ($managerFiles.Count -gt 1) { throw 'More than one manager version found. Select a build directory containing a single version.' }
+$manager = if ($managerFiles.Count -eq 1) { $managerFiles[0].FullName } else { Join-Path $BuildDirectory 'Bars Service Manager 3000.exe' }
 $integration = Join-Path $BuildDirectory 'Net6-Integration.exe'
 foreach ($required in @($manager, $integration)) { if (-not (Test-Path -LiteralPath $required)) { throw "Build artifact not found: $required" } }
 if ((Get-AuthenticodeSignature -LiteralPath $manager).Status -ne 'NotSigned') { throw 'The test build must be unsigned (project rule: do not sign by default).' }

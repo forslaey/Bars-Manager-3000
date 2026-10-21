@@ -64,9 +64,10 @@ namespace ServiceTool
                             Show(dialog); var label = System.Linq.Enumerable.First(System.Linq.Enumerable.OfType<Label>(Children(dialog)), l => l.Text == "Bars Component Manager 3000");
                             Check(TextRenderer.MeasureText(label.Text, label.Font).Width <= label.Width, "English component product name fits About dialog"); dialog.Close();
                         }
-                        Button about = Button(form, "О программе"), back = Button(form, "В меню"), report = Button(form, "Сохранить отчёт");
-                        VerifyAbout(form, "Bars Component Manager 3000", "Проверка и установка компонентов BARS");
-                        Check(about.Top == back.Top && back.Top == report.Top && about.Height >= 38, "Library footer buttons share baseline and useful height");
+                        Button back = Button(form, "В меню"), report = Button(form, "Сохранить отчёт"), restart = Button(form,"Перезагрузка");
+                        Check(!Children(form).OfType<Button>().Any(b=>b.Text=="О программе"),"About exists only in launcher");
+                        Check(restart.Left<back.Left && back.Top==report.Top && back.Height>=38,"Restart before menu on aligned footer");
+                        Check(Children(form).OfType<Label>().Any(l=>l.Text=="Менеджер системных библиотек Windows"),"Localized content heading preserves product window title");
                         var all = Field<BrandButton>(form, "selectAll");
                         var allChecks = Field<Dictionary<string, LibraryCheck>>(form, "checks");
                         var notApplicable = ((LibraryPackage)grid.Rows[grid.Rows.Count - 1].Tag).Id;
@@ -121,16 +122,16 @@ namespace ServiceTool
                         form.SetTheme(dark, false); Show(form);
                         Check(Field<RefreshToggle>(form, "autoRefreshToggle").Text == "Проверять каждый 10с.", "Service toggle caption");
                         Check(Field<DataGridView>(form, "servicesGrid").CellBorderStyle == DataGridViewCellBorderStyle.Single, "Service cell borders on both axes");
-                        Button back = Button(form, "В меню"), about = Button(form, "О программе");
-                        VerifyAbout(form, "Bars Service Manager 3000", "Управление службами BARS");
-                        Check(back.Top == about.Top && back.Height == about.Height && back.Height >= 38, "Service footer buttons aligned");
+                        Button back = Button(form, "В меню");
+                        Check(!Children(form).OfType<Button>().Any(b=>b.Text=="О программе"),"Service About removed");
+                        Check(back.Height>=38,"Service menu remains usable");
                         back.PerformClick(); Check(!form.Visible && form.MenuRequested, "Standalone service module requests launcher on return");
                     }
                     using (var hub = new ManagerHub())
                     {
                         hub.SetTheme(dark, false); Show(hub);
                         VerifyAbout(hub, "Bars Manager 3000", "Управление службами и установка библиотек BARS");
-                        foreach (string title in new[] { "Менеджер Служб", "Менеджер компонентов" })
+                        foreach (string title in new[] { "Менеджер служб", "Менеджер библиотек" })
                         {
                             Button open = Button(hub, title); Control ancestor = open.Parent; while (!(ancestor is Card)) ancestor = ancestor.Parent;
                             Point position = ancestor.PointToClient(open.PointToScreen(Point.Empty));

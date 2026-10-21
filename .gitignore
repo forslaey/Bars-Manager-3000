@@ -35,3 +35,6 @@ LibraryReports/
 
 # User-requested preview of the four-module manager
 !releases/v2.2.0/Bars Manager 3000.exe
+
+# User-requested signed release
+!releases/v2.3.13/Bars Manager 3000 2.3.13.exe

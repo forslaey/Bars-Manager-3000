@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -62,6 +63,7 @@ namespace ServiceTool
             // GetFullPath would silently resolve a relative value against the process directory,
             // so the operator's input is rejected unless it already names a drive.
             if (!Path.IsPathRooted(value)) throw new IOException("Укажи полный путь с буквой диска, например C:\\DataKrat\\_tools");
+            if(value.Length<3 || value[1]!=':' || (value[2]!='\\'&&value[2]!='/')) throw new IOException("Укажи полный локальный путь с буквой диска");
             string full; try { full = Path.GetFullPath(value); } catch (ArgumentException) { throw new IOException("Некорректный путь"); } catch (NotSupportedException) { throw new IOException("Некорректный путь"); }
             if (full.StartsWith(@"\\", StringComparison.Ordinal)) throw new IOException("Сетевые пути не поддерживаются: выбери локальный диск");
             string root = Path.GetPathRoot(full);
@@ -81,6 +83,8 @@ namespace ServiceTool
             if (Path.GetFileName(target) != "_tools") throw new IOException("Некорректная целевая папка");
             var tools = Discover(source);
             if (Path.GetFullPath(source).TrimEnd('\\').Equals(target.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) throw new IOException("Исходная папка уже находится в выбранном месте");
+            string sourceFull=Path.GetFullPath(source).TrimEnd('\\'),targetFull=target.TrimEnd('\\');
+            if(sourceFull.StartsWith(targetFull+"\\",StringComparison.OrdinalIgnoreCase)||targetFull.StartsWith(sourceFull+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("Исходная папка и место установки не должны находиться друг внутри друга");
             SafePath(target);
             string parent = Path.GetDirectoryName(target); Directory.CreateDirectory(parent);
             string stage = Path.Combine(parent, ".bars-tools-" + Guid.NewGuid().ToString("N"));
@@ -172,8 +176,9 @@ namespace ServiceTool
             using (var layers = user.CreateSubKey(CompatibilityKey))
                 AdministratorSettings(layers, Launchers(source).Select(t => Path.Combine(target, t.Directory, t.Executable)));
         }
-        internal static void ShortcutsAt(string source, string target, string desktop)
+        internal static void ShortcutsAt(string source, string target, string desktop, bool create = true)
         {
+            if(!create)return;
             // Called in the interactive user's STA, never in the administrator helper.
             foreach (var tool in Launchers(source))
             {
@@ -201,6 +206,77 @@ namespace ServiceTool
                     shortcut.GetType().InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
                 }
                 finally { if (shortcut != null) Marshal.FinalReleaseComObject(shortcut); if (shell != null) Marshal.FinalReleaseComObject(shell); }
+            }
+        }
+        // Only recognizable tool directories below the selected _tools folder qualify.
+        internal static List<BarsTool> Installed(string target)
+        {
+            target=Path.GetFullPath(target); if(target.StartsWith(@"\\",StringComparison.Ordinal))throw new IOException("Для удаления выбери локальную папку"); SafePath(target);
+            if(!Path.GetFileName(target.TrimEnd('\\')).Equals("_tools",StringComparison.OrdinalIgnoreCase)) throw new IOException("Для удаления выбери папку _tools");
+            var result=new List<BarsTool>(); if(!Directory.Exists(target))return result;
+            string[] prefixes={"fiLinn","Piglet","WinSCP"},exes={"cspPanel.exe","DK-QStart.exe","WinSCP.exe"};
+            for(int i=0;i<prefixes.Length;i++)
+            {
+                string prefix=prefixes[i],exe=exes[i];
+                var matches=Directory.GetDirectories(target).Where(d=>Path.GetFileName(d).StartsWith(prefix,StringComparison.OrdinalIgnoreCase)&&File.Exists(Path.Combine(d,exe))).ToArray();
+                if(matches.Length>1)throw new IOException("Несколько папок "+prefix+": удаление неоднозначно");
+                if(matches.Length==1){SafePath(matches[0]);SafePath(Path.Combine(matches[0],exe));result.Add(new BarsTool{Name=prefix,Directory=Path.GetFileName(matches[0]),Executable=exe});}
+            }
+            return result;
+        }
+        internal static List<string> InstalledLaunchers(string target,IEnumerable<BarsTool> tools)
+        {
+            var paths=new List<string>();foreach(var tool in tools){paths.Add(Path.Combine(target,tool.Directory,tool.Executable));if(tool.Name=="fiLinn")paths.Add(Path.Combine(target,tool.Directory,"tftpd32.exe"));}return paths;
+        }
+        internal static void Remove(string target,string confirmedDirectories,Action<string> progress)
+        {
+            target=Path.GetFullPath(target); var tools=Installed(target);
+            if(tools.Count==0 || String.Join("\n",tools.Select(t=>t.Directory))!=confirmedDirectories)throw new IOException("Состав утилит изменился. Проверь путь и повтори удаление");
+            foreach(string exe in InstalledLaunchers(target,tools))foreach(var process in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(exe)))using(process)
+            {
+                try{if(!process.HasExited && process.MainModule.FileName.StartsWith(target.TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("Закрой утилиты перед удалением");}
+                catch(System.ComponentModel.Win32Exception){throw new IOException("Не удалось проверить работающую утилиту. Закрой её перед удалением");}
+            }
+            // All resolved removal targets must stay inside the explicitly selected folder.
+            foreach(var tool in tools){string directory=Path.GetFullPath(Path.Combine(target,tool.Directory));if(!directory.StartsWith(target.TrimEnd('\\')+"\\",StringComparison.OrdinalIgnoreCase))throw new IOException("Путь удаления выходит за пределы _tools");SafePath(directory);}
+            LibraryCancellation.Check();
+            string stage=Path.Combine(target,".bars-remove-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(stage);
+            var moved=new List<BarsTool>();
+            try{foreach(var tool in tools){Directory.Move(Path.Combine(target,tool.Directory),Path.Combine(stage,tool.Directory));moved.Add(tool);}}
+            catch{foreach(var tool in moved.AsEnumerable().Reverse())Directory.Move(Path.Combine(stage,tool.Directory),Path.Combine(target,tool.Directory));Directory.Delete(stage);throw;}
+            // Backups and unrelated directories/files are deliberately outside this private stage.
+            try{DeleteStage(stage);}catch(Exception ex){throw new IOException("Не удалось завершить удаление. Остатки находятся в "+stage+". "+ex.Message);}
+            progress("Удалены: "+String.Join(", ",tools.Select(t=>t.Name))+". Посторонние файлы и резервные копии сохранены");
+        }
+        internal static void RemoveAdministratorSettings(RegistryKey layers,IEnumerable<string> paths)
+        {
+            foreach(string path in paths)
+            {
+                string value=Convert.ToString(layers.GetValue(path,""));if(value.Length==0)continue;
+                string rest=String.Join(" ",value.Split(new[]{' ','\t'},StringSplitOptions.RemoveEmptyEntries).Where(f=>!f.Equals("RUNASADMIN",StringComparison.OrdinalIgnoreCase)));
+                if(rest=="~"||rest.Length==0)layers.DeleteValue(path,false);else layers.SetValue(path,rest,RegistryValueKind.String);
+            }
+        }
+        internal static void RemoveReferences(string target,IEnumerable<BarsTool> tools,string desktop)
+        {
+            var paths=InstalledLaunchers(target,tools);
+            using(var user=RegistryKey.OpenBaseKey(RegistryHive.CurrentUser,Environment.Is64BitOperatingSystem?RegistryView.Registry64:RegistryView.Registry32))
+            using(var layers=user.OpenSubKey(CompatibilityKey,true)){if(layers!=null)RemoveAdministratorSettings(layers,paths);}
+            RemoveShortcuts(paths,desktop);
+        }
+        internal static void RemoveShortcuts(IEnumerable<string> targets,string desktop)
+        {
+            if(!Directory.Exists(desktop))return;SafePath(desktop);var expected=new HashSet<string>(targets.Select(Path.GetFullPath),StringComparer.OrdinalIgnoreCase);
+            foreach(string link in Directory.GetFiles(desktop,"*.lnk"))
+            {
+                SafePath(link);object shell=null,shortcut=null;
+                try
+                {
+                    shell=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell",true));shortcut=shell.GetType().InvokeMember("CreateShortcut",BindingFlags.InvokeMethod,null,shell,new object[]{link});
+                    string previous=Convert.ToString(shortcut.GetType().InvokeMember("TargetPath",BindingFlags.GetProperty,null,shortcut,null));
+                    if(!String.IsNullOrWhiteSpace(previous)&&expected.Contains(Path.GetFullPath(previous)))File.Delete(link);
+                }
+                finally{if(shortcut!=null)Marshal.FinalReleaseComObject(shortcut);if(shell!=null)Marshal.FinalReleaseComObject(shell);}
             }
         }
         internal static string FindSource()

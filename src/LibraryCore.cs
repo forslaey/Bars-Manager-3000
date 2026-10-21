@@ -92,15 +92,16 @@ namespace ServiceTool
             OsVersion version = new OsVersion { Size = Marshal.SizeOf(typeof(OsVersion)) };
             return RtlGetVersion(ref version) == 0 ? version.Build : 0;
         }
-        public static bool RebootPending()
+        public static bool RebootPending() { return RebootPendingReason().Length>0; }
+        internal static string RebootPendingReason()
         {
             foreach (RegistryView view in Views())
             using (RegistryKey machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view))
             {
-                using (RegistryKey key = machine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending")) if (key != null) return true;
-                using (RegistryKey key = machine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired")) if (key != null) return true;
+                using (RegistryKey key = machine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending")) if (key != null) return "Windows ожидает перезагрузки после обслуживания компонентов (CBS). Это не обязательно результат работы менеджера.";
+                using (RegistryKey key = machine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired")) if (key != null) return "Центр обновления Windows ожидает перезагрузки. Это не обязательно результат работы менеджера.";
             }
-            return false;
+            return "";
         }
         internal static RegistryView[] Views() { return Environment.Is64BitOperatingSystem ? new[] { RegistryView.Registry64, RegistryView.Registry32 } : new[] { RegistryView.Registry32 }; }
         public static List<LibraryCheck> Scan()

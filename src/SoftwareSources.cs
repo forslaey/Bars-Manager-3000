@@ -45,12 +45,26 @@ namespace ServiceTool
         }
         internal static string Text(string id, string url)
         {
-            using (var response=Open(id,url)) using (var input=response.GetResponseStream()) using (var output=new MemoryStream())
+            using (var response=Open(id,url))
             {
+                string content=(response.ContentType??"").Split(';')[0].Trim();
+                if(!content.StartsWith("text/",StringComparison.OrdinalIgnoreCase)&&!content.Equals("application/json",StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Вместо сведений о версии сервер вернул другой тип файла");
+                if(response.ContentLength>4*1024*1024)throw new InvalidDataException("Ответ метаданных слишком большой");
+                using(var input=response.GetResponseStream()) using(var output=new MemoryStream())
+                {
                 var buffer=new byte[16384]; int n;
                 while ((n=input.Read(buffer,0,buffer.Length))>0) { LibraryCancellation.Check(); if (output.Length+n>4*1024*1024) throw new InvalidDataException("Ответ метаданных слишком большой"); output.Write(buffer,0,n); }
                 return Encoding.UTF8.GetString(output.ToArray());
+                }
             }
+        }
+        internal static SoftwarePackage ParseAnyDesk(string text)
+        {
+            var matches=Regex.Matches(text??"",@"(?m)^\s*\d{2}\.\d{2}\.\d{4}\s+-\s+(\d+(?:\.\d+){1,3})\s+\(Windows\)[ \t]*\r?$",RegexOptions.IgnoreCase);
+            if(matches.Count==0)throw new InvalidDataException("В официальном списке выпусков не найдена стабильная версия AnyDesk для Windows");
+            string version=matches[0].Groups[1].Value;
+            foreach(Match match in matches)if(SoftwareCatalog.Compare(match.Groups[1].Value,version)>0)version=match.Groups[1].Value;
+            return new SoftwarePackage{Id="anydesk",Architecture="x86",Version=version,File="AnyDesk.exe",Url="https://download.anydesk.com/AnyDesk.exe",Source="Официальный AnyDesk · Windows",Sha256=""};
         }
         internal static SoftwarePackage ParseGitHub(string id, string json)
         {
@@ -76,6 +90,11 @@ namespace ServiceTool
         }
         internal static SoftwarePackage GitHub(string id)
         { return ParseGitHub(id,Text(id,"https://api.github.com/repos/"+(id=="notepad" ? "notepad-plus-plus/notepad-plus-plus" : "ip7z/7zip")+"/releases/latest")); }
+        internal static SoftwarePackage GitHubVersion(string version)
+        {
+            Version parsed; if(!Version.TryParse(version,out parsed)) throw new InvalidDataException("Неверная версия 7-Zip");
+            return ParseGitHub("7zip",Text("7zip","https://api.github.com/repos/ip7z/7zip/releases/tags/"+Uri.EscapeDataString(version)));
+        }
         internal static SoftwarePackage ParseRuDesktop(string html)
         {
             var matches=Regex.Matches(html,@"https://storage\.rudesktop\.ru/download/rudesktop-(\d+(?:\.\d+){1,3})-x64\.msi",RegexOptions.IgnoreCase);
@@ -87,7 +106,7 @@ namespace ServiceTool
         {
             if (id=="notepad" || id=="7zip") return GitHub(id);
             if (id=="rudesktop") return ParseRuDesktop(Text(id,"https://rudesktop.ru/downloads/"));
-            if (id=="anydesk") {using(var probe=Open(id,"https://download.anydesk.com/AnyDesk.exe")){if(probe.ContentLength>=0 && probe.ContentLength<65536)throw new IOException("Официальный источник не вернул установщик");}return new SoftwarePackage { Id=id, Architecture="x86", Version="0.0", File="AnyDesk.exe", Url="https://download.anydesk.com/AnyDesk.exe", Source="Официальный AnyDesk · версия после получения", Sha256="" };}
+            if (id=="anydesk") return ParseAnyDesk(Text(id,"https://download.anydesk.com/changelog.txt"));
             throw new InvalidDataException("Неизвестный источник");
         }
         internal static SoftwarePackage Download(SoftwarePackage remote, string cache, Action<string> progress, Func<bool> cancelled)

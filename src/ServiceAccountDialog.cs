@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -64,7 +64,7 @@ namespace ServiceTool
             ConfigureCombo(username);
             var userRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             userRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            userRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 36));
+            userRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48));
             userRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             userRow.Controls.Add(username, 0, 0);
             var refreshUsers = new BrandButton { Text = "↻", AccessibleName = "Обновить список пользователей Windows", Palette = colors,

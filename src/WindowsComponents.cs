@@ -115,7 +115,7 @@ namespace ServiceTool
     }
     internal static class ManagerSystemActions
     {
-        internal static bool Known(string action) { return action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "system-restart" || action == "software-install" || action == "software-defaults" || action == "software-query"; }
+        internal static bool Known(string action) { return action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "tools-remove" || action == "system-restart" || action == "software-install" || action == "software-defaults" || action == "software-query" || action == "software-remove" || action == "software-access"; }
         internal static LibraryInstallResult Execute(string action, string data, string path, Action<string> progress)
         {
             if (!Known(action)) throw new InvalidDataException("Неизвестное действие менеджера");
@@ -126,13 +126,16 @@ namespace ServiceTool
                 if (!acquired) throw new InvalidOperationException("Другая операция менеджера ещё выполняется");
                 try
                 {
+                    if (action == "software-remove") return SoftwareMaintenance.Remove(data,progress);
+                    if (action == "software-access") return SoftwareMaintenance.ConfigureAccess(data,progress);
                     if (action == "software-query") return new LibraryInstallResult {ExitCode=0,State=LibraryState.Unknown,Message=SoftwareDetection.Query(data)};
                     if (action == "software-install") return SoftwareInstaller.Install(data,path,progress);
                     if (action == "software-defaults") return SoftwareDefaults.Apply(data,progress);
                     if (action == "features-query") return WindowsComponents.Run(WindowsComponents.QueryScript(), progress);
                     if (action == "features-enable") return WindowsComponents.Run(WindowsComponents.EnableScript(data), progress);
                     if (action == "features-disable") return WindowsComponents.Run(WindowsComponents.DisableScript(data), progress);
-                    if (action == "tools-deploy") { ToolsDeployment.Copy(data, path, progress, () => LibraryCancellation.Requested); return new LibraryInstallResult { ExitCode = 0, Message = "Утилиты скопированы", State = LibraryState.Installed }; }
+                    if (action == "tools-remove") {ToolsDeployment.Remove(path,data,progress);return new LibraryInstallResult {ExitCode=0,State=LibraryState.Missing,Message="Утилиты удалены"};}
+                    if (action == "tools-deploy") { ToolsDeployment.CopyToTarget(data, path, progress, () => LibraryCancellation.Requested); return new LibraryInstallResult { ExitCode = 0, Message = "Утилиты скопированы", State = LibraryState.Installed }; }
                     if (data != "restart-confirmed" || path != "") throw new InvalidDataException("Перезагрузка не подтверждена");
                     var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "shutdown.exe"), "/r /t 0") { UseShellExecute = false, CreateNoWindow = true };
                     using (var process = Process.Start(start)) { process.WaitForExit(); if (process.ExitCode != 0) throw new InvalidOperationException("Windows не приняла запрос перезагрузки: " + process.ExitCode); }

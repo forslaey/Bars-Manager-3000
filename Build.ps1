@@ -26,22 +26,23 @@ try {
     }
     if ($Sign) { foreach ($taskArchitecture in @('x86','x64')) { & (Join-Path $PSScriptRoot 'tools\Sign-File.ps1') -FilePath (Join-Path $taskBuild "Installer.$taskArchitecture.exe") -CertificateThumbprint $CertificateThumbprint -TimestampServer $TimestampServer } }
     $taskSources = @(Get-ChildItem -LiteralPath $taskSource -File -Filter '*.cs' | ForEach-Object FullName)
-    $taskResources = @("/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico")
+    $taskResources = @("/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png")
     foreach ($taskArchitecture in @('x86','x64')) { $taskResources += "/resource:$(Join-Path $taskBuild "Installer.$taskArchitecture.exe"),BARS.Helper.$taskArchitecture" }
-    $taskStaged = Join-Path $taskBuild 'Bars Service Manager 3000.exe'
+    $taskStaged = Join-Path $taskBuild 'Bars Manager 3000.exe'
     & $taskCompiler @taskCommon @taskResources '/platform:anycpu' "/out:$taskStaged" @taskSources
     if ($LASTEXITCODE -ne 0) { throw "Ошибка компиляции: $LASTEXITCODE" }
     if ($Sign) { & (Join-Path $PSScriptRoot 'tools\Sign-File.ps1') -FilePath $taskStaged -CertificateThumbprint $CertificateThumbprint -TimestampServer $TimestampServer }
-    $taskBinary = Join-Path $taskOutput 'Bars Service Manager 3000.exe'
+    $taskVersion = ([version][Diagnostics.FileVersionInfo]::GetVersionInfo($taskStaged).FileVersion).ToString(3)
+    $taskBinary = Join-Path $taskOutput ("Bars Manager 3000 $taskVersion.exe")
     Copy-Item -LiteralPath $taskStaged -Destination $taskBinary -Force
-    foreach ($taskOld in @('ServiceManager3000.exe','ServiceManager3000.exe.config','ServiceManager3000.x86.exe','ServiceManager3000.x86.exe.config','ServiceManager3000.x64.exe','ServiceManager3000.x64.exe.config','Bars Service Manager 3000.exe.config')) {
+    foreach ($taskOld in @('Bars Service Manager 3000.exe','ServiceManager3000.exe','ServiceManager3000.exe.config','ServiceManager3000.x86.exe','ServiceManager3000.x86.exe.config','ServiceManager3000.x64.exe','ServiceManager3000.x64.exe.config','Bars Service Manager 3000.exe.config')) {
         $taskOldPath = Join-Path $taskOutput $taskOld
         if (Test-Path -LiteralPath $taskOldPath) { Remove-Item -LiteralPath $taskOldPath -Force }
     }
     Write-Output "Собрано: $taskBinary (один файл; установщики x86/x64 встроены)"
 }
 finally {
-    foreach ($taskName in @('Installer.x86.exe','Installer.x64.exe','Bars Service Manager 3000.exe')) {
+    foreach ($taskName in @('Installer.x86.exe','Installer.x64.exe','Bars Manager 3000.exe')) {
         $taskFile = Join-Path $taskBuild $taskName
         if (Test-Path -LiteralPath $taskFile) { Remove-Item -LiteralPath $taskFile -Force }
     }

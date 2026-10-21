@@ -128,7 +128,6 @@ namespace ServiceTool
         private readonly Button refreshButton;
         private readonly Button servicesButton;
         private readonly Button themeToggleButton;
-        private readonly Button aboutButton;
         private readonly Button installProfileButton;
         private readonly ToolTip toolTips = new ToolTip();
         private readonly Button startButton;
@@ -233,7 +232,7 @@ namespace ServiceTool
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             layout.RowCount = 5;
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 142));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 184));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 390));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
@@ -276,26 +275,29 @@ namespace ServiceTool
 
             Card fileCard = new Card { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10) };
             fileCard.Padding = new Padding(12, 12, 12, 14);
-            TableLayoutPanel fileLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = new Padding(0), Padding = new Padding(0) };
+            TableLayoutPanel fileLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = new Padding(0), Padding = new Padding(0) };
             fileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+            fileLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-            fileLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             fileCard.Controls.Add(fileLayout);
             fileTitle.Text = "Перетащи сюда .exe-файл службы BARS";
             fileTitle.Font = new Font(Font, FontStyle.Bold);
             fileTitle.Dock = DockStyle.Fill;
             fileTitle.AutoEllipsis = true;
             fileTitle.Margin = new Padding(0);
-            fileLayout.Controls.Add(fileTitle, 0, 0);
+            var moduleTitle=new FlushLabel {Text="Менеджер служб",Font=new Font("Segoe UI",15F,FontStyle.Bold),Dock=DockStyle.Fill,Margin=Padding.Empty,TextAlign=ContentAlignment.MiddleLeft};
+            fileLayout.Controls.Add(moduleTitle,0,0);
+            fileLayout.Controls.Add(fileTitle, 0, 2);
             Label fileHelp = new FlushLabel { Text = "Или выбери файл кнопкой. Перетаскивание только выбирает .exe службы BARS.", Tag = "muted", Font = new Font("Segoe UI", 9F), ForeColor = muted, Dock = DockStyle.Fill, Margin = new Padding(0) };
-            fileLayout.Controls.Add(fileHelp, 0, 1);
+            fileLayout.Controls.Add(fileHelp, 0, 3);
             TableLayoutPanel fileInput = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 2, Margin = new Padding(0) };
             fileInput.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             fileInput.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 192));
             fileInput.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            fileLayout.Controls.Add(fileInput, 0, 2);
+            fileLayout.Controls.Add(fileInput, 0, 4);
             pathBox.ReadOnly = true;
             pathBox.BackColor = Color.FromArgb(248, 250, 253);
             pathBox.BorderStyle = BorderStyle.FixedSingle;
@@ -521,6 +523,9 @@ namespace ServiceTool
             startupCombo.DropDownStyle = ComboBoxStyle.DropDownList;
             startupCombo.FlatStyle = FlatStyle.Flat;
             startupCombo.DrawMode = DrawMode.OwnerDrawFixed;
+            ((BrandComboBox)startupCombo).HoverHighlight=false;
+            startupCombo.ItemHeight=startupCombo.Font.Height+8;
+            startupCombo.FontChanged+=delegate{startupCombo.ItemHeight=startupCombo.Font.Height+8;};
             startupCombo.Items.AddRange(new object[] { "Автоматически", "Автоматически (отложенный запуск)", "Вручную", "Отключена" });
             startupCombo.DrawItem += DrawStartupItem;
             startupCombo.SelectedIndexChanged += delegate { if (!bindingServices) { startupDirty = true; UpdateServiceControls(false); } };
@@ -534,7 +539,10 @@ namespace ServiceTool
             startupSlot.Controls.Add(startupCombo);
             startupSlot.Layout += delegate
             {
-                startupCombo.SetBounds(0, (startupSlot.ClientSize.Height - startupCombo.Height) / 2, startupSlot.ClientSize.Width, startupCombo.Height);
+                int width=(int)Math.Round(startupSlot.ClientSize.Width*0.8);
+                startupCombo.SetBounds(0, (startupSlot.ClientSize.Height - startupCombo.Height) / 2, width, startupCombo.Height);
+                int dropWidth=width;foreach(object item in startupCombo.Items)dropWidth=Math.Max(dropWidth,TextRenderer.MeasureText(Convert.ToString(item),startupCombo.Font).Width+40);
+                startupCombo.DropDownWidth=dropWidth;
             };
             management.Controls.Add(startupSlot, 3, 1);
             management.Controls.Add(applyStartupButton, 4, 1);
@@ -570,25 +578,15 @@ namespace ServiceTool
             activity.Tag = "muted";
             activity.ForeColor = muted;
             activity.Text = "Локальный компьютер • автообновление: 10 с";
-            TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0, 8, 0, 0) };
+            TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(activity, 0, 0);
-            aboutButton = MakeButton("О программе", false);
-            aboutButton.Font = new Font("Segoe UI", 10F);
-            aboutButton.Dock = DockStyle.Fill;
-            aboutButton.Margin = new Padding(0, 0, 10, 0);
-            aboutButton.Click += delegate
-            {
-                using (AboutDialog dialog = new AboutDialog(palette, Icon, "Bars Service Manager 3000", "Управление службами BARS")) dialog.ShowDialog(this);
-            };
-            footer.Controls.Add(aboutButton, 1, 0);
             Button menuButton = MakeButton("В меню", false);
             menuButton.Dock = DockStyle.Fill; menuButton.Margin = Padding.Empty;
             menuButton.Click += delegate { MenuRequested = true; Close(); };
-            footer.Controls.Add(menuButton, 2, 0);
+            footer.Controls.Add(menuButton, 1, 0);
             layout.Controls.Add(footer, 0, 4);
 
             timer.Interval = 10000;

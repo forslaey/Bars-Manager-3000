@@ -33,6 +33,8 @@ namespace ServiceTool
         private bool closeAfterCancel;
         private bool rebootRequired, pendingRestart;
         private readonly BrandButton restart;
+        private readonly ToolTip restartHelp = new ToolTip();
+        private readonly BrandButton windowsComponents;
         private Func<bool, DialogResult> confirmCancellation = null;
         internal const string CancelWarning = "Отменить очередь и завершить процессы текущего установщика?\r\n\r\nСначала отправим запрос закрытия; через 2 секунды завершим оставшиеся процессы этой очереди. Принудительное прерывание может оставить компонент установленным частично. Полный откат не гарантирован; после отмены нужна проверка.\r\n\r\nСистемную службу Windows Installer и посторонние установки не завершаем. Windows может продолжить завершение своей операции или откат.";
         internal bool MenuRequested { get; private set; }
@@ -52,14 +54,14 @@ namespace ServiceTool
             }
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 124)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 154)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
             var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 12) };
-            var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Margin = Padding.Empty };
+            var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
-            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            Label title = Label("Bars Component Manager 3000", false); title.Font = new Font("Segoe UI", 13, FontStyle.Bold); statusLayout.Controls.Add(title, 0, 0);
+            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            Label title = Label("Менеджер системных библиотек Windows", false); title.Font = new Font("Segoe UI", 13, FontStyle.Bold); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
             monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.Fill; monitor.Checked = true; monitor.Margin = Padding.Empty;
-            monitor.CheckedChanged += delegate { timer.Enabled = monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 0);
+            monitor.CheckedChanged += delegate { timer.Enabled = monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 3);
             summary = Label("Проверяем установленные компоненты…", true); statusLayout.Controls.Add(summary, 0, 1); statusLayout.SetColumnSpan(summary, 2);
             sourceLabel = Label("", true); sourceLabel.Font = new Font("Segoe UI", 9); statusLayout.Controls.Add(sourceLabel, 0, 2); statusLayout.SetColumnSpan(sourceLabel, 2); status.Controls.Add(statusLayout);
             body.Controls.Add(status, 0, 0);
@@ -81,13 +83,14 @@ namespace ServiceTool
             var logTitle = Label("Журнал проверки и установки", true); logTitle.Dock = DockStyle.Top; logTitle.Height = 24; logTitle.Font = new Font("Segoe UI", 9);
             journal.Dock = DockStyle.Fill; journal.Font = new Font("Consolas", 9); journalScroll.Dock = DockStyle.Right; journalScroll.Width = 14; journalScroll.Bind(journal);
             logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(logCard, 0, 2);
-            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            restart = Button("Перезагрузить…", false); restart.Margin = Padding.Empty; restart.Enabled = false; restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 4, 0);
-            activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0);
-            report = Button("Сохранить отчёт", false); report.Click += delegate { ExportReport(); }; footer.Controls.Add(report, 2, 0);
-            BrandButton back = Button("В меню", false); back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 3, 0);
-            BrandButton about = Button("О программе", false); about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon, "Bars Component Manager 3000")) dialog.ShowDialog(this); }; footer.Controls.Add(about, 1, 0); body.Controls.Add(footer, 0, 3);
+            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 2, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            restart = Button("Перезагрузка", false); restart.Margin = new Padding(0, 0, 10, 0); restart.Enabled = false; restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
+            activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0); footer.SetColumnSpan(activity, 5);
+            report = Button("Сохранить отчёт", false); report.Click += delegate { ExportReport(); }; footer.Controls.Add(report, 1, 1);
+            BrandButton back = Button("В меню", false); back.Margin = Padding.Empty; back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
+            windowsComponents = Button("Компоненты", false); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
+            body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false); UpdateSource();
             timer.Tick += async delegate { if (!installing && !checking && Visible) await RefreshAsync(false); };
             Shown += async delegate
@@ -121,6 +124,28 @@ namespace ServiceTool
             activity.Text = closing ? (MenuRequested ? "Отменяем операцию и возвращаемся в меню…" : "Отменяем операцию и закрываем программу…") : "Отменяем текущую операцию…";
             Log("Запрошена отмена: новые пакеты не запускаются; процессы активной установки будут завершены. Полный откат не гарантирован.");
         }
+        private void UpdateRestartAvailability()
+        {
+            string reason=pendingRestart ? "Установщик сообщил о необходимости перезагрузки." : LibraryDetection.RebootPendingReason();
+            restart.Enabled=!installing&&!checking&&reason.Length>0;
+            restart.AccessibleDescription=reason.Length>0?reason:"Перезагрузка не требуется.";
+            restartHelp.SetToolTip(restart,restart.AccessibleDescription);
+        }
+        private void OpenWindowsComponents()
+        {
+            if(installing || checking) return;
+            bool wasRunning=timer.Enabled; timer.Stop();
+            try
+            {
+                using(var form=new WindowsFeaturesForm(preview, true))
+                {
+                    form.SetTheme(Colors.Dark,false); form.StartPosition=FormStartPosition.CenterParent;
+                    form.ShowDialog(this);
+                }
+                SetTheme(ThemePreference.LoadDark(),false);
+            }
+            finally { if(!IsDisposed && !Disposing) timer.Enabled=wasRunning && monitor.Checked && !preview; }
+        }
         private void ConfigureGrid()
         {
             grid.Dock = DockStyle.Fill; grid.Margin = Padding.Empty; grid.BackgroundColor = Colors.Surface; grid.BorderStyle = BorderStyle.None;
@@ -138,7 +163,7 @@ namespace ServiceTool
             grid.EditMode = DataGridViewEditMode.EditProgrammatically;
             grid.CellClick += delegate(object sender, DataGridViewCellEventArgs e) { if (!binding && e.RowIndex >= 0 && e.ColumnIndex > 0) { useFocusedRow = true; UpdateAction(); } };
             grid.CurrentCellChanged += delegate { if (!binding && grid.Focused && grid.CurrentCell != null && grid.CurrentCell.ColumnIndex > 0) { useFocusedRow = true; UpdateAction(); } };
-            grid.CellMouseClick += delegate(object sender, DataGridViewCellMouseEventArgs e)
+            grid.CellMouseDown += delegate(object sender, DataGridViewCellMouseEventArgs e)
             { if (e.Button == MouseButtons.Left && e.ColumnIndex == 0) ToggleSelection(e.RowIndex); };
             grid.KeyDown += delegate(object sender, KeyEventArgs e)
             { if (e.KeyCode == Keys.Space && !e.Alt && !e.Control && grid.CurrentRow != null) { ToggleSelection(grid.CurrentRow.Index); e.Handled = e.SuppressKeyPress = true; } };
@@ -258,7 +283,7 @@ namespace ServiceTool
         internal async Task RefreshAsync(bool refreshSource)
         {
             if (checking || installing || IsDisposed) return;
-            checking = true; refresh.Enabled = install.Enabled = false; activity.Text = "Проверяем систему…";
+            checking = true; windowsComponents.Enabled = false; refresh.Enabled = install.Enabled = restart.Enabled = false; activity.Text = "Проверяем систему…";
             try
             {
                 if (refreshSource && !String.IsNullOrEmpty(source) && Directory.Exists(source))
@@ -273,12 +298,12 @@ namespace ServiceTool
                     SelectMissing(); firstScan = false;
                     if (!preview) try { var saved = PausedLibraryQueue.Load(); if (saved.Count > 0) { selection.Clear(); foreach (var id in saved) if (checks.ContainsKey(id) && checks[id].State != LibraryState.NotApplicable) selection.Add(id); Log("Восстановлен выбор приостановленной очереди. Проверь состояния и выбери действие заново; автоматически ничего не запускается."); } } catch (Exception ex) { Log("Не удалось восстановить выбор: " + ex.Message); }
                 }
-                restart.Enabled = !installing && (pendingRestart || LibraryDetection.RebootPending());
+                UpdateRestartAvailability();
                 RenderRows(); Log("Проверка завершена. Подходящих компонентов: " + checks.Values.Count(c => c.State == LibraryState.Installed) + " из " + checks.Count + "; нужно обновить: " + checks.Values.Count(c => c.Relation == LibraryRelation.Older) + "; нужна проверка: " + checks.Values.Count(c => c.State == LibraryState.Unknown) + ".");
                 activity.Text = "Проверка работает без папки установщиков";
             }
             catch (Exception ex) { Log("Ошибка проверки: " + ex.Message); activity.Text = "Не удалось завершить проверку"; }
-            finally { checking = false; if (!IsDisposed) { refresh.Enabled = install.Enabled = true; UpdateAction(); } }
+            finally { checking = false; if (!IsDisposed) { windowsComponents.Enabled = !installing; refresh.Enabled = install.Enabled = true; UpdateRestartAvailability(); UpdateAction(); } }
         }
         private async Task ReadSourceAsync()
         {
@@ -326,7 +351,7 @@ namespace ServiceTool
                     catch (Exception ex) { Log("Не удалось выбрать папку: " + ex.Message); return; } }
             }
             }
-            UpdateSource(); installing = true; stopRequested = cancelRequested = closeAfterCancel = false; timer.Stop(); install.Enabled = refresh.Enabled = selectAll.Enabled = restart.Enabled = false; stop.Enabled = true;
+            UpdateSource(); installing = true; windowsComponents.Enabled = false; stopRequested = cancelRequested = closeAfterCancel = false; timer.Stop(); install.Enabled = refresh.Enabled = selectAll.Enabled = restart.Enabled = false; stop.Enabled = true;
             foreach (DataGridViewRow row in grid.Rows) row.Cells[0].ReadOnly = true;
             try
             {
@@ -404,7 +429,7 @@ namespace ServiceTool
                 {
                     stop.Enabled = false; refresh.Enabled = install.Enabled = true; timer.Enabled = monitor.Checked && !closeAfterCancel;
                     activity.Text = cancelRequested ? "Отменено. Проверь состояние компонентов перед повторной установкой." : "Очередь завершена или приостановлена. Подробности в журнале.";
-                    RenderRows(); restart.Enabled = pendingRestart || LibraryDetection.RebootPending();
+                    RenderRows(); windowsComponents.Enabled = true; UpdateRestartAvailability();
                     if (closeAfterCancel) BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) Close(); });
                 }
             }
@@ -434,6 +459,6 @@ namespace ServiceTool
             }
             SelectMissing(); RenderRows(); activity.Text = "Проверка системы доступна без установщиков"; Log("Проверка завершена. Путь к библиотекам запросим при начале установки.");
         }
-        protected override void Dispose(bool disposing) { if (disposing) { if (installing && activeSession != null) activeSession.Cancel(); timer.Dispose(); } base.Dispose(disposing); if (disposing) headerFont.Dispose(); }
+        protected override void Dispose(bool disposing) { if (disposing) { if (installing && activeSession != null) activeSession.Cancel(); timer.Dispose(); restartHelp.Dispose(); } base.Dispose(disposing); if (disposing) headerFont.Dispose(); }
     }
 }

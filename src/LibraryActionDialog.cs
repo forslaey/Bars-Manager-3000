@@ -13,11 +13,11 @@ namespace ServiceTool
             var items = selected.ToList();
             Text = "Действие с компонентами"; Icon = icon; Font = new Font("Segoe UI", 10);
             AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(760, 450); MinimumSize = new Size(700, 430); StartPosition = FormStartPosition.CenterParent;
+            ClientSize = new Size(760, 470); MinimumSize = new Size(700, 450); StartPosition = FormStartPosition.CenterParent;
             BackColor = colors.Canvas; ForeColor = colors.Text; DoubleBuffered = true; MinimizeBox = MaximizeBox = false;
             var layout = new BufferedLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 1, RowCount = 4 };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 92)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
             layout.Controls.Add(new Label { Text = "Выбранные компоненты", Font = new Font(Font, FontStyle.Bold), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft }, 0, 0);
             var card = new Card { Dock = DockStyle.Fill, BackColor = colors.Surface, BorderColor = colors.Border, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 8) };
             var list = new JournalTextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true, BorderStyle = BorderStyle.None, BackColor = colors.Surface, ForeColor = colors.Text, Font = Font };

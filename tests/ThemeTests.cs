@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -297,7 +297,7 @@ namespace ServiceTool
                 detail.PointToScreen(Point.Empty).X == grid.PointToScreen(Point.Empty).X, "Summary aligns with the list without a left inset at " + scale);
             CheckBox refresh = Field<RefreshToggle>(form, "autoRefreshToggle");
             VerifyFitsAncestors(refresh, "Autorefresh toggle at " + scale);
-            VerifyFitsAncestors(Field<Button>(form, "aboutButton"), "About button at " + scale);
+
             Control[] registration = { Field<Button>(form, "installButton"), Field<Button>(form, "removeButton"), Field<Button>(form, "installProfileButton"),
                 Field<Button>(form, "refreshButton"), Field<Button>(form, "servicesButton") };
             float center = registration[0].Top + registration[0].Height / 2F;

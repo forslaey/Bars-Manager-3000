@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -92,8 +94,8 @@ namespace ServiceTool
         {
             Find(package.Id);
             if (!Environment.Is64BitOperatingSystem) throw new InvalidOperationException("Этот модуль устанавливает программы на Windows x64");
-            if (package.Architecture != "x64" && !(package.Id == "anydesk" && package.Architecture == "x86" && allowAnyDesk32))
-                throw new InvalidOperationException("Требуется x64. Для AnyDesk x86 нужно явно разрешённое исключение");
+            if (package.Architecture != "x64" && !(package.Id == "anydesk" && package.Architecture == "x86"))
+                throw new InvalidOperationException("Требуется x64; AnyDesk поддерживается также в разрядности x86");
             if (!Regex.IsMatch(package.Sha256 ?? "", @"\A[0-9a-fA-F]{64}\z")) throw new InvalidDataException("Нет контрольной суммы пакета");
         }
         internal static string FindFolder()
@@ -104,18 +106,25 @@ namespace ServiceTool
             return root == null ? null : Path.Combine(root, "_soft");
         }
         internal static List<SoftwarePackage> Local(string folder, Action<string> progress, string sourceLabel="Локальный _soft")
+        { return Local(folder,progress,sourceLabel,true); }
+        internal static List<SoftwarePackage> Local(string folder, Action<string> progress, string sourceLabel, bool onlineDigest)
         {
             var packages = new List<SoftwarePackage>(); if (String.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder)) return packages;
             ToolsDeployment.SafePath(folder);
             foreach (string file in Directory.GetFiles(folder))
             {
-                LibraryCancellation.Check(); string name = Path.GetFileName(file).ToLowerInvariant();
-                string id = name.StartsWith("npp.") ? "notepad" : Regex.IsMatch(name,@"^7z\d+-x64\.exe$") ? "7zip" : name == "anydesk.exe" ? "anydesk" : name.StartsWith("rudesktop-") && name.EndsWith("-x64.msi") ? "rudesktop" : null;
+                LibraryCancellation.Check();string id=PackageId(file);
                 if (id == null) continue;
-                try { var package = Describe(id,file,sourceLabel); SoftwareTrust.Verify(package, false); packages.Add(package); }
+                try { var package = Describe(id,file,sourceLabel); SoftwareTrust.Verify(package, onlineDigest); packages.Add(package); }
+                catch (OperationCanceledException) { throw; }
                 catch (Exception ex) { progress(Path.GetFileName(file) + ": " + ex.Message); }
             }
             return packages;
+        }
+        internal static string PackageId(string file)
+        {
+            string name=Path.GetFileName(file).ToLowerInvariant();
+            return name.StartsWith("npp.")?"notepad":Regex.IsMatch(name,@"^7z\d+-x64\.exe$")?"7zip":name=="anydesk.exe"?"anydesk":name.StartsWith("rudesktop-")&&name.EndsWith("-x64.msi")?"rudesktop":null;
         }
     }
     internal static class SoftwareTrust
@@ -140,15 +149,59 @@ namespace ServiceTool
             }
             finally { data.State=2; WinVerifyTrust(new IntPtr(-1),ref action,ref data); Marshal.DestroyStructure(pointer,typeof(FileInfo)); Marshal.FreeHGlobal(pointer); }
         }
+        private static string ApprovalFolder { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"BARS\Manager\SoftwareApprovals"); } }
+        private static bool Approved(SoftwarePackage package)
+        {
+            try
+            {
+                string folder=ApprovalFolder; if(!Directory.Exists(folder)) return false; ToolsDeployment.SafePath(folder);
+                var acl=Directory.GetAccessControl(folder);
+                string owner=acl.GetOwner(typeof(SecurityIdentifier)).Value;
+                if(owner!="S-1-5-32-544" && owner!="S-1-5-18") return false;
+                foreach(FileSystemAccessRule rule in acl.GetAccessRules(true,true,typeof(SecurityIdentifier)))
+                {
+                    string sid=rule.IdentityReference.Value;
+                    if(rule.AccessControlType==AccessControlType.Allow && sid!="S-1-5-32-544" && sid!="S-1-5-18" &&
+                        (rule.FileSystemRights & (FileSystemRights.Write | FileSystemRights.Delete | FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership | FileSystemRights.DeleteSubdirectoriesAndFiles))!=0) return false;
+                }
+                string path=Path.Combine(folder,package.Sha256.ToLowerInvariant()+".bin"); ToolsDeployment.SafePath(path);
+                var fileAcl=File.GetAccessControl(path);
+                if(fileAcl.GetOwner(typeof(SecurityIdentifier)).Value!="S-1-5-32-544") return false;
+                foreach(FileSystemAccessRule rule in fileAcl.GetAccessRules(true,true,typeof(SecurityIdentifier)))
+                    if(rule.AccessControlType==AccessControlType.Allow && rule.IdentityReference.Value!="S-1-5-32-544" && rule.IdentityReference.Value!="S-1-5-18" && (rule.FileSystemRights & (FileSystemRights.Write | FileSystemRights.Delete | FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership))!=0) return false;
+                byte[] bytes=File.ReadAllBytes(path); if(bytes.Length>4096) return false;
+                string value=Encoding.UTF8.GetString(ProtectedData.Unprotect(bytes,null,DataProtectionScope.LocalMachine));
+                return value==package.Id+"|"+package.Version+"|"+package.Sha256.ToLowerInvariant();
+            }
+            catch(IOException){return false;} catch(UnauthorizedAccessException){return false;} catch(CryptographicException){return false;}
+        }
+        private static void Remember(SoftwarePackage package)
+        {
+            if(!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)) return;
+            string folder=ApprovalFolder; ToolsDeployment.SafePath(folder);
+            var acl=new DirectorySecurity(); acl.SetAccessRuleProtection(true,false);
+            acl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid,null));
+            foreach(var sid in new[]{WellKnownSidType.BuiltinAdministratorsSid,WellKnownSidType.LocalSystemSid}) acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(sid,null),FileSystemRights.FullControl,InheritanceFlags.ContainerInherit|InheritanceFlags.ObjectInherit,PropagationFlags.None,AccessControlType.Allow));
+            acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid,null),FileSystemRights.ReadAndExecute,InheritanceFlags.ContainerInherit|InheritanceFlags.ObjectInherit,PropagationFlags.None,AccessControlType.Allow));
+            Directory.CreateDirectory(folder,acl); Directory.SetAccessControl(folder,acl);
+            string path=Path.Combine(folder,package.Sha256.ToLowerInvariant()+".bin"); ToolsDeployment.SafePath(path);
+            byte[] value=ProtectedData.Protect(Encoding.UTF8.GetBytes(package.Id+"|"+package.Version+"|"+package.Sha256.ToLowerInvariant()),null,DataProtectionScope.LocalMachine);
+            // Replace a pre-existing file so it inherits the protected directory's permissions.
+            string temp=Path.Combine(folder,Guid.NewGuid().ToString("N")+".tmp");
+            try {File.WriteAllBytes(temp,value); var fileAcl=File.GetAccessControl(temp); fileAcl.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid,null)); File.SetAccessControl(temp,fileAcl); if(File.Exists(path))File.Delete(path); File.Move(temp,path);}
+            finally {if(File.Exists(temp))File.Delete(temp);}
+        }
         internal static void Verify(SoftwarePackage package, bool onlineDigest)
         {
             if (!String.Equals(SoftwareCatalog.Hash(package.File),package.Sha256,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Файл изменился после проверки SHA-256");
             if (package.Id == "7zip")
             {
                 if (String.Equals(package.Sha256,Local7ZipHash,StringComparison.OrdinalIgnoreCase)) return;
+                if (Approved(package)) return;
                 if (!onlineDigest) throw new InvalidDataException("Для этой неподписанной версии 7-Zip нужен SHA-256 из официального релиза");
-                var release = SoftwareSources.GitHub("7zip");
+                var release = SoftwareSources.GitHubVersion(package.Version);
                 if (!String.Equals(release.Sha256,package.Sha256,StringComparison.OrdinalIgnoreCase) || SoftwareCatalog.Compare(release.Version,package.Version)!=0) throw new InvalidDataException("7-Zip не совпадает с официальным релизом");
+                Remember(package);
                 return;
             }
             Signature(package.File,SoftwareCatalog.Find(package.Id).Publisher);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -471,6 +471,7 @@ namespace ServiceTool
     internal sealed class BrandComboBox : ComboBox
     {
         public ThemePalette Palette;
+        public bool HoverHighlight = true;
         private bool hovered;
         private const int WM_PAINT = 0x000F;
         private const int WM_PRINT = 0x0317;
@@ -495,14 +496,17 @@ namespace ServiceTool
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
         private static extern bool GetComboBoxInfo(IntPtr comboHandle, ref ComboBoxInformation information);
+        [System.Runtime.InteropServices.DllImport("uxtheme.dll",CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int SetWindowTheme(IntPtr window,string application,string identifiers);
 
         public BrandComboBox()
         {
             SetStyle(ControlStyles.ResizeRedraw, true);
         }
 
-        protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovered = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e);if(!HoverHighlight)SetWindowTheme(Handle,String.Empty,String.Empty); }
+        protected override void OnMouseEnter(EventArgs e) { hovered = true;if(HoverHighlight)Invalidate();base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hovered = false;if(HoverHighlight)Invalidate();base.OnMouseLeave(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
         protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
         protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
@@ -528,10 +532,18 @@ namespace ServiceTool
             if (ClientSize.Width < 4 || ClientSize.Height < 4) return;
             ThemePalette p = Palette;
             Rectangle button = DropDownButtonRectangle();
+              if(!HoverHighlight)
+              {
+                  Color surface=Enabled?p.SurfaceAlt:p.DisabledSurface;
+                  using(Brush brush=new SolidBrush(surface))graphics.FillRectangle(brush,ClientRectangle);
+                  TextRenderer.DrawText(graphics,Text,Font,new Rectangle(7,1,Math.Max(1,button.Left-12),ClientSize.Height-2),Enabled?p.Text:p.DisabledText,
+                      TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix|TextFormatFlags.EndEllipsis);
+              }
             Rectangle inner = new Rectangle(1, 1, ClientSize.Width - 2, ClientSize.Height - 2);
             Rectangle fill = Rectangle.Intersect(inner, Rectangle.FromLTRB(button.Left - 1, 1, button.Right + 1, ClientSize.Height - 1));
-            Color background = !Enabled ? p.DisabledSurface : (hovered || DroppedDown ? p.Selection : p.SurfaceAlt);
-            Color foreground = !Enabled ? p.DisabledText : (hovered || DroppedDown ? p.SelectionText : p.Text);
+            bool highlighted=(HoverHighlight&&hovered)||DroppedDown;
+            Color background = !Enabled ? p.DisabledSurface : (highlighted ? p.Selection : p.SurfaceAlt);
+            Color foreground = !Enabled ? p.DisabledText : (highlighted ? p.SelectionText : p.Text);
             using (Brush brush = new SolidBrush(background)) graphics.FillRectangle(brush, fill);
             float scale = graphics.DpiX / 96F;
             float centerX = button.Left + button.Width / 2F;
@@ -565,6 +577,68 @@ namespace ServiceTool
             int width = Math.Min(ClientSize.Width - 2, Math.Max(16, SystemInformation.VerticalScrollBarWidth));
             return new Rectangle(RightToLeft == RightToLeft.Yes ? 1 : ClientSize.Width - width - 1,
                 1, width, ClientSize.Height - 2);
+        }
+    }
+}
+
+namespace ServiceTool
+{
+    // Keep the picker slightly below the path frame in both modules.
+    internal sealed class PathPickerRow : System.Windows.Forms.Panel
+    {
+        private readonly BrandTextBox field;
+        private readonly BrandButton picker;
+        private readonly int buttonWidth;
+        private System.Drawing.Size pickerSize;
+        private int pickerDrop=4;
+        private bool arranging;
+        internal int PreferredRowWidth {get{return PathFieldMetrics.Measure(field).Width+pickerSize.Width+(int)System.Math.Round(12F*pickerSize.Width/buttonWidth);}}
+        internal PathPickerRow(BrandTextBox path,BrandButton button,int width)
+        {
+            field=path;picker=button;buttonWidth=width;
+            SetStyle(System.Windows.Forms.ControlStyles.AllPaintingInWmPaint|System.Windows.Forms.ControlStyles.OptimizedDoubleBuffer|System.Windows.Forms.ControlStyles.ResizeRedraw,true);
+            Margin=System.Windows.Forms.Padding.Empty;
+            field.Dock=picker.Dock=System.Windows.Forms.DockStyle.None;
+            field.Anchor=picker.Anchor=System.Windows.Forms.AnchorStyles.Top|System.Windows.Forms.AnchorStyles.Left;
+            field.Margin=picker.Margin=System.Windows.Forms.Padding.Empty;
+            pickerSize=new System.Drawing.Size(buttonWidth,40);picker.Size=pickerSize;
+            Controls.Add(field);Controls.Add(picker);
+        }
+        protected override void OnLayout(System.Windows.Forms.LayoutEventArgs e)
+        {
+            base.OnLayout(e);if(arranging||field==null||ClientSize.Width<1||ClientSize.Height<1)return;
+            arranging=true;
+            try
+            {
+                var measure=PathFieldMetrics.Measure(field);
+                int width=pickerSize.Width,gap=(int)System.Math.Round(12F*width/buttonWidth);
+                int height=System.Math.Min(ClientSize.Height,pickerSize.Height);
+                int pathWidth=System.Math.Max(1,System.Math.Min(measure.Width,ClientSize.Width-gap-width));
+                picker.SetBounds(pathWidth+gap,ClientSize.Height-height,width,height);
+                field.SetBounds(0,ClientSize.Height-1-pickerDrop-measure.Height,pathWidth,measure.Height);
+            }
+            finally{arranging=false;}
+        }
+        protected override void ScaleControl(System.Drawing.SizeF factor,System.Windows.Forms.BoundsSpecified specified)
+        {
+            pickerSize=new System.Drawing.Size((int)System.Math.Round(pickerSize.Width*factor.Width),(int)System.Math.Round(pickerSize.Height*factor.Height));
+            pickerDrop=(int)System.Math.Round(pickerDrop*factor.Height);
+            base.ScaleControl(factor,specified);
+        }
+    }
+    internal static class PathFieldMetrics
+    {
+        internal const string ShortcutCaption="Создать ярлыки на рабочем столе";
+        internal static System.Drawing.Size Measure(System.Windows.Forms.Control control)
+        {
+            using(var graphics=control.CreateGraphics())
+            {
+                var text=System.Windows.Forms.TextRenderer.MeasureText(graphics,ShortcutCaption,control.Font,new System.Drawing.Size(int.MaxValue,int.MaxValue),System.Windows.Forms.TextFormatFlags.SingleLine|System.Windows.Forms.TextFormatFlags.NoPrefix);
+                int prefix=1+(int)System.Math.Round(29*graphics.DpiX/96F);
+                int overhang=(int)System.Math.Ceiling(control.Font.SizeInPoints*graphics.DpiX/72F/6F);
+                int height=System.Windows.Forms.TextRenderer.MeasureText(graphics,"Ag",control.Font).Height+(int)System.Math.Round(6*graphics.DpiX/96F);
+                return new System.Drawing.Size(prefix+text.Width-overhang,height);
+            }
         }
     }
 }

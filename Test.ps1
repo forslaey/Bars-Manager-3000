@@ -16,7 +16,10 @@ $taskBuild = if ([String]::IsNullOrWhiteSpace($BuildDirectory)) {
 New-Item -ItemType Directory -Path $taskBuild -Force | Out-Null
 $taskPackage = Join-Path $taskBuild 'package'
 & (Join-Path $PSScriptRoot 'Build.ps1') -OutputDirectory $taskPackage -Sign:$Sign -ReferenceAssemblies $ReferenceAssemblies
-$taskPackageAssembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $taskPackage 'Bars Service Manager 3000.exe')))
+$taskVersionMatch = [regex]::Match((Get-Content -LiteralPath (Join-Path $taskSource 'AssemblyInfo.cs') -Raw), 'AssemblyFileVersion\("([0-9.]+)"\)')
+if (-not $taskVersionMatch.Success) { throw 'Не найдена версия сборки в AssemblyInfo.cs.' }
+$taskPackageName = 'Bars Manager 3000 ' + ([version]$taskVersionMatch.Groups[1].Value).ToString(3) + '.exe'
+$taskPackageAssembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $taskPackage $taskPackageName)))
 foreach ($taskArchitecture in @('x86','x64')) {
     $taskResource = $taskPackageAssembly.GetManifestResourceStream("BARS.Helper.$taskArchitecture")
     $taskResourceOutput = [IO.File]::Create((Join-Path $taskBuild "Installer.$taskArchitecture.exe"))
@@ -25,7 +28,7 @@ foreach ($taskArchitecture in @('x86','x64')) {
 
 function Invoke-TaskTests([string] $taskName, [string] $taskMain, [string[]] $taskInputs) {
     $taskOutput = Join-Path $taskBuild ($taskName + '.exe')
-    $taskArguments = @('/nologo', '/target:exe', '/platform:anycpu', '/utf8output', '/codepage:65001', "/out:$taskOutput", "/main:$taskMain", '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Xml.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.IO.Compression.dll', '/reference:System.IO.Compression.FileSystem.dll', '/reference:System.Configuration.Install.dll', '/reference:System.ServiceProcess.dll', '/reference:System.Security.dll', '/reference:System.Web.Extensions.dll', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico")
+    $taskArguments = @('/nologo', '/target:exe', '/platform:anycpu', '/utf8output', '/codepage:65001', "/out:$taskOutput", "/main:$taskMain", '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Xml.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.IO.Compression.dll', '/reference:System.IO.Compression.FileSystem.dll', '/reference:System.Configuration.Install.dll', '/reference:System.ServiceProcess.dll', '/reference:System.Security.dll', '/reference:System.Web.Extensions.dll', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png")
     foreach ($taskArchitecture in @('x86','x64')) { $taskArguments += "/resource:$(Join-Path $taskBuild "Installer.$taskArchitecture.exe"),BARS.Helper.$taskArchitecture" }
     & $taskCompiler @taskArguments @taskInputs
     if ($LASTEXITCODE -ne 0) { throw "Не удалось собрать $taskName" }
@@ -43,10 +46,19 @@ $taskUiSources += Join-Path $taskSource 'EmbeddedHelpers.cs'
 $taskUiSources += Join-Path $taskSource 'AssemblyInfo.cs'
 $taskUiSources += Join-Path $taskSource 'ApplicationStorage.cs'
 $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
+$taskUiSources += Join-Path $taskSource 'SoftwarePackageStorage.cs'
 $taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs','SoftwareCatalog.cs','SoftwareSources.cs','SoftwareDetection.cs','SoftwareInstaller.cs','SoftwareDefaults.cs','SoftwareManagerForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
 Invoke-TaskTests 'UtilityModuleTests' 'ServiceTool.UtilityModuleTests' ($taskUiSources + (Join-Path $taskTests 'UtilityModuleTests.cs'))
 if ($UtilitySmoke) { Invoke-TaskTests 'UtilitySmokeTests' 'ServiceTool.UtilitySmokeTests' ($taskUiSources + (Join-Path $taskTests 'UtilitySmokeTests.cs')) }
 Invoke-TaskTests 'SoftwareTests' 'ServiceTool.SoftwareTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareTests.cs'))
+Invoke-TaskTests 'SoftwareMaintenanceTests' 'ServiceTool.SoftwareMaintenanceTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareMaintenanceTests.cs'))
+Invoke-TaskTests 'LayoutFitTests' 'ServiceTool.LayoutFitTests' ($taskUiSources + (Join-Path $taskTests 'LayoutFitTests.cs'))
+Invoke-TaskTests 'RapidSelectionTests' 'ServiceTool.RapidSelectionTests' ($taskUiSources + (Join-Path $taskTests 'RapidSelectionTests.cs'))
+Invoke-TaskTests 'StartupModeUiTests' 'ServiceTool.StartupModeUiTests' ($taskUiSources + (Join-Path $taskTests 'StartupModeUiTests.cs'))
+if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareStartupTests' 'ServiceTool.SoftwareStartupTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareStartupTests.cs')) }
+if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareVersionCheckTests' 'ServiceTool.SoftwareVersionCheckTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareVersionCheckTests.cs')) }
+if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareStorageTests' 'ServiceTool.SoftwareStorageTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareStorageTests.cs')) }
+Invoke-TaskTests 'ToolsRemovalTests' 'ServiceTool.ToolsRemovalTests' ($taskUiSources + (Join-Path $taskTests 'ToolsRemovalTests.cs'))
 if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareSmokeTests' 'ServiceTool.SoftwareSmokeTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareSmokeTests.cs')) }
 Invoke-TaskTests 'UiTests' 'ServiceTool.UiTests' ($taskUiSources + (Join-Path $taskTests 'UiTests.cs'))
 Invoke-TaskTests 'ThemeTests' 'ServiceTool.ThemeTests' ($taskUiSources + (Join-Path $taskTests 'ThemeTests.cs'))

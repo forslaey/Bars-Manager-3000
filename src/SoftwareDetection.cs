@@ -12,7 +12,7 @@ namespace ServiceTool
 {
     internal static class SoftwareDetection
     {
-        private static bool Matches(string id, string display)
+        internal static bool Matches(string id, string display)
         {
             return id=="notepad" ? display.StartsWith("Notepad++",StringComparison.OrdinalIgnoreCase) : id=="7zip" ? Regex.IsMatch(display,@"^7-Zip(?:\s|$)",RegexOptions.IgnoreCase) :
                 id=="anydesk" ? display.Equals("AnyDesk",StringComparison.OrdinalIgnoreCase) : display.StartsWith("RuDesktop",StringComparison.OrdinalIgnoreCase);
@@ -64,7 +64,7 @@ namespace ServiceTool
                             try
                             {
                                 ToolsDeployment.SafePath(candidate); string arch=SoftwareCatalog.Architecture(candidate);
-                                if (arch!="x64" && !(id=="anydesk" && arch=="x86" && allowAnyDesk32)) continue;
+                                if (arch!="x64" && !(id=="anydesk" && arch=="x86")) continue;
                                 var meta=FileVersionInfo.GetVersionInfo(candidate); string expected=app.Name;
                                 if ((meta.ProductName ?? "").IndexOf(expected,StringComparison.OrdinalIgnoreCase)<0) continue;
                                 Version parsed; if (!Version.TryParse(version,out parsed)) continue;
