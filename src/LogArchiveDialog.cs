@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -158,7 +158,7 @@ namespace ServiceTool
         private void UpdatePageLabel()
         {
             pageLabel.Text = folders.Count == 0 ? "Папок дат с логами нет" :
-                "Страница " + (page + 1) + " из " + Math.Max(1, (folders.Count + PageSize - 1) / PageSize) + " · выбрано: " + selected.Count;
+                "Страница " + (page + 1) + " из " + Math.Max(1, (folders.Count + PageSize - 1) / PageSize) + "; выбрано: " + selected.Count;
         }
 
         private void ConfirmSelection()

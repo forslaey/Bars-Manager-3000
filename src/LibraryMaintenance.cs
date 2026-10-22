@@ -164,7 +164,7 @@ namespace ServiceTool
             {
                 LibraryCancellation.Check();
                 if (!connected()) throw new IOException("Менеджер закрыл соединение; следующий деинсталлятор не запускался");
-                progress("Удаляем " + targets[index].Name + " · " + targets[index].Version);
+                progress("Удаляем " + targets[index].Name + ", версия " + targets[index].Version);
                 int code = LibraryProcess.Run(commands[index], progress);
                 bool remains = StillRegistered(targets[index]);
                 if (!LibraryPlan.Success(code) || remains || LibraryPlan.NeedsReboot(code))

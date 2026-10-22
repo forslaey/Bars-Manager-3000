@@ -54,16 +54,27 @@ namespace ServiceTool
             }
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 154)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 172)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
             var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 12) };
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
-            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
             Label title = Label("Менеджер системных библиотек Windows", false); title.Font = new Font("Segoe UI", 13, FontStyle.Bold); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
-            monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.Fill; monitor.Checked = true; monitor.Margin = Padding.Empty;
-            monitor.CheckedChanged += delegate { timer.Enabled = monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 3);
-            summary = Label("Проверяем установленные компоненты…", true); statusLayout.Controls.Add(summary, 0, 1); statusLayout.SetColumnSpan(summary, 2);
-            sourceLabel = Label("", true); sourceLabel.Font = new Font("Segoe UI", 9); statusLayout.Controls.Add(sourceLabel, 0, 2); statusLayout.SetColumnSpan(sourceLabel, 2); status.Controls.Add(statusLayout);
+            monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.None; monitor.Anchor = AnchorStyles.Right | AnchorStyles.Bottom; monitor.Checked = true; monitor.Margin = Padding.Empty; monitor.Height = 28;
+            monitor.CheckedChanged += delegate { timer.Enabled = monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 2); statusLayout.SetRowSpan(monitor, 2);
+            statusLayout.Layout += delegate
+            {
+                using (Graphics graphics = monitor.CreateGraphics())
+                {
+                    int textWidth = TextRenderer.MeasureText(graphics, monitor.Text, monitor.Font, Size.Empty,
+                        TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+                    int desired = (int)Math.Ceiling(54 * graphics.DpiX / 96F) + textWidth;
+                    int width = Math.Max(1, Math.Min(desired, statusLayout.GetColumnWidths()[1]));
+                    if (monitor.Width != width) monitor.Width = width;
+                }
+            };
+            summary = Label("Проверяем установленные компоненты…", true); statusLayout.Controls.Add(summary, 0, 2);
+            sourceLabel = Label("", true); sourceLabel.Font = new Font("Segoe UI", 9); statusLayout.Controls.Add(sourceLabel, 0, 3); status.Controls.Add(statusLayout);
             body.Controls.Add(status, 0, 0);
             var tableCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 12), Margin = new Padding(0, 0, 0, 12) };
             var tableLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
@@ -126,10 +137,15 @@ namespace ServiceTool
         }
         private void UpdateRestartAvailability()
         {
-            string reason=pendingRestart ? "Установщик сообщил о необходимости перезагрузки." : LibraryDetection.RebootPendingReason();
+            string reason=pendingRestart ? "Windows или установщик сообщили о необходимости перезагрузки." : LibraryDetection.RebootPendingReason();
             restart.Enabled=!installing&&!checking&&reason.Length>0;
-            restart.AccessibleDescription=reason.Length>0?reason:"Перезагрузка не требуется.";
+            restart.AccessibleDescription=reason.Length>0?reason:"Не обнаружены признаки ожидаемой перезагрузки Windows.";
             restartHelp.SetToolTip(restart,restart.AccessibleDescription);
+        }
+        internal void RememberWindowsRestart(bool required)
+        {
+            pendingRestart |= required;
+            UpdateRestartAvailability();
         }
         private void OpenWindowsComponents()
         {
@@ -141,10 +157,11 @@ namespace ServiceTool
                 {
                     form.SetTheme(Colors.Dark,false); form.StartPosition=FormStartPosition.CenterParent;
                     form.ShowDialog(this);
+                    RememberWindowsRestart(form.RestartRequired);
                 }
                 SetTheme(ThemePreference.LoadDark(),false);
             }
-            finally { if(!IsDisposed && !Disposing) timer.Enabled=wasRunning && monitor.Checked && !preview; }
+            finally { if(!IsDisposed && !Disposing) { UpdateRestartAvailability(); timer.Enabled=wasRunning && monitor.Checked && !preview; } }
         }
         private void ConfigureGrid()
         {
@@ -256,8 +273,8 @@ namespace ServiceTool
         }
         private void UpdateSummary()
         {
-            summary.Text = "Компонентов: " + checks.Count + " · установлено: " + checks.Values.Count(c => c.State == LibraryState.Installed) + " · не найдено: " + checks.Values.Count(c => c.State == LibraryState.Missing && c.Relation != LibraryRelation.Older) +
-                " · нужно обновить: " + checks.Values.Count(c => c.Relation == LibraryRelation.Older) + " · нужна проверка: " + checks.Values.Count(c => c.State == LibraryState.Unknown) + " · выбрано: " + selection.Count; UpdateAction();
+            summary.Text = "Компонентов: " + checks.Count + "; установлено: " + checks.Values.Count(c => c.State == LibraryState.Installed) + "; не найдено: " + checks.Values.Count(c => c.State == LibraryState.Missing && c.Relation != LibraryRelation.Older) +
+                "; нужно обновить: " + checks.Values.Count(c => c.Relation == LibraryRelation.Older) + "; нужна проверка: " + checks.Values.Count(c => c.State == LibraryState.Unknown) + "; выбрано: " + selection.Count; UpdateAction();
         }
         private void RenderRows()
         {
@@ -404,7 +421,7 @@ namespace ServiceTool
                         LibraryOperation step = operation == LibraryOperation.Reinstall && !targetIds.Contains(package.Id) ? LibraryOperation.Install : operation;
                         if ((step == LibraryOperation.Install || step == LibraryOperation.Update) && checks[package.Id].Relation == LibraryRelation.Older) step = LibraryOperation.Update;
                         Log(prefix + (step == LibraryOperation.Remove ? ": удаление" : step == LibraryOperation.Reinstall ? ": переустановка" : step == LibraryOperation.Update ? ": обновление" : ": установка"));
-                        LibraryInstallResult result = await Task.Run(() => session.Execute(package, source, step, text => SafeActivity(prefix + " · " + text)));
+                        LibraryInstallResult result = await Task.Run(() => session.Execute(package, source, step, text => SafeActivity(prefix + ": " + text)));
                         Log(prefix + ": " + result.Message + (String.IsNullOrEmpty(result.LogPath) ? "" : ". Отчёт: " + result.LogPath));
                         if (closeAfterCancel && cancelRequested) break;
                         List<LibraryCheck> updated = await Task.Run(() => LibraryDetection.Scan()); checks.Clear(); foreach (var check in updated) checks[check.Package.Id] = check; RenderRows();
@@ -442,7 +459,7 @@ namespace ServiceTool
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
                 try
                 {
-                    var text = new StringBuilder("Bars Component Manager 3000 · " + DateTime.Now.ToString("O") + Environment.NewLine);
+                    var text = new StringBuilder("Bars Component Manager 3000, отчёт от " + DateTime.Now.ToString("O") + Environment.NewLine);
                     foreach (LibraryCheck check in LibraryPresentation.Sort(checks.Values)) text.AppendLine(check.Package.Name + " | в комплекте: " + LibraryVersions.Required(check.Package) + " | в системе: " + check.ActualVersion + " | " + check.Caption + " | " + LibraryVersions.Advice(check) + " | " + check.Detail);
                     text.AppendLine().AppendLine(journal.Text); File.WriteAllText(dialog.FileName, text.ToString(), new UTF8Encoding(true)); activity.Text = "Отчёт сохранён";
                 }

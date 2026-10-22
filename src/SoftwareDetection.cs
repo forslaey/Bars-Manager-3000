@@ -73,7 +73,7 @@ namespace ServiceTool
                                 // number. ProductVersion is its MSI/ARP version domain.
                                 string comparable=id=="rudesktop" ? meta.ProductVersion : fileVersion;
                                 Version comparableVersion; if(!Version.TryParse(comparable,out comparableVersion) || SoftwareCatalog.Compare(comparable,version)!=0)continue;
-                                valid.Add(new SoftwareCheck { Id=id,Version=version,Executable=candidate,State=LibraryState.Installed,Detail="Регистрация и EXE подтверждены · "+arch });
+                                valid.Add(new SoftwareCheck { Id=id,Version=version,Executable=candidate,State=LibraryState.Installed,Detail="Регистрация и EXE подтверждены, разрядность "+arch });
                             }
                             catch (IOException) { } catch (UnauthorizedAccessException) { }
                         }

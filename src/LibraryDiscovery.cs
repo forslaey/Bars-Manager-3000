@@ -98,7 +98,7 @@ namespace ServiceTool
         }
         public static LibraryPackage Legacy(LibraryPackage modern)
         {
-            var legacy = new LibraryPackage { Kind = LibraryKind.VcLegacy, Name = "Visual C++ 2012/2013 · профиль 2005–2013 + Lite", Group = "Visual C++", RelativePath = modern.RelativePath, Version = modern.Version, Architecture = modern.Architecture, Sha256 = modern.Sha256, Order = modern.Order - 1, ProductCode = "", UpgradeCode = "", RuntimeFamily = "", UninstallKey = "" }; legacy.Id = Id(legacy); return legacy;
+            var legacy = new LibraryPackage { Kind = LibraryKind.VcLegacy, Name = "Visual C++ 2012/2013: профиль 2005–2013 + Lite", Group = "Visual C++", RelativePath = modern.RelativePath, Version = modern.Version, Architecture = modern.Architecture, Sha256 = modern.Sha256, Order = modern.Order - 1, ProductCode = "", UpgradeCode = "", RuntimeFamily = "", UninstallKey = "" }; legacy.Id = Id(legacy); return legacy;
         }
         private static bool Inno(string file)
         {
@@ -120,7 +120,7 @@ namespace ServiceTool
                 if (!values.TryGetValue("ProductName", out p.Name) || !values.TryGetValue("ProductVersion", out p.Version) || !values.TryGetValue("ProductCode", out p.ProductCode)) throw new InvalidDataException("MSI без обязательных свойств: " + file);
                 values.TryGetValue("UpgradeCode", out p.UpgradeCode);
                 p.Group = p.Name.IndexOf("SQL", StringComparison.OrdinalIgnoreCase) >= 0 || p.Name.IndexOf("Management Objects", StringComparison.OrdinalIgnoreCase) >= 0 ? "SQL Server" : "Системные компоненты";
-                p.Name = p.Name.Trim() + " · " + arch;
+                p.Name = p.Name.Trim() + ", разрядность " + arch;
                 p.Order = p.Name.Contains("CLR") ? 20 : p.Name.Contains("Management Objects") ? 30 : 50;
             }
             else
@@ -137,7 +137,7 @@ namespace ServiceTool
                     Match fileVersion = Regex.Match((info.OriginalFilename ?? "") + " " + Path.GetFileName(file), @"runtime-(\d+\.\d+\.\d+(?:-[a-zA-Z]+\.\d+\.[\d.]+)?)-win-(x64|x86)", RegexOptions.IgnoreCase);
                     p.Version = fileVersion.Success ? fileVersion.Groups[1].Value : basic;
                     if (p.Preview && !p.Version.Contains("-")) p.Version = basic + "-" + Regex.Replace(runtime.Groups[5].Value.ToLowerInvariant(), @"\s+", ".");
-                    p.Name = (p.RuntimeFamily == "Microsoft.NETCore.App" ? ".NET Runtime " : "ASP.NET Core ") + p.Version + " · " + p.Architecture;
+                    p.Name = (p.RuntimeFamily == "Microsoft.NETCore.App" ? ".NET Runtime " : "ASP.NET Core ") + p.Version + ", разрядность " + p.Architecture;
                     p.Order = 100 + Int32.Parse(runtime.Groups[2].Value) * 4 + (p.RuntimeFamily == "Microsoft.NETCore.App" ? 0 : 2) + (p.Architecture == "x64" ? 1 : 0);
                 }
                 else if (product.Contains(".NET Framework") && product.Contains("Developer Pack"))
@@ -168,7 +168,7 @@ namespace ServiceTool
                 {
                     p.Kind = LibraryKind.Access; p.Group = "Системные компоненты"; p.Version = version;
                     p.Architecture = Path.GetFileName(file).IndexOf("x64", StringComparison.OrdinalIgnoreCase) >= 0 ? "x64" : "x86";
-                    p.Name = "Access Database Engine · " + p.Architecture; p.Order = 55;
+                    p.Name = "Access Database Engine, разрядность " + p.Architecture; p.Order = 55;
                 }
                 else return null;
             }

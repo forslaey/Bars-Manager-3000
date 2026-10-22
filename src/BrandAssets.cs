@@ -1,11 +1,31 @@
 ﻿using System.Drawing;
 using System.IO;
 using System.Reflection;
+using System;
+using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace ServiceTool
 {
     internal static class BrandAssets
     {
+        internal const string WebsiteDescription = "Официальный сайт";
+        internal static ProcessStartInfo WebsiteStartInfo()
+        { return new ProcessStartInfo("https://www.datakrat.ru/") { UseShellExecute = true }; }
+
+        internal static void BindWebsite(PictureBox banner, ToolTip tips, IWin32Window owner, Action<ProcessStartInfo> launch = null)
+        {
+            banner.Cursor = Cursors.Hand;
+            banner.AccessibleName = "Открыть сайт ДАТАКРАТ";
+            banner.AccessibleDescription = WebsiteDescription + ": https://www.datakrat.ru/";
+            tips.SetToolTip(banner, WebsiteDescription);
+            banner.Click += delegate
+            {
+                try { if (launch != null) launch(WebsiteStartInfo()); else Process.Start(WebsiteStartInfo()); }
+                catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Не удалось открыть сайт ДАТАКРАТ", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            };
+        }
+
         public static Image LoadLogo()
         {
             return LoadLogo(false);

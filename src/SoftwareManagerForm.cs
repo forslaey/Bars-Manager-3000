@@ -184,8 +184,8 @@ namespace ServiceTool
             foreach(DataGridViewRow row in grid.Rows)
             {
                 string id=Convert.ToString(row.Tag);SoftwareCheck check;SoftwarePackage package;checks.TryGetValue(id,out check);packages.TryGetValue(id,out package);
-                row.Cells[2].Value=check==null?"Не проверено":check.State==LibraryState.Installed?"Установлена · "+(check.Detail.Contains("x86")?"x86":check.Detail.Contains("x64")?"x64":"разрядность уточняется")+"\r\nВерсия "+check.Version:check.State==LibraryState.Missing?"Не установлена":"Требуется проверка";
-                row.Cells[3].Value=package==null?"Пакет не найден\r\nВыбери _soft или проверь доступ к сайту":(package.Version=="0.0"?"Версия после получения":package.Version)+" · "+package.Architecture+"\r\n"+package.Source;
+                row.Cells[2].Value=check==null?"Не проверено":check.State==LibraryState.Installed?"Установлена, "+(check.Detail.Contains("x86")?"x86":check.Detail.Contains("x64")?"x64":"разрядность уточняется")+"\r\nВерсия "+check.Version:check.State==LibraryState.Missing?"Не установлена":"Требуется проверка";
+                row.Cells[3].Value=package==null?"Пакет не найден\r\nВыбери _soft или проверь доступ к сайту":(package.Version=="0.0"?"Версия после получения":package.Version)+", разрядность "+package.Architecture+"\r\n"+package.Source;
                 bool allowed=check!=null&&check.State==LibraryState.Installed||package!=null&&check!=null&&check.State==LibraryState.Missing&&(package.Architecture=="x64"||id=="anydesk");
                 if(allowed)selectable.Add(id);else selection.Remove(id);row.Cells[0].Value=selection.Contains(id);
                 row.Cells[0].ToolTipText=allowed?"Щёлкни, чтобы выбрать или снять отметку":"Сначала проверь установленную программу и пакет";
@@ -305,7 +305,7 @@ namespace ServiceTool
         protected override void Dispose(bool disposing){base.Dispose(disposing);if(disposing)headerFont.Dispose();}
         private void FillPreview()
         {
-            foreach(var app in SoftwareCatalog.Apps){checks[app.Id]=new SoftwareCheck {Id=app.Id,Version=app.Id=="notepad"?"8.9.8.1":"26.04",State=app.Id=="notepad"?LibraryState.Installed:LibraryState.Missing,Detail=app.Id=="notepad"?"Установлена · x64":"Не установлено"};packages[app.Id]=new SoftwarePackage {Id=app.Id,Version=app.Id=="notepad"?"8.9.8.1":app.Id=="7zip"?"26.04":app.Id=="rudesktop"?"3.0.1563":"9.8",Architecture=app.Id=="anydesk"?"x86":"x64",Source=app.Id=="notepad"?"GitHub · официальный релиз":"Локальный _soft"};}
+            foreach(var app in SoftwareCatalog.Apps){checks[app.Id]=new SoftwareCheck {Id=app.Id,Version=app.Id=="notepad"?"8.9.8.1":"26.04",State=app.Id=="notepad"?LibraryState.Installed:LibraryState.Missing,Detail=app.Id=="notepad"?"Установлена, x64":"Не установлено"};packages[app.Id]=new SoftwarePackage {Id=app.Id,Version=app.Id=="notepad"?"8.9.8.1":app.Id=="7zip"?"26.04":app.Id=="rudesktop"?"3.0.1563":"9.8",Architecture=app.Id=="anydesk"?"x86":"x64",Source=app.Id=="notepad"?"Официальный релиз на GitHub":"Локальный _soft"};}
             UpdateRows();Log("Проверка завершена. Для отсутствующих программ доступны установщики");
         }
     }
@@ -318,7 +318,7 @@ namespace ServiceTool
         internal static bool PasswordsMatch(string password,string repeated){return password!=null&&password.Length>=8&&password.Length<=128&&!password.Any(Char.IsControl)&&String.Equals(password,repeated,StringComparison.Ordinal);}
         internal SoftwareRemoteDialog(ThemePalette colors,Icon icon,string appId,bool loadSaved=true)
         {
-            id=appId;Text="Неконтролируемый доступ · "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();ClientSize=new Size(620,410);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
+            id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();ClientSize=new Size(620,410);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
             var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=9};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{76,24,36,24,36,30,36,48,48})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,64));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             heading.Controls.Add(new Label {Text="Постоянный пароль для "+SoftwareCatalog.Find(id).Name+"\r\nПодключение без подтверждения на этом компьютере",Dock=DockStyle.Fill,ForeColor=colors.Text,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,0);

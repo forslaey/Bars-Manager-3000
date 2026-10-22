@@ -130,7 +130,7 @@ namespace ServiceTool
                     using (var hub = new ManagerHub())
                     {
                         hub.SetTheme(dark, false); Show(hub);
-                        VerifyAbout(hub, "Bars Manager 3000", "Управление службами и установка библиотек BARS");
+                        VerifyAbout(hub, "Bars Manager 3000", "Управление Барсом. Я главная тут");
                         foreach (string title in new[] { "Менеджер служб", "Менеджер библиотек" })
                         {
                             Button open = Button(hub, title); Control ancestor = open.Parent; while (!(ancestor is Card)) ancestor = ancestor.Parent;

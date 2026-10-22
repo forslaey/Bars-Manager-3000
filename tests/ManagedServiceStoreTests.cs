@@ -102,7 +102,7 @@ internal static class ManagedServiceStoreTests
             var staleA = new ManagedServiceStore(file);
             var staleB = new ManagedServiceStore(file);
             Assert(staleA.Remember(third), "first stale instance appends");
-            Assert(staleB.Remember(fourth), "second stale instance merges current XML");
+            Assert(staleB.Remember(fourth), "second stale instance merges current XML: " + staleB.Warning);
             Assert(new ManagedServiceStore(file).GetExecutablePaths().Length == 4, "concurrent-instance additions are preserved");
             Assert(staleA.Remember(fifth), "first instance merges additions it did not originally load");
             Assert(new ManagedServiceStore(file).GetExecutablePaths().Length == 5, "all independent observations survive");

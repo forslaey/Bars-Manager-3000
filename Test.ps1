@@ -47,7 +47,7 @@ $taskUiSources += Join-Path $taskSource 'AssemblyInfo.cs'
 $taskUiSources += Join-Path $taskSource 'ApplicationStorage.cs'
 $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
 $taskUiSources += Join-Path $taskSource 'SoftwarePackageStorage.cs'
-$taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs','SoftwareCatalog.cs','SoftwareSources.cs','SoftwareDetection.cs','SoftwareInstaller.cs','SoftwareDefaults.cs','SoftwareManagerForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
+$taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','UserGuideForm.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs','SoftwareCatalog.cs','SoftwareSources.cs','SoftwareDetection.cs','SoftwareInstaller.cs','SoftwareDefaults.cs','SoftwareManagerForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
 Invoke-TaskTests 'UtilityModuleTests' 'ServiceTool.UtilityModuleTests' ($taskUiSources + (Join-Path $taskTests 'UtilityModuleTests.cs'))
 if ($UtilitySmoke) { Invoke-TaskTests 'UtilitySmokeTests' 'ServiceTool.UtilitySmokeTests' ($taskUiSources + (Join-Path $taskTests 'UtilitySmokeTests.cs')) }
 Invoke-TaskTests 'SoftwareTests' 'ServiceTool.SoftwareTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareTests.cs'))
@@ -55,6 +55,8 @@ Invoke-TaskTests 'SoftwareMaintenanceTests' 'ServiceTool.SoftwareMaintenanceTest
 Invoke-TaskTests 'LayoutFitTests' 'ServiceTool.LayoutFitTests' ($taskUiSources + (Join-Path $taskTests 'LayoutFitTests.cs'))
 Invoke-TaskTests 'RapidSelectionTests' 'ServiceTool.RapidSelectionTests' ($taskUiSources + (Join-Path $taskTests 'RapidSelectionTests.cs'))
 Invoke-TaskTests 'StartupModeUiTests' 'ServiceTool.StartupModeUiTests' ($taskUiSources + (Join-Path $taskTests 'StartupModeUiTests.cs'))
+Invoke-TaskTests 'UserGuideTests' 'ServiceTool.UserGuideTests' ($taskUiSources + (Join-Path $taskTests 'UserGuideTests.cs'))
+Invoke-TaskTests 'WindowsRestartTests' 'ServiceTool.WindowsRestartTests' ($taskUiSources + (Join-Path $taskTests 'WindowsRestartTests.cs'))
 if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareStartupTests' 'ServiceTool.SoftwareStartupTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareStartupTests.cs')) }
 if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareVersionCheckTests' 'ServiceTool.SoftwareVersionCheckTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareVersionCheckTests.cs')) }
 if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareStorageTests' 'ServiceTool.SoftwareStorageTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareStorageTests.cs')) }

@@ -55,7 +55,7 @@ namespace ServiceTool
             content.Controls.Add(MakeLabel("Инструменты BARS", subtitleFont, colors.Muted), 0, 1);
             string version = typeof(AboutDialog).Assembly.GetName().Version.ToString(3);
             content.Controls.Add(MakeLabel("Версия " + version, detailFont, colors.Good), 0, 2);
-            content.Controls.Add(MakeLabel(moduleDescription ?? (moduleName == null ? "Управление службами и установка библиотек BARS" : "Проверка и установка компонентов BARS"), bodyFont, colors.Text), 0, 3);
+            content.Controls.Add(MakeLabel(moduleDescription ?? (moduleName == null ? "Управление Барсом. Я главная тут" : "Проверка и установка компонентов BARS"), bodyFont, colors.Text), 0, 3);
             TableLayoutPanel actions = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,

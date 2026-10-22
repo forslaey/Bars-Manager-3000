@@ -30,8 +30,7 @@ namespace ServiceTool
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             logo.Dock = DockStyle.Fill; logo.SizeMode = PictureBoxSizeMode.Zoom; logo.Margin = new Padding(0, 6, 0, 6); logo.Cursor = Cursors.Hand;
-            tips.SetToolTip(logo, "Официальный сайт");
-            logo.Click += delegate { try { Process.Start(new ProcessStartInfo("https://www.datakrat.ru/") { UseShellExecute = true }); } catch (Exception ex) { MessageBox.Show(this, ex.Message, Text); } };
+            BrandAssets.BindWebsite(logo, tips, this);
             header.Controls.Add(logo, 1, 0);
             theme.Size = new Size(86, 40); theme.Anchor = AnchorStyles.None; theme.AccessibleName = "Сменить тему";
             theme.Click += delegate { SetTheme(!Colors.Dark, true); }; header.Controls.Add(theme, 2, 0); Root.Controls.Add(header, 0, 0);
@@ -89,10 +88,12 @@ namespace ServiceTool
             modules.Controls.Add(ModuleCard("Установка программ", "Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nАссоциации файлов и удалённый доступ", "Установка программ", delegate { using (var form = new SoftwareManagerForm(false)) OpenModule(form); }), 0, 1);
             modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { using (var form = new ToolsDeploymentForm(false)) OpenModule(form); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
-            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(Label("Версия " + typeof(ManagerHub).Assembly.GetName().Version.ToString(3), true), 0, 0);
-            BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 1, 0);
+            BrandButton guide = Button("Инструкция", false); guide.AccessibleName = "Открыть инструкцию";
+            guide.Click += delegate { using (var dialog = new UserGuideForm()) { dialog.SetTheme(Colors.Dark, false); dialog.ShowDialog(this); } SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
+            BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 2, 0);
             body.Controls.Add(footer, 0, 2); Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false);
         }
         private const int ModuleRowHeight = 160;

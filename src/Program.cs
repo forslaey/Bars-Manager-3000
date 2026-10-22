@@ -105,6 +105,23 @@ namespace ServiceTool
         }
     }
 
+    internal sealed class PathFieldFrame : Panel
+    {
+        internal Color EdgeColor;
+        internal Color FocusColor;
+        internal PathFieldFrame()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using (var pen = new Pen(ContainsFocus ? FocusColor : EdgeColor))
+                e.Graphics.DrawRectangle(pen, 0, 0, Math.Max(0, Width - 1), Math.Max(0, Height - 1));
+        }
+    }
+
     internal sealed class MainForm : Form
     {
         internal bool MenuRequested { get; private set; }
@@ -115,7 +132,8 @@ namespace ServiceTool
         private readonly Color blue = Color.FromArgb(37, 99, 235);
         private readonly Font serviceHeaderFont = new Font("Segoe UI", 10.5F, FontStyle.Bold);
         private readonly TextBox pathBox = new BrandTextBox();
-        private readonly Label fileTitle = new FlushLabel();
+        private readonly PathFieldFrame pathField = new PathFieldFrame();
+        private readonly FlushLabel fileTitle = new FlushLabel();
         private readonly Label statusTitle = new FlushLabel();
         private readonly Label statusDetail = new FlushLabel();
         private readonly Label hint = new FlushLabel();
@@ -254,10 +272,7 @@ namespace ServiceTool
             brandImage.Anchor = AnchorStyles.None;
             brandImage.Margin = new Padding(0);
             brandImage.BorderStyle = BorderStyle.None;
-            brandImage.Cursor = Cursors.Hand;
-            brandImage.AccessibleName = "Открыть сайт ДАТАКРАТ";
-            brandImage.Click += delegate { OpenBrandWebsite(); };
-            toolTips.SetToolTip(brandImage, "Официальный сайт");
+            BrandAssets.BindWebsite(brandImage, toolTips, this);
             brandImage.Tag = "brand";
             brandSlot.Controls.Add(brandImage);
             brandSlot.Layout += delegate { LayoutBrandImage(brandSlot); };
@@ -283,36 +298,46 @@ namespace ServiceTool
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             fileCard.Controls.Add(fileLayout);
-            fileTitle.Text = "Перетащи сюда .exe-файл службы BARS";
+            fileTitle.Text = "Перетащи сюда .exe-файл службы BARS или выбери файл кнопкой.";
             fileTitle.Font = new Font(Font, FontStyle.Bold);
             fileTitle.Dock = DockStyle.Fill;
             fileTitle.AutoEllipsis = true;
+            fileTitle.SingleLine = true;
             fileTitle.Margin = new Padding(0);
             var moduleTitle=new FlushLabel {Text="Менеджер служб",Font=new Font("Segoe UI",15F,FontStyle.Bold),Dock=DockStyle.Fill,Margin=Padding.Empty,TextAlign=ContentAlignment.MiddleLeft};
             fileLayout.Controls.Add(moduleTitle,0,0);
-            fileLayout.Controls.Add(fileTitle, 0, 2);
-            Label fileHelp = new FlushLabel { Text = "Или выбери файл кнопкой. Перетаскивание только выбирает .exe службы BARS.", Tag = "muted", Font = new Font("Segoe UI", 9F), ForeColor = muted, Dock = DockStyle.Fill, Margin = new Padding(0) };
-            fileLayout.Controls.Add(fileHelp, 0, 3);
+            fileLayout.Controls.Add(fileTitle, 0, 3);
             TableLayoutPanel fileInput = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 2, Margin = new Padding(0) };
             fileInput.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             fileInput.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 192));
             fileInput.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             fileLayout.Controls.Add(fileInput, 0, 4);
             pathBox.ReadOnly = true;
+            pathBox.AutoSize = true;
+            pathBox.Multiline = false;
+            pathBox.WordWrap = false;
             pathBox.BackColor = Color.FromArgb(248, 250, 253);
-            pathBox.BorderStyle = BorderStyle.FixedSingle;
+            pathBox.BorderStyle = BorderStyle.None;
             pathBox.Dock = DockStyle.None;
-            pathBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-            pathBox.Margin = new Padding(0, 0, 12, 0);
+            pathBox.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+            pathBox.Margin = Padding.Empty;
             pathBox.TabStop = false;
             pathBox.Text = ".exe пока не выбран";
+            pathField.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            pathField.Margin = new Padding(0, 0, 12, 0);
+            pathField.Controls.Add(pathBox);
+            pathField.Layout += delegate { ApplyPathTextInset(); };
+            pathField.Click += delegate { pathBox.Focus(); };
+            pathBox.GotFocus += delegate { pathField.Invalidate(); };
+            pathBox.LostFocus += delegate { pathField.Invalidate(); };
             pathBox.HandleCreated += delegate { ApplyPathTextInset(); };
+            pathBox.SizeChanged += delegate { ApplyPathTextInset(); };
             pathBox.FontChanged += delegate
             {
                 if (pathBox.IsHandleCreated && !pathBox.IsDisposed)
                     pathBox.BeginInvoke((MethodInvoker)ApplyPathTextInset);
             };
-            fileInput.Controls.Add(pathBox, 0, 0);
+            fileInput.Controls.Add(pathField, 0, 0);
             chooseButton = MakeButton("Выбрать службу...", false);
             chooseButton.Dock = DockStyle.Fill;
             chooseButton.Margin = new Padding(0);
@@ -323,8 +348,8 @@ namespace ServiceTool
             Card registered = new Card { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10), Padding = new Padding(12) };
             TableLayoutPanel serviceLayout = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, ColumnCount = 1, RowCount = 5 };
             serviceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-            serviceLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
@@ -332,8 +357,8 @@ namespace ServiceTool
             TableLayoutPanel statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 240));
-            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
             statusTitle.Text = "Службы BARS";
             statusTitle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             statusTitle.Dock = DockStyle.Fill;
@@ -347,6 +372,7 @@ namespace ServiceTool
             statusDetail.TextAlign = ContentAlignment.TopLeft;
             statusDetail.AutoEllipsis = true;
             statusDetail.Tag = "muted";
+            statusDetail.Visible = false;
             statusLayout.Controls.Add(statusTitle, 0, 0);
             statusLayout.Controls.Add(statusDetail, 0, 1);
             statusLayout.SetColumnSpan(statusDetail, 2);
@@ -526,6 +552,15 @@ namespace ServiceTool
             ((BrandComboBox)startupCombo).HoverHighlight=false;
             startupCombo.ItemHeight=startupCombo.Font.Height+8;
             startupCombo.FontChanged+=delegate{startupCombo.ItemHeight=startupCombo.Font.Height+8;};
+            Action matchPathField = delegate
+            {
+                if (!pathBox.Font.Equals(startupCombo.Font)) pathBox.Font = new Font(startupCombo.Font, startupCombo.Font.Style);
+                pathField.Height = startupCombo.Height;
+                ApplyPathTextInset();
+            };
+            startupCombo.SizeChanged += delegate { matchPathField(); };
+            startupCombo.FontChanged += delegate { matchPathField(); };
+            matchPathField();
             startupCombo.Items.AddRange(new object[] { "Автоматически", "Автоматически (отложенный запуск)", "Вручную", "Отключена" });
             startupCombo.DrawItem += DrawStartupItem;
             startupCombo.SelectedIndexChanged += delegate { if (!bindingServices) { startupDirty = true; UpdateServiceControls(false); } };
@@ -577,7 +612,7 @@ namespace ServiceTool
             activity.Font = new Font("Segoe UI", 8.5F);
             activity.Tag = "muted";
             activity.ForeColor = muted;
-            activity.Text = "Локальный компьютер • автообновление: 10 с";
+            activity.Text = "Локальный компьютер; автообновление каждые 10 с";
             TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
@@ -621,8 +656,8 @@ namespace ServiceTool
 
         private void UpdateRefreshActivity()
         {
-            activity.Text = "Локальный компьютер" + (lastChecked.HasValue ? " • проверено в " + lastChecked.Value.ToString("HH:mm:ss") : "") +
-                (autoRefreshToggle.Checked ? " • автообновление: 10 с" : " • автообновление выключено");
+            activity.Text = "Локальный компьютер" + (lastChecked.HasValue ? "; проверено в " + lastChecked.Value.ToString("HH:mm:ss") : "") +
+                (autoRefreshToggle.Checked ? "; автообновление каждые 10 с" : "; автообновление выключено");
         }
 
         private Label MakeLabel(string text, float size, Color color, Rectangle bounds)
@@ -641,14 +676,19 @@ namespace ServiceTool
 
         private void ApplyPathTextInset()
         {
-            if (pathBox.IsDisposed || !pathBox.IsHandleCreated) return;
+            if (pathBox.IsDisposed || pathField.IsDisposed) return;
             int inset;
-            using (Graphics graphics = pathBox.CreateGraphics())
+            using (Graphics graphics = pathField.CreateGraphics())
                 inset = Math.Max(1, (int)Math.Round(8F * graphics.DpiX / 96F));
-            // Single-line Windows text boxes use native margins rather than Control.Padding.
-            SendMessage(pathBox.Handle, 0x00D3, new IntPtr(3), new IntPtr(inset | (inset << 16)));
+            // Center the actual native edit window, including its caret and selection.
+            // Its normal single-line height prevents native text from sticking to the top
+            // of the taller outer frame. Never paint over the edit's text.
+            int height = pathBox.PreferredHeight;
+            Rectangle bounds = new Rectangle(inset,
+                Math.Max(1, (pathField.ClientSize.Height - height) / 2),
+                Math.Max(1, pathField.ClientSize.Width - inset * 2), height);
+            if (pathBox.Bounds != bounds) pathBox.Bounds = bounds;
         }
-
         private void LayoutBrandImage(Control slot)
         {
             if (slot.ClientSize.Width < 1 || slot.ClientSize.Height < 1 || brandImage.Image == null) return;
@@ -721,6 +761,14 @@ namespace ServiceTool
             }
             BrandTextBox input = control as BrandTextBox;
             if (input != null) input.Palette = palette;
+            if (control == pathField)
+            {
+                background = palette.SurfaceAlt;
+                control.BackColor = background;
+                pathField.EdgeColor = palette.Border;
+                pathField.FocusColor = palette.Accent;
+                pathField.Invalidate();
+            }
             if (control == pathBox) control.BackColor = palette.SurfaceAlt;
             foreach (Control child in control.Controls) ApplyThemeTree(child, background);
         }
@@ -899,7 +947,11 @@ namespace ServiceTool
                 if (!String.IsNullOrEmpty(storeWarning)) AppendLog(storeWarning);
                 loggedStoreWarning = storeWarning;
             }
-            if (!String.IsNullOrEmpty(warning)) SetHint(warning);
+            if (!String.IsNullOrEmpty(warning))
+            {
+                toolTips.SetToolTip(statusTitle, warning);
+                if (!log.Text.Contains(warning)) AppendLog(warning);
+            }
         }
 
         private static string StartupValue(int index)
@@ -1078,7 +1130,7 @@ namespace ServiceTool
                         break;
                     }
                 }
-            bool rebuild = !GridRowsUnchanged();
+            bool rebuild = !GridRowIdentitiesUnchanged();
             int scrollRow = servicesGrid.FirstDisplayedScrollingRowIndex;
             bindingServices = true;
             servicesGrid.SuspendLayout();
@@ -1099,7 +1151,21 @@ namespace ServiceTool
                             if (cell.ColumnIndex != 0) cell.ToolTipText = Convert.ToString(cell.Value);
                     }
                 }
-                else for (int i = 0; i < managedRows.Count; i++) servicesGrid.Rows[i].Tag = managedRows[i];
+                else for (int i = 0; i < managedRows.Count; i++)
+                {
+                    ServiceEntry entry = managedRows[i];
+                    DataGridViewRow row = servicesGrid.Rows[i];
+                    row.Tag = entry;
+                    string[] values = { entry.DisplayName, entry.Name,
+                        currentServiceNames.Contains(entry.Name) ? StateText(entry.State) : "Не проверено", RenderedStartupMode(entry) };
+                    for (int column = 0; column < values.Length; column++)
+                    {
+                        DataGridViewCell cell = row.Cells[column];
+                        if (Convert.ToString(cell.Value) != values[column]) cell.Value = values[column];
+                        string tip = column == 0 ? entry.DisplayName + Environment.NewLine + entry.BinaryPath : values[column];
+                        if (cell.ToolTipText != tip) cell.ToolTipText = tip;
+                    }
+                }
                 if (rebuild || focusSelectedExecutable)
                 {
                     servicesGrid.ClearSelection();
@@ -1128,17 +1194,14 @@ namespace ServiceTool
                 entry.StartMode == "Auto" && entry.DelayedAutoStart ? "Автоматически (отложенный запуск)" : ModeText(entry.StartMode);
         }
 
-        private bool GridRowsUnchanged()
+        private bool GridRowIdentitiesUnchanged()
         {
             if (servicesGrid.Rows.Count != managedRows.Count) return false;
             for (int i = 0; i < managedRows.Count; i++)
             {
                 ServiceEntry entry = managedRows[i];
                 DataGridViewRow row = servicesGrid.Rows[i];
-                if (Convert.ToString(row.Cells[0].Value) != entry.DisplayName || Convert.ToString(row.Cells[1].Value) != entry.Name ||
-                    Convert.ToString(row.Cells[2].Value) != (currentServiceNames.Contains(entry.Name) ? StateText(entry.State) : "Не проверено") ||
-                    Convert.ToString(row.Cells[3].Value) != RenderedStartupMode(entry) ||
-                    row.Cells[0].ToolTipText != entry.DisplayName + Environment.NewLine + entry.BinaryPath) return false;
+                if (Convert.ToString(row.Cells[1].Value) != entry.Name) return false;
             }
             return true;
         }
@@ -1155,11 +1218,9 @@ namespace ServiceTool
                 SetStatus("Регистрация не найдена", "Среди служб Windows нет прямой ссылки на выбранный .exe.", muted);
             else
             {
-                bool running = matches.Exists(delegate(ServiceEntry entry) { return entry.State == "Running"; });
-                string detail = matches.Count == 1
-                    ? matches[0].DisplayName + " · " + StateText(matches[0].State)
-                    : "Связанных служб: " + matches.Count + ". Состояния показаны в таблице ниже.";
-                SetStatus("Служба зарегистрирована" + (running ? " · работает" : ""), detail, Color.FromArgb(21, 128, 85));
+                string title = matches.Count == 1 ? RegistrationText(matches[0].State)
+                    : "Зарегистрировано служб: " + matches.Count;
+                SetStatus(title, String.Empty, Color.FromArgb(21, 128, 85));
             }
             SetHint(matches.Count > 1
                 ? "Процедура -u относится к .exe службы и может удалить все связанные с ним службы."
@@ -1168,11 +1229,9 @@ namespace ServiceTool
 
         private void SetHint(string text)
         {
-            string notice = String.Empty;
-            if (!String.IsNullOrEmpty(selectedPath) && installProfiles.Get(selectedPath).Mode == ServiceInstallMode.ManagedDotNet)
-                notice = "Сверхособенный режим установки кривонаписанной службы с выбранной учётной записью";
-            hint.Text = String.IsNullOrEmpty(notice) ? text : notice + (String.IsNullOrEmpty(text) ? "" : Environment.NewLine + text);
-            hint.Visible = !String.IsNullOrEmpty(hint.Text);
+            hint.Text = String.Empty;
+            hint.Visible = false;
+            toolTips.SetToolTip(removeButton, text);
         }
 
         private void ConfigureInstallProfile()
@@ -1242,7 +1301,7 @@ namespace ServiceTool
                     destination = dialog.FileName;
                 }
                 token.ThrowIfCancellationRequested();
-                SetStatus("Собираем логи…", serviceName + " · ZIP создаётся без остановки службы.", blue);
+                SetStatus("Собираем логи…", serviceName + ": ZIP создаётся без остановки службы.", blue);
                 AppendLog("Сбор TXT/LOG-логов службы " + serviceName + ".");
                 activity.Text = "Создаём ZIP. Для отмены нажми «Отменить сбор».";
                 LogArchiveResult result = await Task.Factory.StartNew(delegate
@@ -1250,7 +1309,7 @@ namespace ServiceTool
                 if (closing) return;
                 SetStatus("Логи собраны", "Файлов: " + result.FileCount + ". Архив: " + destination, Color.FromArgb(21, 128, 85));
                 AppendLog("Логи службы " + serviceName + " сохранены: " + destination + ". Файлов: " + result.FileCount + ".");
-                activity.Text = "Архив сохранён · " + DateTime.Now.ToString("HH:mm:ss");
+                activity.Text = "Архив сохранён в " + DateTime.Now.ToString("HH:mm:ss");
             }
             catch (OperationCanceledException)
             {
@@ -1371,17 +1430,17 @@ namespace ServiceTool
                 {
                     string reason = waitReason == ProcedureWaitReason.RegistrationObserved ? "Регистрация изменилась" :
                         waitReason == ProcedureWaitReason.TimedOut ? "Истекли 2 минуты ожидания" : "Ожидание остановлено";
-                    SetStatus(reason + " · .exe ещё работает",
+                    SetStatus(reason + ", но .exe ещё работает",
                         (expected ? (install ? "Служба уже зарегистрирована. " : "Регистрация службы уже удалена. ") : "Результат регистрации пока не подтверждён. ") +
                         "Процесс " + procedureProcessId + " не остановлен; код выхода неизвестен. Менеджер доступен. Проверь результат в оснастке «Службы» Windows.", Color.DarkOrange);
                 }
                 else if (exitCode != 0)
                 {
-                    SetStatus("Процедура вернула ошибку · код " + exitCode,
+                    SetStatus("Процедура вернула ошибку с кодом " + exitCode,
                         !String.IsNullOrEmpty(executionDetail) ? executionDetail : verified ? "Наблюдаемое состояние регистрации показано ниже. Подробности смотри в журнале службы BARS." : "Дополнительно не удалось проверить регистрацию службы.", Color.Firebrick);
                 }
                 else if (!verified)
-                    SetStatus("Процедура завершена · статус не проверен", lastError == null ? "Повтори проверку статуса." : lastError.Message, Color.DarkOrange);
+                    SetStatus("Процедура завершена, но статус не проверен", lastError == null ? "Повтори проверку статуса." : lastError.Message, Color.DarkOrange);
                 else if (expected)
                     SetStatus(install ? "Установка подтверждена" : "Удаление подтверждено",
                         install ? "Служба найдена в регистрации Windows. Установка не означает автоматический запуск." : "Прямые ссылки на выбранный .exe в списке служб больше не найдены.", Color.FromArgb(21, 128, 85));
@@ -1435,12 +1494,16 @@ namespace ServiceTool
 
         private void SetStatus(string title, string detail, Color color)
         {
+            bool changed = statusTitle.Text != title || statusDetail.Text != detail;
             statusTitle.Text = title;
             statusTone = color == Color.Firebrick ? "error" : color == Color.DarkOrange ? "warning" :
                 color == Color.FromArgb(21, 128, 85) ? "success" : color == blue ? "info" : "neutral";
             ApplyStatusColor();
             statusDetail.Text = detail;
-            toolTips.SetToolTip(statusDetail, detail);
+            statusDetail.Visible = false;
+            toolTips.SetToolTip(statusTitle, detail);
+            if (changed && (statusTone == "error" || statusTone == "warning") && !String.IsNullOrEmpty(detail))
+                AppendLog(title + ": " + detail);
         }
 
         private async Task RunServiceCommandAsync(string action, string mode)
@@ -1452,7 +1515,7 @@ namespace ServiceTool
             timer.Stop();
             UpdateActions();
             string description = action == "start" ? "Запускаем службу…" : action == "stop" ? "Останавливаем службу…" : "Изменяем режим запуска…";
-            SetStatus(description, entry.DisplayName + " · " + serviceName, blue);
+            SetStatus(description, entry.DisplayName + ", имя службы: " + serviceName, blue);
             AppendLog("Служба " + serviceName + ": " + action + (action == "startup" ? " → " + mode : ""));
             activity.Text = "Выполняется действие для выбранной службы.";
             int result = -1;
@@ -1498,7 +1561,7 @@ namespace ServiceTool
                 string message = action == "startup" && result == 1003
                     ? "Изменение не завершено; восстановить прежние настройки тоже не удалось. Проверь режим запуска в оснастке Windows."
                     : new Win32Exception(result).Message;
-                SetStatus("Действие завершилось с ошибкой · код " + result, message, Color.Firebrick);
+                SetStatus("Действие завершилось с ошибкой, код " + result, message, Color.Firebrick);
                 AppendLog("Ошибка " + result + ": " + message);
                 return;
             }
@@ -1509,12 +1572,12 @@ namespace ServiceTool
             if (confirmed)
             {
                 string title = action == "start" ? "Служба запущена" : action == "stop" ? "Служба остановлена" : "Режим запуска сохранён";
-                SetStatus(title, observed.DisplayName + " · " + serviceName, Color.FromArgb(21, 128, 85));
+                SetStatus(title, observed.DisplayName + ", имя службы: " + serviceName, Color.FromArgb(21, 128, 85));
                 AppendLog(title + ": " + serviceName + ". Состояние проверено.");
             }
             else
             {
-                SetStatus("Процедура выполнена · результат не подтверждён", "Обнови статус: ожидаемое состояние выбранной службы пока не удалось подтвердить.", Color.DarkOrange);
+                SetStatus("Процедура выполнена, но результат не подтверждён", "Обнови статус: ожидаемое состояние выбранной службы пока не удалось подтвердить.", Color.DarkOrange);
                 AppendLog("Код выхода 0, но ожидаемое состояние службы не подтверждено.");
             }
         }
@@ -1560,13 +1623,22 @@ namespace ServiceTool
 
         internal static ProcessStartInfo BuildBrandLinkStartInfo()
         {
-            return new ProcessStartInfo("https://www.datakrat.ru/") { UseShellExecute = true };
+            return BrandAssets.WebsiteStartInfo();
         }
 
-        private void OpenBrandWebsite()
+        internal static string RegistrationText(string state)
         {
-            try { Process.Start(BuildBrandLinkStartInfo()); }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Не удалось открыть сайт ДАТАКРАТ", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            switch (state)
+            {
+                case "Running": return "Служба зарегистрирована и работает";
+                case "Stopped": return "Служба зарегистрирована и остановлена";
+                case "Start Pending": return "Служба зарегистрирована и запускается";
+                case "Stop Pending": return "Служба зарегистрирована и останавливается";
+                case "Paused": return "Служба зарегистрирована и приостановлена";
+                case "Pause Pending": return "Служба зарегистрирована и приостанавливается";
+                case "Continue Pending": return "Служба зарегистрирована и возобновляет работу";
+                default: return "Служба зарегистрирована, состояние неизвестно";
+            }
         }
 
         private static string StateText(string state)

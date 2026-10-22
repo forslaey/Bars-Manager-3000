@@ -115,7 +115,7 @@ namespace ServiceTool
             {
                 await InvokeAsync(form, "SetExecutableAsync", executableA);
                 Assert(!Field<Button>(form, "installButton").Enabled && Field<Button>(form, "removeButton").Enabled, "A stopped service remains registered and removable");
-                Assert(Field<Label>(form, "statusTitle").Text == "Служба зарегистрирована", "Stopped registration is not presented as running");
+                Assert(Field<Label>(form, "statusTitle").Text == "Служба зарегистрирована и остановлена", "Stopped registration is not presented as running");
                 DataGridView grid = Field<DataGridView>(form, "servicesGrid");
                 Assert(grid.Rows.Count == 1, "Stopped registration appears in the grid");
                 Assert(Convert.ToString(grid.Rows[0].Cells[1].Value) == "stopped-A" && Convert.ToString(grid.Rows[0].Cells[2].Value) == "Остановлена", "The grid preserves identity and translates stopped state");
@@ -171,7 +171,7 @@ namespace ServiceTool
                 Assert(!Field<Button>(form, "installButton").Enabled && Field<Button>(form, "removeButton").Enabled, "A directly observed match permits removal despite a partial catalog");
                 Assert(Field<bool>(form, "verified") && Field<DataGridView>(form, "servicesGrid").Rows.Count == 1, "Known partial match remains visible and verified");
                 Assert(Field<Label>(form, "statusTitle").Text.Contains("зарегистрирована") && Field<Label>(form, "statusTitle").Text.Contains("работает"), "Known running registration is shown");
-                Assert(Field<Label>(form, "hint").Text.Contains(warning), "The partial-read warning remains visible beside a known match");
+                Assert(!Field<Label>(form, "hint").Visible && Field<TextBox>(form, "log").Text.Contains(warning), "The partial-read warning remains available in the journal without the removed caption");
             }
             Console.WriteLine("PASS: matched partial catalog retains warning and known registration");
         }

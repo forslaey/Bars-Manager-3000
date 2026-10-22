@@ -86,9 +86,11 @@ namespace ServiceTool
 
     internal sealed class FlushLabel : Label
     {
+        public bool SingleLine { get; set; }
         protected override void OnPaint(PaintEventArgs e)
         {
-            TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.WordBreak;
+            TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix |
+                (SingleLine ? TextFormatFlags.SingleLine : TextFormatFlags.WordBreak);
             if (TextAlign == ContentAlignment.MiddleLeft) flags |= TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine;
             if (AutoEllipsis) flags |= TextFormatFlags.EndEllipsis;
             TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ForeColor, flags);

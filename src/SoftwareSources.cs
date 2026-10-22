@@ -64,7 +64,7 @@ namespace ServiceTool
             if(matches.Count==0)throw new InvalidDataException("В официальном списке выпусков не найдена стабильная версия AnyDesk для Windows");
             string version=matches[0].Groups[1].Value;
             foreach(Match match in matches)if(SoftwareCatalog.Compare(match.Groups[1].Value,version)>0)version=match.Groups[1].Value;
-            return new SoftwarePackage{Id="anydesk",Architecture="x86",Version=version,File="AnyDesk.exe",Url="https://download.anydesk.com/AnyDesk.exe",Source="Официальный AnyDesk · Windows",Sha256=""};
+            return new SoftwarePackage{Id="anydesk",Architecture="x86",Version=version,File="AnyDesk.exe",Url="https://download.anydesk.com/AnyDesk.exe",Source="Официальный AnyDesk для Windows",Sha256=""};
         }
         internal static SoftwarePackage ParseGitHub(string id, string json)
         {
@@ -84,7 +84,7 @@ namespace ServiceTool
                 string digest=asset.ContainsKey("digest") ? Convert.ToString(asset["digest"]) : "";
                 if (!Regex.IsMatch(digest,@"^sha256:[0-9a-fA-F]{64}$")) throw new InvalidDataException("GitHub не предоставил SHA-256 релиза");
                 found.Add(new SoftwarePackage { Id=id, Version=id=="notepad" ? match.Groups[1].Value : Int32.Parse(match.Groups[1].Value)+"."+match.Groups[2].Value,
-                    Architecture="x64", File=name, Url=url, Sha256=digest.Substring(7), Source="GitHub · официальный релиз" });
+                    Architecture="x64", File=name, Url=url, Sha256=digest.Substring(7), Source="Официальный релиз на GitHub" });
             }
             if (found.Count!=1) throw new InvalidDataException("Не найден единственный установщик x64"); return found[0];
         }

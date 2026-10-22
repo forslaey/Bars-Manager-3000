@@ -52,13 +52,21 @@ namespace ServiceTool
             { Session = session; try { return await Task.Run(() => session.ExecuteSystem(action, data, path, Progress)); } finally { Session = null; } }
         }
         // Runs several privileged actions inside one elevation prompt.
-        protected async Task<List<LibraryInstallResult>> ExecuteAll(IList<string[]> steps)
+        protected async Task<List<LibraryInstallResult>> ExecuteAll(IList<string[]> steps, Action<LibraryInstallResult> completed = null)
         {
             var results = new List<LibraryInstallResult>();
             using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => CancelRequested)))
             {
                 Session = session;
-                try { foreach (var step in steps) results.Add(await Task.Run(() => session.ExecuteSystem(step[0], step[1], step[2], Progress))); }
+                try
+                {
+                    foreach (var step in steps)
+                    {
+                        var result = await Task.Run(() => session.ExecuteSystem(step[0], step[1], step[2], Progress));
+                        results.Add(result);
+                        if (completed != null) completed(result);
+                    }
+                }
                 finally { Session = null; }
             }
             return results;
@@ -81,6 +89,20 @@ namespace ServiceTool
         private readonly BrandButton check, action;
         private Dictionary<string, string> states = new Dictionary<string, string>();
         private readonly bool preview;
+        internal bool RestartRequired { get; private set; }
+
+        internal void RecordRestartResults(IEnumerable<LibraryInstallResult> results)
+        {
+            RestartRequired |= results.Any(result => result.Reboot);
+        }
+
+        private void RecordFeatureStates(string message)
+        {
+            states = WindowsComponents.Parse(message);
+            RestartRequired |= states.Values.Any(state =>
+                String.Equals(state, "EnablePending", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(state, "DisablePending", StringComparison.OrdinalIgnoreCase));
+        }
         internal WindowsFeaturesForm(bool previewMode, bool returnToComponents = false) : base("Компоненты Windows", new Size(760, 590))
         {
             if(returnToComponents) Back.Text="Назад";
@@ -158,7 +180,7 @@ namespace ServiceTool
         private async Task Check()
         {
             if (Busy || preview) return; Lock(true); Activity.Text = "Проверяем Windows…";
-            try { var result = await Execute("features-query", "", ""); states = WindowsComponents.Parse(result.Message); if (states.Count == 0) throw new IOException("Windows не вернула список компонентов"); Activity.Text = "Проверка завершена"; }
+            try { var result = await Execute("features-query", "", ""); RecordFeatureStates(result.Message); if (states.Count == 0) throw new IOException("Windows не вернула список компонентов"); Activity.Text = RestartRequired ? "Windows ожидает перезагрузки после изменения компонентов" : "Проверка завершена"; }
             catch (Exception ex) { states.Clear(); Failure(ex); }
             finally { Lock(false); }
         }
@@ -173,21 +195,23 @@ namespace ServiceTool
                 : install.Length > 0 ? "Установить выбранные компоненты Windows? Может потребоваться доступ к Windows Update или установочному носителю."
                 : "Удалить выбранные компоненты Windows? Зависящие от них приложения перестанут работать.";
             if (MessageBox.Show(this, question + "\r\nАвтоматическая перезагрузка не выполняется.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            Lock(true); bool changed = false, restart = false;
+            Lock(true); bool restart = false;
             try
             {
                 var steps = new List<string[]>();
                 if (install.Length > 0) steps.Add(new[] { "features-enable", install, "" });
                 if (remove.Length > 0) steps.Add(new[] { "features-disable", remove, "" });
-                var results = await ExecuteAll(steps);
-                restart = results.Any(r => r.Reboot); changed = results.Any(r => LibraryPlan.Success(r.ExitCode));
-                var observed = await Execute("features-query", "", ""); states = WindowsComponents.Parse(observed.Message);
-                Activity.Text = restart ? "Изменения применены. Нужна перезагрузка" : "Проверка после изменения завершена";
+                var results = await ExecuteAll(steps, result => RecordRestartResults(new[] { result }));
+                RecordRestartResults(results);
+                restart = RestartRequired;
+                var observed = await Execute("features-query", "", ""); RecordFeatureStates(observed.Message);
+                restart = RestartRequired;
+                Activity.Text = restart ? "Изменения применены. Нужна перезагрузка" : "Проверка завершена. Компоненты Windows не запросили перезагрузку";
             }
-            catch (Exception ex) { states.Clear(); Failure(ex); }
+            catch (Exception ex) { restart = RestartRequired; states.Clear(); Failure(ex); }
             finally { Lock(false); }
-            // Offer a restart after installation and after removal alike.
-            if (changed) await Restart();
+            // A successful change alone does not mean that Windows needs a reboot.
+            if (restart) await Restart();
         }
     }
     internal sealed class ToolsDeploymentForm : UtilityModuleForm

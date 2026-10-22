@@ -138,7 +138,7 @@ namespace ServiceTool
                             using (RegistryKey registration = classes.OpenSubKey(@"Msxml2.DOMDocument.6.0\CLSID"))
                                 if (registration != null && Version.TryParse(package.Version, out required) && version.Major == required.Major && version.CompareTo(required) >= 0)
                                 {
-                                    var integrated = LibraryVersions.Known(package, version.ToString(), "MSXML 6 предоставлен Windows: " + version + " · " + package.Architecture + "; COM зарегистрирован; отдельное удаление не требуется");
+                                    var integrated = LibraryVersions.Known(package, version.ToString(), "MSXML 6 предоставлен Windows: " + version + ", разрядность " + package.Architecture + "; COM зарегистрирован; отдельное удаление не требуется");
                                     integrated.ProtectedComponent = true; return integrated;
                                 }
                         }
@@ -219,7 +219,7 @@ namespace ServiceTool
                             if (File.Exists(path))
                             {
                                 var standalone = (inventory ?? LibraryMaintenance.Inventory()).Where(p => LibraryMaintenance.Matches(package, p) && LibraryMaintenance.StillRegistered(p) && LibraryVersions.Number(p.Version) != null).OrderByDescending(p => LibraryVersions.Number(p.Version)).FirstOrDefault();
-                                if (standalone != null) return LibraryVersions.Known(package, standalone.Version, "Microsoft.ACE.OLEDB.16.0 · " + package.Architecture + "; DLL и регистрация Access Database Engine найдены");
+                                if (standalone != null) return LibraryVersions.Known(package, standalone.Version, "Microsoft.ACE.OLEDB.16.0, разрядность " + package.Architecture + "; DLL и регистрация Access Database Engine найдены");
                                 result.State = LibraryState.Unknown; result.Detail = "Провайдер ACE доступен, но отдельная установка Access Database Engine не подтверждена; он может входить в Office или остаться после удаления"; return result;
                             }
                         }
@@ -243,7 +243,7 @@ namespace ServiceTool
         }
         internal static LibraryCheck ProbeRuntime(LibraryPackage package, IEnumerable<string> directories, IEnumerable<LibraryRegisteredProduct> inventory, Func<LibraryRegisteredProduct, bool> registered, Func<string, string> informationalVersion = null)
         {
-            var result = new LibraryCheck { Package = package, State = LibraryState.Missing, Relation = LibraryRelation.Missing, Detail = "Подходящий runtime не найден: " + package.RuntimeFamily + " · " + package.Architecture };
+            var result = new LibraryCheck { Package = package, State = LibraryState.Missing, Relation = LibraryRelation.Missing, Detail = "Подходящий runtime не найден: " + package.RuntimeFamily + ", разрядность " + package.Architecture };
             var products = inventory.Where(p => LibraryMaintenance.RuntimeFamily(package, p) && registered(p)).ToList();
             var compatible = products.Where(p => LibraryVersions.Compatible(package, LibraryMaintenance.RuntimeVersion(p))).ToList();
             result.HasProduct = compatible.Count > 0; var confirmed = new List<LibraryCheck>(); bool orphan = false; var others = new List<string>();

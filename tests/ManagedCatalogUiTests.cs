@@ -226,7 +226,7 @@ namespace ServiceTool
                 Select(form, "bars-B");
                 Assert(Field<bool>(form, "verified") && Field<Button>(form, "removeButton").Enabled && Field<Button>(form, "startButton").Enabled,
                     "A directly observed B registration stays manageable despite another incomplete entry");
-                Assert(Field<Label>(form, "hint").Text.Contains("Injected incomplete catalog"), "Partial-read warning remains visible after row selection");
+                Assert(!Field<Label>(form, "hint").Visible && Field<TextBox>(form, "log").Text.Contains("Injected incomplete catalog"), "Partial-read warning remains in the journal after row selection without restoring the removed caption");
             }
         }
 

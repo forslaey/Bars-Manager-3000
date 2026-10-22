@@ -208,15 +208,17 @@ namespace ServiceTool
                         form.WindowState = FormWindowState.Normal; Application.DoEvents();
                         foreach (Control child in Descendants(form)) if (child is Card) { Check(child.Width > 0 && Style(child, ControlStyles.ResizeRedraw), "Maximize/restore retains full redraw on all cards"); }
                     }
-                    TextBox path = Field<TextBox>(form, "pathBox");
+                    Control path = Field<Control>(form, "pathField");
                     Label title = Field<Label>(form, "fileTitle");
                     Check(title is FlushLabel && title.PointToScreen(Point.Empty).X == path.PointToScreen(Point.Empty).X, "File drop title aligns exactly with path field");
                     Button button = Field<Button>(form, "refreshButton");
                     DataGridView grid = Field<DataGridView>(form, "servicesGrid");
-                    Label detail = Field<Label>(form, "statusDetail");
-                    int gapAbove = button.PointToScreen(Point.Empty).Y - (detail.PointToScreen(Point.Empty).Y + detail.Font.Height);
-                    int gapBelow = grid.PointToScreen(Point.Empty).Y - (button.PointToScreen(Point.Empty).Y + button.Height);
-                    Check(Math.Abs(gapAbove - gapBelow) <= 5, "Registration actions are centered between description text and list");
+                    Label status = Field<Label>(form, "statusTitle");
+                    Check(button.PointToScreen(Point.Empty).Y >= status.PointToScreen(Point.Empty).Y + status.Height &&
+                        grid.PointToScreen(Point.Empty).Y >= button.PointToScreen(Point.Empty).Y + button.Height,
+                        "Registration actions fit between the compact status header and list");
+                    Check(!Field<Label>(form, "statusDetail").Visible && !Field<Label>(form, "hint").Visible,
+                        "Both removed lines remain hidden after resizing");
                 }
                 Set(form, "operationRunning", false); form.Close();
             }
@@ -247,8 +249,17 @@ namespace ServiceTool
                 Check(Field<Dictionary<string, List<ServiceEntry>>>(form, "indexedServices").Count == 5, "Snapshot paths are indexed once per distinct EXE");
                 data.Entries[0].State = "Running"; data.Entries[0].CanStop = true;
                 await Refresh(form);
-                Check(removals > 0 && Convert.ToString(grid.Rows[0].Cells[2].Value) == "Работает", "Changed status still updates the table");
+                Check(removals == 0 && Object.ReferenceEquals(original, grid.Rows[0]) && Convert.ToString(grid.Rows[0].Cells[2].Value) == "Работает", "Changed status updates the existing row without rebuilding the table");
                 Check(grid.FirstDisplayedScrollingRowIndex == 12, "Changed refresh also retains scroll position");
+                data.Entries[0].DisplayName = "Updated service display name";
+                data.Entries[0].StartupKnown = false;
+                await Refresh(form);
+                Check(removals == 0 && Convert.ToString(grid.Rows[0].Cells[0].Value) == data.Entries[0].DisplayName &&
+                    grid.Rows[0].Cells[0].ToolTipText.StartsWith(data.Entries[0].DisplayName), "Display name and tooltip update in place");
+                Check(Convert.ToString(grid.Rows[0].Cells[3].Value) == "Не удалось прочитать", "Unknown startup configuration updates in place");
+                data.Entries.RemoveAt(0);
+                await Refresh(form);
+                Check(removals > 0 && grid.Rows.Count == 39 && ((ServiceEntry)grid.Rows[0].Tag).Name == "Bars.Test1", "Structural changes still rebuild the correct service identities");
             }
         }
         private static async Task Refresh(MainForm form) { await (Task)Call(form, "RefreshStatusAsync", true); }

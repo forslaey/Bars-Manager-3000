@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Threading;
 namespace ServiceTool
@@ -16,7 +16,7 @@ namespace ServiceTool
         public LibraryHeartbeat(Action<string> callback, int interval)
         {
             send = callback;
-            timer = new Timer(delegate { lock (gate) if (!completed) send(phase + " · " + elapsed.Elapsed.ToString(@"hh\:mm\:ss")); }, null, interval, interval);
+            timer = new Timer(delegate { lock (gate) if (!completed) send(phase + ", прошло " + elapsed.Elapsed.ToString(@"hh\:mm\:ss")); }, null, interval, interval);
         }
         public void SetPhase(string text) { lock (gate) { phase = text; if (!completed) send(text); } }
         public void Dispose() { lock (gate) completed = true; timer.Dispose(); }

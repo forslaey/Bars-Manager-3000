@@ -82,7 +82,8 @@ namespace ServiceTool
                 VerifyManagementControls(form);
                 await InvokeAsync(form, "SetExecutableAsync", fixtureExe);
                 Label multipleHint = Field<Label>(form, "hint");
-                Assert(multipleHint.Visible && multipleHint.Text.Contains("может удалить"), "Warning about removing multiple registrations remains visible");
+                Assert(!multipleHint.Visible && Field<ToolTip>(form, "toolTips").GetToolTip(Field<Button>(form, "removeButton")).Contains("может удалить"),
+                    "Multiple-registration warning is available on the removal button without restoring the removed line");
                 VerifySelectedServiceControls(form);
                 VerifyWrappedServiceText(form);
                 foreach (bool dark in new bool[] { false, true })
@@ -259,14 +260,16 @@ namespace ServiceTool
         private static void VerifyFileSelectionCopy(MainForm form)
         {
             Assert(Field<Button>(form, "chooseButton").Text == "Выбрать службу...", "File picker uses the requested service caption");
-            Assert(Field<Label>(form, "fileTitle").Text == "Перетащи сюда .exe-файл службы BARS", "File drop zone uses the requested BARS wording");
+            FlushLabel fileTitle = Field<FlushLabel>(form, "fileTitle");
+            Assert(fileTitle.Text == "Перетащи сюда .exe-файл службы BARS или выбери файл кнопкой.", "File drop zone uses the requested combined wording");
+            Assert(fileTitle.SingleLine && ((TableLayoutPanel)fileTitle.Parent).GetRow(fileTitle) == 3, "Combined instruction is single-line at the former lower caption position");
             int helpCount = 0;
             foreach (Control control in AllControls(form))
             {
                 if (control is Label && control.Text.StartsWith("Или выбери файл кнопкой", StringComparison.Ordinal)) helpCount++;
                 Assert(control.Text != "Права администратора Windows запросит при выполнении процедуры.", "Removed UAC hint is absent from the UI");
             }
-            Assert(helpCount == 1, "File selection has one concise friendly help label");
+            Assert(helpCount == 0, "File selection has no separate second help label");
             Label hint = Field<Label>(form, "hint");
             Assert(String.IsNullOrEmpty(hint.Text) || !hint.Visible, "Default service hint is empty or hidden");
         }
@@ -274,14 +277,19 @@ namespace ServiceTool
         private static void VerifyFileSelectionLayout(MainForm form, string scale)
         {
             TextBox path = Field<TextBox>(form, "pathBox");
+            Control frame = Field<Control>(form, "pathField");
             Button choose = Field<Button>(form, "chooseButton");
-            Assert(path.Parent == choose.Parent, "Path and picker share the same input row at " + scale);
+            Assert(path.Parent == frame && frame.Parent == choose.Parent, "Path frame and picker share the same input row at " + scale);
             VerifyFitsAncestors(path, "Path input at " + scale);
             VerifyFitsAncestors(choose, "File-picker button at " + scale);
-            VerifyFitsMargins(path, "Path-input margins at " + scale);
+            VerifyFitsMargins(frame, "Path-frame margins at " + scale);
             VerifyFitsMargins(choose, "File-picker margins at " + scale);
-            Assert(path.Right + path.Margin.Right <= choose.Left - choose.Margin.Left, "Path and picker do not overlap at " + scale);
-            Assert(path.Height >= path.Font.Height + 3, "Path-input text and border fit vertically at " + scale);
+            Assert(frame.Right + frame.Margin.Right <= choose.Left - choose.Margin.Left, "Path and picker do not overlap at " + scale);
+            Assert(path.ReadOnly && !path.Multiline && path.BorderStyle == BorderStyle.None && path.AutoSize, "Path retains a native single-line edit at its normal height at " + scale);
+            Assert(Math.Abs(path.Top - (frame.ClientSize.Height - path.Bottom)) <= 1, "Native text, caret and selection are vertically centered within the frame at " + scale);
+            Assert(frame.Height == Field<ComboBox>(form, "startupCombo").Height, "Outer frame matches the startup-mode height at " + scale);
+            path.SelectAll();
+            Assert(path.SelectionLength == path.TextLength, "Native path selection remains functional at " + scale);
             int textHeight = TextRenderer.MeasureText(choose.Text, choose.Font,
                 new Size(Math.Max(1, choose.ClientSize.Width - 16), Int32.MaxValue),
                 TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
@@ -293,8 +301,9 @@ namespace ServiceTool
         {
             DataGridView grid = Field<DataGridView>(form, "servicesGrid");
             Label title = Field<Label>(form, "statusTitle"), detail = Field<Label>(form, "statusDetail");
-            Assert(title.PointToScreen(Point.Empty).X == grid.PointToScreen(Point.Empty).X &&
-                detail.PointToScreen(Point.Empty).X == grid.PointToScreen(Point.Empty).X, "Summary aligns with the list without a left inset at " + scale);
+            Assert(title.PointToScreen(Point.Empty).X == grid.PointToScreen(Point.Empty).X,
+                "Summary aligns with the list without a left inset at " + scale);
+            Assert(!detail.Visible, "Removed status detail remains hidden at " + scale);
             CheckBox refresh = Field<RefreshToggle>(form, "autoRefreshToggle");
             VerifyFitsAncestors(refresh, "Autorefresh toggle at " + scale);
 
@@ -503,7 +512,8 @@ namespace ServiceTool
                 if (kind == "warning")
                 {
                     Label warningHint = Field<Label>(form, "hint");
-                    Assert(warningHint.Visible && warningHint.Text.Contains("Injected partial catalog warning"), "Partial-catalog warning remains visible");
+                    Assert(!warningHint.Visible && Field<TextBox>(form, "log").Text.Contains("Injected partial catalog warning"),
+                        "Partial-catalog warning remains available in the journal without a lower caption");
                 }
                 foreach (bool dark in new bool[] { false, true, false })
                 {
