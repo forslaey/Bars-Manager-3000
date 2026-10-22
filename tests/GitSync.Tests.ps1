@@ -35,14 +35,14 @@ function Check {
     Write-Host "PASS: $Name"
 }
 function Sync {
-    param([string]$Folder, [string]$Mode, [int]$Expected = 0, [string]$InputText = '', [switch]$Cmd)
+    param([string]$Folder, [string]$Mode, [int]$Expected = 0, [string]$InputText = '', [switch]$Cmd, [string]$LauncherDirectory = $sourceRoot, [switch]$CaptureOutput)
     $info = New-Object Diagnostics.ProcessStartInfo
     $info.FileName = 'powershell.exe'
     $info.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $syncScript + '" -Action ' + $Mode + ' -ProjectPath "' + $Folder + '" -RepositoryUrl "' + $server + '"'
     if ($Mode -eq 'Upload' -and !$InputText) { $info.Arguments += ' -Yes -Message "integration test"' }
     if ($Cmd) {
         $info.FileName = 'cmd.exe'
-        $info.Arguments = '/d /c ""' + (Join-Path $sourceRoot ('Git-' + $Mode + '.cmd')) + '" -ProjectPath "' + $Folder + '""'
+        $info.Arguments = '/d /c ""' + (Join-Path $LauncherDirectory ('Git-' + $Mode + '.cmd')) + '" -ProjectPath "' + $Folder + '""'
     }
     $info.UseShellExecute = $false
     $info.CreateNoWindow = $true
@@ -58,6 +58,7 @@ function Sync {
     $output = $stdout.Result + $stderr.Result
     if ($process.ExitCode -ne $Expected) { throw "Unexpected sync exit $($process.ExitCode), expected $Expected`n$output" }
     $process.Dispose()
+    if ($CaptureOutput) { return $output }
 }
 try {
     G -A @('init', '--bare', '--initial-branch=main', $server) | Out-Null
@@ -100,6 +101,14 @@ try {
     Sync -Folder $first -Mode Upload -Cmd
     Sync -Folder $first -Mode Download -Cmd
     Check $true 'Both CMD launchers run successfully and finish their pause with redirected input'
+    $incomplete = Join-Path $lab 'copied CMD files without helper'
+    New-Item -ItemType Directory -Path $incomplete | Out-Null
+    foreach ($mode in @('Download','Upload')) {
+        Copy-Item -LiteralPath (Join-Path $sourceRoot ('Git-' + $mode + '.cmd')) -Destination $incomplete
+        $result = Sync -Folder $first -Mode $mode -Expected 2 -Cmd -LauncherDirectory $incomplete -CaptureOutput
+        Check ($result.Contains('ERROR: Missing file:') -and $result.Contains('Git-Sync.ps1')) ('Missing helper gives useful message and exit 2: ' + $mode)
+    }
+    Check (([string](G -A @('-C', $first, 'rev-parse', 'HEAD'))) -eq $before) 'Missing helper cannot change repository history'
     G -A @('-C', $first, 'remote', 'set-url', '--push', 'origin', (Join-Path $lab 'missing.git')) | Out-Null
     [IO.File]::WriteAllText((Join-Path $first 'retry.txt'), 'retry')
     Sync -Folder $first -Mode Upload -Expected 1
