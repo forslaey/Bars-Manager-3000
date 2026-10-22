@@ -44,7 +44,7 @@ namespace ServiceTool
         {
             string directory=existingDirectory ?? Path.Combine(Environment.GetFolderPath(id=="anydesk" ? Environment.SpecialFolder.ProgramFilesX86 : Environment.SpecialFolder.ProgramFiles),SoftwareCatalog.Find(id).Folder);
             var start=new ProcessStartInfo { UseShellExecute=false, CreateNoWindow=true, WorkingDirectory=Path.GetDirectoryName(file) };
-            if (id=="rudesktop") { start.FileName=Path.Combine(Environment.SystemDirectory,"msiexec.exe"); start.Arguments="/i "+LibraryPlan.Quote(file)+" /qn /norestart REBOOT=ReallySuppress /L*v "+LibraryPlan.Quote(log); }
+            if (id=="rudesktop" || id=="chrome") { start.FileName=Path.Combine(Environment.SystemDirectory,"msiexec.exe"); start.Arguments="/i "+LibraryPlan.Quote(file)+" /qn /norestart REBOOT=ReallySuppress /L*v "+LibraryPlan.Quote(log); }
             else { start.FileName=file; start.Arguments=id=="anydesk" ? "--install "+LibraryPlan.Quote(directory)+" --silent --start-with-win --create-desktop-icon --update-manually" : "/S"; }
             return start;
         }
@@ -67,7 +67,7 @@ namespace ServiceTool
             bool install=SoftwareDetection.ShouldInstall(before,package);
             if (install && !app.Remote)
             {
-                string[] names=package.Id=="7zip" ? new[]{"7zFM","7z"} : new[]{"notepad++"};
+                string[] names=package.Id=="chrome" ? new[]{"chrome"} : package.Id=="7zip" ? new[]{"7zFM","7z"} : new[]{"notepad++"};
                 foreach (string name in names) foreach (var process in Process.GetProcessesByName(name)) using(process) if (!process.HasExited) throw new InvalidOperationException("Закрой "+app.Name+" перед обновлением. Приложение принудительно не закрывалось");
             }
             if (!install) return new LibraryInstallResult { ExitCode=0,State=LibraryState.Installed,Message="Уже установлена такая же или более новая версия. Установщик пропущен" };
@@ -158,7 +158,7 @@ namespace ServiceTool
         internal static ProcessStartInfo RemovalCommand(string id,string exe,string code,string log)
         {
             SoftwareCatalog.Find(id);
-            if(id=="rudesktop")
+            if(id=="rudesktop" || id=="chrome")
             {
                 Guid product;if(!Guid.TryParse(code,out product))throw new InvalidDataException("Не найден код установленного RuDesktop");
                 return new ProcessStartInfo(Path.Combine(Environment.SystemDirectory,"msiexec.exe"),"/x "+LibraryPlan.Quote(product.ToString("B"))+" /qn /norestart REBOOT=ReallySuppress /L*v "+LibraryPlan.Quote(log)){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=Environment.SystemDirectory};
@@ -198,17 +198,17 @@ namespace ServiceTool
             var records=Registrations(id).Where(v=>{Version parsed;return Version.TryParse(v.Version,out parsed)&&SoftwareCatalog.Compare(v.Version,check.Version)==0;}).ToArray();
             if(records.Length!=1)throw new IOException("Неоднозначная регистрация удаления; нужна ручная проверка");var record=records[0];
             string directory=Path.GetDirectoryName(check.Executable);ToolsDeployment.SafePath(directory);
-            if(id!="anydesk"&&id!="rudesktop")foreach(string name in id=="notepad"?new[]{"notepad++"}:new[]{"7zFM","7z"})foreach(var process in Process.GetProcessesByName(name))using(process)if(!process.HasExited)throw new IOException("Закрой "+app.Name+" перед удалением");
+            if(id!="anydesk"&&id!="rudesktop")foreach(string name in id=="notepad"?new[]{"notepad++"}:id=="chrome"?new[]{"chrome"}:new[]{"7zFM","7z"})foreach(var process in Process.GetProcessesByName(name))using(process)if(!process.HasExited)throw new IOException("Закрой "+app.Name+" перед удалением");
             string logs=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),@"BARS\Manager\SoftwareLogs");Directory.CreateDirectory(logs);string log=Path.Combine(logs,id+"-remove-"+Guid.NewGuid().ToString("N")+".log");
             var start=RemovalCommand(id,check.Executable,record.Msi?record.Key:null,log);
-            if(id=="rudesktop"&&!LibraryMaintenance.ExactMsiInstalled(record.Key))throw new IOException("Регистрация Windows Installer не подтверждена; удаление не запускалось");
+            if((id=="rudesktop"||id=="chrome")&&!LibraryMaintenance.ExactMsiInstalled(record.Key))throw new IOException("Регистрация Windows Installer не подтверждена; удаление не запускалось");
             if(id=="notepad"||id=="7zip")
             {
                 var registered=LibraryMaintenance.Command(record,log);
                 if(!Path.GetFullPath(registered.FileName).Equals(Path.GetFullPath(start.FileName),StringComparison.OrdinalIgnoreCase))throw new IOException("Деинсталлятор не соответствует установленной программе");
             }
             if(id!="7zip")SoftwareTrust.Signature(check.Executable,app.Publisher);
-            if(id!="rudesktop"){ToolsDeployment.SafePath(start.FileName);if(!File.Exists(start.FileName))throw new FileNotFoundException("Деинсталлятор не найден");if(id=="notepad")SoftwareTrust.Signature(start.FileName,app.Publisher);}
+            if(id!="rudesktop"&&id!="chrome"){ToolsDeployment.SafePath(start.FileName);if(!File.Exists(start.FileName))throw new FileNotFoundException("Деинсталлятор не найден");if(id=="notepad")SoftwareTrust.Signature(start.FileName,app.Publisher);}
             progress("Удаляем "+app.Name);int code=RunRemoval(start,progress,id=="anydesk"?(Func<bool>)(()=>
             {
                 if(File.Exists(check.Executable)||Registrations(id).Count>0)return false;
@@ -282,6 +282,7 @@ namespace ServiceTool
         internal static void CleanupUser(string id,Action<string> progress)
         {
             PreserveUserDocuments(id,progress);string roaming=Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),local=Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if(id=="chrome"){DeleteSettings(Path.Combine(local,@"Google\Chrome"),Path.Combine(local,"Google"));return;}
             string folder=id=="notepad"?"Notepad++":id=="7zip"?"7-Zip":SoftwareCatalog.Find(id).Folder;
             foreach(string root in new[]{roaming,local}.Distinct(StringComparer.OrdinalIgnoreCase))
             {

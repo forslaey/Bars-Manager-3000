@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -18,7 +18,7 @@ namespace ServiceTool
     {
         internal static readonly GuideSection[] Sections = {
             new GuideSection("Начало работы",
-                "BARS Manager 3000 объединяет четыре инструмента: управление службами, менеджер библиотек, установку программ и распаковку утилит. Компоненты Windows открываются из менеджера библиотек.\n\n" +
+                "BARS Manager 3000 объединяет пять инструментов: управление службами, менеджер библиотек, установку программ, распаковку утилит и первичные системные настройки. Компоненты Windows открываются из менеджера библиотек.\n\n" +
                 "1. Запусти EXE менеджера и выбери нужную карточку в главном окне.\n2. Проверь выбранный файл, папку или строку перед действием.\n3. Изменения запускаются кнопками соответствующего модуля. Если Windows запросит права администратора, проверь действие и подтверди запрос.\n4. Дождись результата и прочитай журнал. Успешное завершение стороннего установщика само по себе не заменяет проверку результата.\n\n" +
                 "Кнопка «В меню» возвращает в главное окно. При активной операции сначала следуй предупреждению. В компактных окнах обслуживания Windows и утилит может потребоваться дождаться завершения.\n\n" +
                 "Значок темы переключает светлое и тёмное оформление. Выбор сохраняется для следующих запусков. «О программе» содержит сведения о программе и авторе."),
@@ -43,12 +43,13 @@ namespace ServiceTool
                 "Менеджер библиотек проверяет компоненты Windows и сравнивает их с выбранным комплектом. Проверка сама по себе ничего не устанавливает.\n\n" +
                 "1. Открой «Менеджер библиотек».\n2. Выбери папку комплекта «Библиотеки», если она не найдена автоматически.\n3. Запусти проверку и сравни версии в системе и в комплекте. Учитываются полная версия, разрядность и поколение компонента.\n4. Отметь нужные компоненты и выбери действие. Перед запуском проверь очередь.\n\n" +
                 "«Установлено» означает, что компонент обнаружен. «Не найдено» — подходящая установка не подтверждена. «Нужна проверка» означает недостаток надёжных данных. Рекомендация об обновлении учитывает сравнение версий. Более новая установленная версия не должна заменяться старой из комплекта.\n\n" +
-                "Для Visual C++ доступны два профиля с обязательным RuntimePack Lite. RuntimePack Full не используется. Разные поколения и разрядности могут требоваться одновременно: наличие x64 не заменяет x86. Зависимости SQL CLR/SMO и базовый runtime для ASP.NET добавляются автоматически. При необходимости сохрани текстовый отчёт о проверке."),
+                "Для Visual C++ доступны два профиля с обязательным RuntimePack Lite. RuntimePack Full не используется. Разные поколения и разрядности могут требоваться одновременно: наличие x64 не заменяет x86. Зависимости SQL CLR/SMO и базовый runtime для ASP.NET добавляются автоматически. После установки, удаления или переустановки TXT-журнал автоматически сохраняется в папке «Журнал установки библиотек» внутри выбранной папки «Библиотеки». Кнопка «Открыть журнал» открывает эту папку. В журнале указаны компоненты, версии, результаты и причины остановки очереди."),
             new GuideSection("Библиотеки: действия и отмена",
                 "«По рекомендации» обновляет подходящий компонент без предварительного удаления. «Переустановка» явно удаляет выбранные зарегистрированные продукты соответствующего поколения и разрядности, затем запускает пакет комплекта. «Удаление» использует зарегистрированные деинсталляторы. Если надёжного способа удаления нет, действие останавливается.\n\n" +
                 "Перед подтверждением проверь очередь и предупреждения. Сортировка таблицы не меняет порядок зависимостей. При ошибке, требовании перезагрузки или неподтверждённом результате очередь останавливается.\n\n" +
                 "Отмена\nНажми «Отменить операцию» и прочитай предупреждение. После подтверждения новые пакеты не запускаются; менеджер завершает процессы собственного задания. Общая служба Windows Installer и чужие установщики не завершаются. При закрытии во время активной операции также требуется подтверждение.\n\n" +
                 "Принудительное прерывание не гарантирует откат. Системная часть Windows Installer может продолжить завершение операции или откат. После отмены дождись завершения системной операции и повтори проверку компонентов. Не запускай параллельно другую установку для исправления ещё незавершённой."),
+            new GuideSection("Первичные системные настройки", "Четыре независимые группы: политики локальных паролей, режим администратора без запросов UAC, все профили брандмауэра и временная защита Defender. При открытии выполняется проверка. Изменения — только после нажатия кнопки и подтверждения.\n\nПрофиль BARS повторяет согласованный список политик. «Стандарт Windows» применяет стандартные значения, а не прежние настройки компьютера. Существующие пароли и состав группы администраторов не меняются. Параметры, отсутствующие в этой версии Windows, пропускаются с сообщением. На контроллере домена локальный профиль паролей не применяется; доменные политики имеют приоритет.\n\nПосле изменения UAC нужна перезагрузка. После изменения политик паролей перезагрузка также предлагается, но автоматически не выполняется. Брандмауэр переключается для доменного, частного и общедоступного профилей. SmartScreen для приложений отключается отдельной кнопкой для всех пользователей; «Стандарт Windows» возвращает режим предупреждений. Уже открытое предупреждение нужно закрыть и запустить приложение заново. Политики организации имеют приоритет. Defender может блокировать отключение защитой от изменений и включаться обратно самостоятельно. Результат проверяется по фактическому состоянию; блокировка не считается успехом."),
             new GuideSection("Компоненты Windows",
                 "Открой менеджер библиотек и нажми «Компоненты». В отдельном окне показаны профиль IIS и компоненты Telnet/TFTP. При открытии состояние Windows проверяется автоматически.\n\n" +
                 "1. Дождись окончания проверки.\n2. Отметь нужные компоненты.\n3. Проверь подпись действия: установка, удаление или оба действия.\n4. Подтверди операцию и дождись окончания.\n\n" +
@@ -101,7 +102,7 @@ namespace ServiceTool
     internal sealed class UserGuideForm : ManagerModuleForm
     {
         private readonly BrandTextBox search = new BrandTextBox();
-        private readonly ListBox sections = new ListBox();
+        private readonly GuideSectionListBox sections = new GuideSectionListBox();
         private readonly RichTextBox reader = new RichTextBox();
         private readonly Label results = new Label();
         private readonly BrandButton previous, next;
@@ -134,16 +135,16 @@ namespace ServiceTool
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 275)); content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             sections.Dock = DockStyle.Fill; sections.IntegralHeight = false; sections.BorderStyle = BorderStyle.FixedSingle; sections.Margin = new Padding(0, 0, 14, 0);
-            sections.Font = new Font("Segoe UI", 10F); sections.DrawMode = DrawMode.OwnerDrawFixed; sections.ItemHeight = 44; sections.AccessibleName = "Разделы инструкции";
+            sections.Font = new Font("Segoe UI", 10F); sections.AccessibleName = "Разделы инструкции";
             sections.DrawItem += delegate(object sender, DrawItemEventArgs e)
             {
                 if (e.Index < 0) return;
                 bool selected = (e.State & DrawItemState.Selected) != 0;
                 Color background = selected ? Colors.SurfaceAlt : Colors.Surface;
                 using (var brush = new SolidBrush(background)) e.Graphics.FillRectangle(brush, e.Bounds);
-                var bounds = new Rectangle(e.Bounds.X + 10, e.Bounds.Y + 3, e.Bounds.Width - 20, e.Bounds.Height - 6);
+                var bounds = sections.TitleBounds(e.Graphics,e.Bounds);
                 TextRenderer.DrawText(e.Graphics, sections.Items[e.Index].ToString(), sections.Font, bounds, Colors.Text,
-                    TextFormatFlags.WordBreak | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+                    GuideSectionListBox.TitleFlags | TextFormatFlags.VerticalCenter);
                 if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
             };
             reader.Dock = DockStyle.Fill; reader.ReadOnly = true; reader.BorderStyle = BorderStyle.None; reader.Margin = Padding.Empty;
@@ -173,7 +174,7 @@ namespace ServiceTool
                 foreach (int position in positions) hits.Add(Tuple.Create(section, position));
             }
             if (sections.Items.Count > 0) sections.SelectedItem = selected != null && sections.Items.Contains(selected) ? selected : sections.Items[0];
-            sections.EndUpdate(); binding = false; ShowSection(true);
+            sections.EndUpdate();sections.RefreshHeights();binding = false; ShowSection(true);
         }
 
         private void ShowSection(bool selectFirst)

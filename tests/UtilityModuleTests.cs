@@ -148,7 +148,7 @@ namespace ServiceTool
                     }
                     if (form is ManagerHub)
                     {
-                        var cards = Children(form).OfType<Card>().ToArray(); Check(cards.Length == 4 && cards.Max(c=>c.Width)-cards.Min(c=>c.Width)<=1 && cards.Max(c => c.Height) - cards.Min(c => c.Height) <= 1, "Four equal cards in a complete 2x2 grid: " + String.Join(",", cards.Select(c => c.Height)));
+                        var allCards = Children(form).OfType<Card>().ToArray(); Check(allCards.Length==5,"Five launcher cards"); var cards=allCards.Where(c=>c.Width<allCards.Max(v=>v.Width)-5).ToArray(); Check(cards.Length == 4 && cards.Max(c=>c.Width)-cards.Min(c=>c.Width)<=1 && cards.Max(c => c.Height) - cards.Min(c => c.Height) <= 1, "Four equal cards in a complete 2x2 grid: " + String.Join(",", cards.Select(c => c.Height)));
                         var actions = cards.Select(c => Children(c).OfType<BrandButton>().Single()).ToArray();
                         Check(actions.Select(b => b.Size).Distinct().Count() == 1, "All launch actions equal size");
                         Check(actions.Any(b => b.Text == "Установка программ"), "Programs module is its own launcher card");

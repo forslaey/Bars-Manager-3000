@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Diagnostics;
@@ -53,11 +53,11 @@ namespace ServiceTool
     {
      using(var form=new SoftwareManagerForm(true))
      {
-      form.SetTheme(dark,false);Show(form);Call(form,"ToggleSelection",0);
+      form.SetTheme(dark,false);Show(form);Call(form,"ToggleSelection",1);
       Check(!Field<BrandButton>(form,"install").Enabled&&Field<BrandButton>(form,"remove").Enabled&&!Field<BrandButton>(form,"access").Enabled,"Current text editor removable but not reinstallable or remote-configurable");
-      Call(form,"ToggleSelection",0);var checks=Field<Dictionary<string,SoftwareCheck>>(form,"checks");var packages=Field<Dictionary<string,SoftwarePackage>>(form,"packages");checks["anydesk"]=new SoftwareCheck{Id="anydesk",State=LibraryState.Installed,Version="9.8.2",Detail="Установлена · x86"};packages["anydesk"].Version="9.8.2";Call(form,"UpdateRows");Call(form,"ToggleSelection",2);
+      Call(form,"ToggleSelection",1);var checks=Field<Dictionary<string,SoftwareCheck>>(form,"checks");var packages=Field<Dictionary<string,SoftwarePackage>>(form,"packages");checks["anydesk"]=new SoftwareCheck{Id="anydesk",State=LibraryState.Installed,Version="9.8.2",Detail="Установлена · x86"};packages["anydesk"].Version="9.8.2";Call(form,"UpdateRows");Call(form,"ToggleSelection",3);
       Check(!Field<BrandButton>(form,"install").Enabled&&Field<BrandButton>(form,"remove").Enabled&&Field<BrandButton>(form,"access").Enabled,"Already installed remote app enables delete/access but not same-version installation");
-      packages["anydesk"].Version="9.8.3";Call(form,"UpdateRows");Check(Field<BrandButton>(form,"install").Enabled,"Genuine remote-app update available");Call(form,"ToggleSelection",2);Check(!Field<BrandButton>(form,"remove").Enabled&&!Field<BrandButton>(form,"access").Enabled,"Cleared selection immediately disables actions");form.Close();
+      packages["anydesk"].Version="9.8.3";Call(form,"UpdateRows");Check(Field<BrandButton>(form,"install").Enabled,"Genuine remote-app update available");Call(form,"ToggleSelection",3);Check(!Field<BrandButton>(form,"remove").Enabled&&!Field<BrandButton>(form,"access").Enabled,"Cleared selection immediately disables actions");form.Close();
      }
      using(var form=new WindowsFeaturesForm(true))
      {

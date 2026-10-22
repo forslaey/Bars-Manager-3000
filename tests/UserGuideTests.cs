@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -110,7 +110,7 @@ namespace ServiceTool
                 {
                     Show(hub, 1F); var buttons = All(hub).OfType<BrandButton>();
                     Check(buttons.Count(button => button.Text == "Инструкция") == 1, "Dedicated guide launcher button");
-                    Check(buttons.Count(button => button.Primary) == 4, "Four module cards retained"); Capture(hub, "hub-guide"); hub.Close();
+                    Check(buttons.Count(button => button.Primary) == 5, "Five module cards retained"); Capture(hub, "hub-guide"); hub.Close();
                 }
                 Console.WriteLine("PASS: " + count + " guide/search/service UI checks. Both themes; simulated 100/125/150/200%. No service operations or installers."); return 0;
             }

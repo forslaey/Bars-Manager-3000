@@ -27,7 +27,9 @@ namespace ServiceTool
         private readonly Font headerFont = new Font("Segoe UI", 10.5F, FontStyle.Bold);
         private readonly bool preview;
         private bool checking, installing, stopRequested, binding, firstScan = true, useFocusedRow;
-        private string source, lastLog, sourceError;
+        private string source, sourceError;
+        private LibraryJournal operationJournal;
+        private bool journalWriteFailed;
         private LibrarySession activeSession;
         private volatile bool cancelRequested;
         private bool closeAfterCancel;
@@ -96,9 +98,9 @@ namespace ServiceTool
             logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(logCard, 0, 2);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 2, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            restart = Button("Перезагрузка", false); restart.Margin = new Padding(0, 0, 10, 0); restart.Enabled = false; restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
+            restart = Button("Перезагрузка", false); restart.Margin = new Padding(0, 0, 10, 0); restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
             activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0); footer.SetColumnSpan(activity, 5);
-            report = Button("Сохранить отчёт", false); report.Click += delegate { ExportReport(); }; footer.Controls.Add(report, 1, 1);
+            report = Button("Открыть журнал", false); report.Click += delegate { OpenJournal(); }; footer.Controls.Add(report, 1, 1);
             BrandButton back = Button("В меню", false); back.Margin = Padding.Empty; back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
             windowsComponents = Button("Компоненты", false); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
             body.Controls.Add(footer, 0, 3);
@@ -138,8 +140,8 @@ namespace ServiceTool
         private void UpdateRestartAvailability()
         {
             string reason=pendingRestart ? "Windows или установщик сообщили о необходимости перезагрузки." : LibraryDetection.RebootPendingReason();
-            restart.Enabled=!installing&&!checking&&reason.Length>0;
-            restart.AccessibleDescription=reason.Length>0?reason:"Не обнаружены признаки ожидаемой перезагрузки Windows.";
+            restart.Enabled=!installing&&!checking;
+            restart.AccessibleDescription=reason.Length>0?reason:"Обязательная перезагрузка не запрошена. Можно перезагрузить компьютер вручную.";
             restartHelp.SetToolTip(restart,restart.AccessibleDescription);
         }
         internal void RememberWindowsRestart(bool required)
@@ -177,7 +179,7 @@ namespace ServiceTool
             string[] names = { "Компонент", "Комплект", "В системе", "Разрядность", "Состояние", "Рекомендация" }; int[] weights = { 24, 12, 14, 9, 14, 27 };
             for (int i = 0; i < names.Length; i++) { int index = grid.Columns.Add("c" + i, names[i]); grid.Columns[index].ReadOnly = true; grid.Columns[index].FillWeight = weights[i]; grid.Columns[index].MinimumWidth = i == 0 ? 140 : i == 3 ? 100 : 70; }
             foreach (DataGridViewColumn column in grid.Columns) column.SortMode = DataGridViewColumnSortMode.NotSortable;
-            grid.EditMode = DataGridViewEditMode.EditProgrammatically;
+            grid.EditMode = DataGridViewEditMode.EditProgrammatically; grid.TouchScrollingEnabled=true;
             grid.CellClick += delegate(object sender, DataGridViewCellEventArgs e) { if (!binding && e.RowIndex >= 0 && e.ColumnIndex > 0) { useFocusedRow = true; UpdateAction(); } };
             grid.CurrentCellChanged += delegate { if (!binding && grid.Focused && grid.CurrentCell != null && grid.CurrentCell.ColumnIndex > 0) { useFocusedRow = true; UpdateAction(); } };
             grid.CellMouseDown += delegate(object sender, DataGridViewCellMouseEventArgs e)
@@ -238,7 +240,15 @@ namespace ServiceTool
         {
             if (IsDisposed) return; journal.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + text + Environment.NewLine); journal.SelectionStart = journal.TextLength; journal.ScrollToCaret();
             if (journal.TextLength > 150000) journal.Text = journal.Text.Substring(journal.TextLength - 100000);
-            if (!String.IsNullOrEmpty(lastLog)) try { File.AppendAllText(lastLog, DateTime.Now.ToString("O") + " " + text + Environment.NewLine, Encoding.UTF8); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            if (operationJournal != null)
+            {
+                try { operationJournal.Append(text); journalWriteFailed = false; }
+                catch (Exception ex)
+                {
+                    if (!journalWriteFailed) journal.AppendText("Не удалось записать журнал на диск: " + ex.Message + ". Записи остаются в памяти; повторим сохранение при завершении." + Environment.NewLine);
+                    journalWriteFailed = true;
+                }
+            }
         }
         private void SelectMissing()
         {
@@ -357,10 +367,10 @@ namespace ServiceTool
                 { activity.Text = "Обнови файлы установщиков: переустановка более старой версией заблокирована"; return; }
             }
             var targetIds = new HashSet<string>(targets.Select(c => c.Package.Id));
-            if (operation != LibraryOperation.Remove)
+            // A library root is also required for removal journals.
             {
             if (String.IsNullOrEmpty(source) || !Directory.Exists(source)) source = LibrarySource.AutoDetect(AppDomain.CurrentDomain.BaseDirectory);
-            if (String.IsNullOrEmpty(source))
+            if (String.IsNullOrEmpty(source) || !Directory.Exists(source))
             {
                 using (var dialog = new FolderBrowserDialog { Description = "Выбери папку «Библиотеки» с установщиками BARS", ShowNewFolderButton = false })
                 { if (dialog.ShowDialog(this) != DialogResult.OK) return;
@@ -373,8 +383,11 @@ namespace ServiceTool
             try
             {
                 string reports = Path.Combine(ApplicationStorage.DirectoryPath, "LibraryReports"); Directory.CreateDirectory(reports);
-                lastLog = Path.Combine(reports, "queue-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".log");
-                Log("Готовим очередь. Кнопка отмены останавливает текущую операцию после подтверждения; полный откат не гарантирован.");
+                operationJournal = new LibraryJournal(source, operation, targets.Select(c => c.Package.Name).ToArray());
+                journalWriteFailed = false;
+                Log("Журнал этой операции: " + operationJournal.FilePath);
+                foreach (LibraryCheck target in targets) Log(target.Package.Name + ": до начала — " + target.Caption + "; версия в системе: " + (String.IsNullOrEmpty(target.ActualVersion) ? "не обнаружена" : target.ActualVersion) + "; версия в комплекте: " + LibraryVersions.Required(target.Package) + ".");
+                Log("Подготавливаем выбранные компоненты. Они будут обработаны по очереди, один за другим. При отмене уже выполненные изменения могут сохраниться.");
                 if (operation != LibraryOperation.Remove) await ReadSourceAsync();
                 Directory.CreateDirectory(ApplicationStorage.DirectoryPath); if (operation != LibraryOperation.Remove) File.WriteAllText(ApplicationStorage.FilePath("library-source.txt"), source, Encoding.UTF8);
                 List<LibraryPackage> chosen = targetIds.Select(LibraryCatalog.Find).Where(p => p != null).ToList();
@@ -385,8 +398,8 @@ namespace ServiceTool
                 {
                     if (stopRequested) break;
                     LibraryCheck state = await Task.Run(() => LibraryDetection.Check(package)); checks[package.Id] = state;
-                    if (operation == LibraryOperation.Remove && !LibraryVersions.CanRemove(state)) { Log(package.Name + ": не установлено; удаление пропущено"); continue; }
-                    if (state.State == LibraryState.Installed && (operation == LibraryOperation.Install || operation == LibraryOperation.Update || state.Relation == LibraryRelation.Newer || !targetIds.Contains(package.Id))) { Log(package.Name + ": уже установлено; " + state.Detail + "; пропускаем"); continue; }
+                    if (operation == LibraryOperation.Remove && !LibraryVersions.CanRemove(state)) { Log(package.Name + ": удаление не выполнялось — подходящий установленный компонент для удаления не найден. " + state.Detail); continue; }
+                    if (state.State == LibraryState.Installed && (operation == LibraryOperation.Install || operation == LibraryOperation.Update || state.Relation == LibraryRelation.Newer || !targetIds.Contains(package.Id))) { Log(package.Name + ": установка не требуется — подходящая или более новая версия уже есть в системе. " + state.Detail); continue; }
                     if (state.State == LibraryState.NotApplicable) throw new InvalidOperationException(package.Name + ": " + state.Detail);
                     if (state.State == LibraryState.Unknown && (operation == LibraryOperation.Install || operation == LibraryOperation.Update))
                         throw new InvalidOperationException(package.Name + ": нужна проверка. " + state.Detail);
@@ -422,10 +435,10 @@ namespace ServiceTool
                         if ((step == LibraryOperation.Install || step == LibraryOperation.Update) && checks[package.Id].Relation == LibraryRelation.Older) step = LibraryOperation.Update;
                         Log(prefix + (step == LibraryOperation.Remove ? ": удаление" : step == LibraryOperation.Reinstall ? ": переустановка" : step == LibraryOperation.Update ? ": обновление" : ": установка"));
                         LibraryInstallResult result = await Task.Run(() => session.Execute(package, source, step, text => SafeActivity(prefix + ": " + text)));
-                        Log(prefix + ": " + result.Message + (String.IsNullOrEmpty(result.LogPath) ? "" : ". Отчёт: " + result.LogPath));
+                        Log(prefix + ": " + result.Message + ". Код завершения: " + result.ExitCode + (String.IsNullOrEmpty(result.LogPath) ? "" : ". Подробный журнал установщика: " + result.LogPath));
                         if (closeAfterCancel && cancelRequested) break;
                         List<LibraryCheck> updated = await Task.Run(() => LibraryDetection.Scan()); checks.Clear(); foreach (var check in updated) checks[check.Package.Id] = check; RenderRows();
-                        if (operation == LibraryOperation.Remove && checks[package.Id].State != LibraryState.Missing) Log(package.Name + ": после удаления — " + checks[package.Id].Caption + ". " + checks[package.Id].Detail);
+                        if (checks.ContainsKey(package.Id)) Log(prefix + ": после проверки — " + checks[package.Id].Caption + "; версия в системе: " + (String.IsNullOrEmpty(checks[package.Id].ActualVersion) ? "не обнаружена" : checks[package.Id].ActualVersion) + ". " + LibraryVersions.Advice(checks[package.Id]));
                         if (result.Reboot) {
                             rebootRequired = pendingRestart = true;
                             PausedLibraryQueue.Save(needed.Skip(i).Select(p => p.Id), operation);
@@ -441,6 +454,16 @@ namespace ServiceTool
             catch (Exception ex) { Log("Очередь остановлена: " + ex.Message + ". Если внешний установщик ещё работает, дождись его завершения перед повтором."); }
             finally
             {
+                if (operationJournal != null)
+                {
+                    Log(cancelRequested ? "Работа остановлена по запросу пользователя. Перед повтором нажми «Проверить систему»." : "Обработка очереди завершена. Результат каждого компонента и причины остановки указаны выше.");
+                    Log(pendingRestart ? "Windows или установщик сообщили, что нужна перезагрузка. Сохрани работу перед перезагрузкой." : "Установщики не сообщили об обязательной перезагрузке. При необходимости её можно запустить кнопкой «Перезагрузка».");
+                    string savedPath = operationJournal.FilePath;
+                    try { operationJournal.Save(); journalWriteFailed = false; }
+                    catch (Exception ex) { journalWriteFailed = true; if (!IsDisposed) MessageBox.Show(this, "Не удалось сохранить журнал: " + savedPath + "\r\n" + ex.Message + "\r\nЗаписи остаются в окне журнала. Проверь доступность папки и свободное место.", "Журнал не сохранён", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                    operationJournal = null;
+                    Log(journalWriteFailed ? "Внимание: журнал не сохранён на диск." : "Журнал сохранён: " + savedPath);
+                }
                 activeSession = null; installing = false;
                 if (!IsDisposed)
                 {
@@ -452,19 +475,19 @@ namespace ServiceTool
             }
             if (rebootRequired && !closeAfterCancel && !cancelRequested && !IsDisposed) { rebootRequired = false; await RestartOffer.Show(this); }
         }
-        private void ExportReport()
+        private void OpenJournal()
         {
-            using (var dialog = new SaveFileDialog { Filter = "Текстовый отчёт (*.txt)|*.txt", FileName = "BARS-компоненты-" + DateTime.Now.ToString("yyyy-MM-dd-HHmm") + ".txt" })
+            try
             {
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                try
+                if (String.IsNullOrEmpty(source) || !Directory.Exists(source))
                 {
-                    var text = new StringBuilder("Bars Component Manager 3000, отчёт от " + DateTime.Now.ToString("O") + Environment.NewLine);
-                    foreach (LibraryCheck check in LibraryPresentation.Sort(checks.Values)) text.AppendLine(check.Package.Name + " | в комплекте: " + LibraryVersions.Required(check.Package) + " | в системе: " + check.ActualVersion + " | " + check.Caption + " | " + LibraryVersions.Advice(check) + " | " + check.Detail);
-                    text.AppendLine().AppendLine(journal.Text); File.WriteAllText(dialog.FileName, text.ToString(), new UTF8Encoding(true)); activity.Text = "Отчёт сохранён";
+                    using (var dialog = new FolderBrowserDialog { Description = "Выбери папку «Библиотеки», в которой хранятся журналы", ShowNewFolderButton = false })
+                    { if (dialog.ShowDialog(this) != DialogResult.OK) return; source = LibrarySource.NormalizeRoot(dialog.SelectedPath); UpdateSource(); }
                 }
-                catch (Exception ex) { Log("Не удалось сохранить отчёт: " + ex.Message); }
+                string folder = LibraryJournal.Folder(source); Directory.CreateDirectory(folder);
+                Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
             }
+            catch (Exception ex) { Log("Не удалось открыть папку журналов: " + ex.Message); }
         }
         private void FillPreview()
         {
@@ -474,7 +497,7 @@ namespace ServiceTool
                 LibraryState state = index++ % 3 == 0 ? LibraryState.Installed : package.Interactive ? LibraryState.Unknown : LibraryState.Missing;
                 checks[package.Id] = new LibraryCheck { Package = package, State = state, Relation = state == LibraryState.Installed ? LibraryRelation.Equal : LibraryRelation.Missing, HasProduct = state == LibraryState.Installed, ActualVersion = state == LibraryState.Installed ? LibraryVersions.Required(package) : "", Detail = state == LibraryState.Installed ? "Версия и разрядность подтверждены" : "Папка не нужна для проверки; выбери компонент для установки" };
             }
-            SelectMissing(); RenderRows(); activity.Text = "Проверка системы доступна без установщиков"; Log("Проверка завершена. Путь к библиотекам запросим при начале установки.");
+            SelectMissing(); RenderRows(); UpdateRestartAvailability(); activity.Text = "Проверка системы доступна без установщиков"; Log("Проверка завершена. Путь к библиотекам запросим при начале установки.");
         }
         protected override void Dispose(bool disposing) { if (disposing) { if (installing && activeSession != null) activeSession.Cancel(); timer.Dispose(); restartHelp.Dispose(); } base.Dispose(disposing); if (disposing) headerFont.Dispose(); }
     }

@@ -19,7 +19,7 @@ namespace ServiceTool
                 foreach(bool dark in new[]{false,true}) foreach(float scale in new[]{1F,1.25F,1.5F,2F})
                 {
                     var palette=ThemePalette.Create(dark);
-                    var forms=new Form[]{new ManagerHub(),new LibraryManagerForm(true),new SoftwareManagerForm(true),new ToolsDeploymentForm(true),new WindowsFeaturesForm(true,true),new MainForm(null,true),new AboutDialog(palette,null),new ServiceAccountDialog(palette,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false),new SoftwareRemoteDialog(palette,null,"anydesk",false),new SoftwareRemoteDialog(palette,null,"rudesktop",false),new LibraryActionDialog(palette,null,new LibraryCheck[0]),new LogArchiveDialog(palette,"Служба BARS",new List<LogDateFolder>(),DateTime.Today)};
+                    var forms=new Form[]{new ManagerHub(),new InitialSystemSettingsForm(true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new ToolsDeploymentForm(true),new WindowsFeaturesForm(true,true),new MainForm(null,true),new AboutDialog(palette,null),new ServiceAccountDialog(palette,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false),new SoftwareRemoteDialog(palette,null,"anydesk",false),new SoftwareRemoteDialog(palette,null,"rudesktop",false),new LibraryActionDialog(palette,null,new LibraryCheck[0]),new LogArchiveDialog(palette,"Служба BARS",new List<LogDateFolder>(),DateTime.Today)};
                     foreach(var form in forms) using(form)
                     {
                         var module=form as ManagerModuleForm;if(module!=null)module.SetTheme(dark,false);var services=form as MainForm;if(services!=null)services.SetTheme(dark,false);
@@ -63,7 +63,7 @@ namespace ServiceTool
                         {
                             var grid=Children(form).OfType<ServiceGrid>().Single();
                             Check(grid.Columns[3].Width>grid.Columns[2].Width,"Source column wider than installed-state column");
-                            Check(grid.DisplayedRowCount(false)==4&&grid.GetRowDisplayRectangle(3,false).Bottom<=grid.ClientRectangle.Bottom,"All four installed programs completely visible with longest official source");
+                            Check(grid.DisplayedRowCount(false)==5&&grid.GetRowDisplayRectangle(4,false).Bottom<=grid.ClientRectangle.Bottom,"All five installed programs completely visible with longest official source");
                             Check(!Children(form).OfType<LibraryGridScrollBar>().Any(),"Four-program list has no scroll control");
                             foreach(DataGridViewRow row in grid.Rows)
                             {
@@ -88,12 +88,12 @@ namespace ServiceTool
                         }
                         if(form is ManagerHub)
                         {
-                            var cards=Children(form).OfType<Card>().ToArray();Check(cards.Length==4,"Only four launcher cards");
-                            foreach(var card in cards){var b=Children(card).OfType<BrandButton>().Single();var at=card.PointToClient(b.PointToScreen(Point.Empty));Check(Math.Abs(at.X*2+b.Width-card.Width)<=2,"Launcher action horizontally centered");Check(card.Height-at.Y-b.Height>=12*scale && card.Height-at.Y-b.Height<=16*scale,"Launcher action near lower edge with consistent inset");}
+                            var cards=Children(form).OfType<Card>().ToArray();Check(cards.Length==5,"Five launcher cards");
+                            foreach(var card in cards){var b=Children(card).OfType<BrandButton>().Single();var at=card.PointToClient(b.PointToScreen(Point.Empty));Check(Math.Abs(at.X*2+b.Width-card.Width)<=2,"Launcher action horizontally centered");Check(card.Height-at.Y-b.Height>=12*scale && card.Height-at.Y-b.Height<=16*scale,"Launcher action near lower edge with consistent inset at "+scale+" card "+card.Size+" gap "+(card.Height-at.Y-b.Height));}
                         }
                         if(form is LibraryManagerForm)
                         {
-                            var actions=Children(form).OfType<Button>().Where(b=>new[]{"Сохранить отчёт","Перезагрузка","Компоненты"}.Contains(b.Text)).ToArray();
+                            var actions=Children(form).OfType<Button>().Where(b=>new[]{"Открыть журнал","Перезагрузка","Компоненты"}.Contains(b.Text)).ToArray();
                             Check(actions.Length==3&&actions.Select(b=>b.Size).Distinct().Count()==1,"All three footer actions have exactly equal dimensions");
                         }
                         if(form is LibraryManagerForm && scale==1F)

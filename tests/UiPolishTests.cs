@@ -64,7 +64,7 @@ namespace ServiceTool
                             Show(dialog); var label = System.Linq.Enumerable.First(System.Linq.Enumerable.OfType<Label>(Children(dialog)), l => l.Text == "Bars Component Manager 3000");
                             Check(TextRenderer.MeasureText(label.Text, label.Font).Width <= label.Width, "English component product name fits About dialog"); dialog.Close();
                         }
-                        Button back = Button(form, "В меню"), report = Button(form, "Сохранить отчёт"), restart = Button(form,"Перезагрузка");
+                        Button back = Button(form, "В меню"), report = Button(form, "Открыть журнал"), restart = Button(form,"Перезагрузка");
                         Check(!Children(form).OfType<Button>().Any(b=>b.Text=="О программе"),"About exists only in launcher");
                         Check(restart.Left<back.Left && back.Top==report.Top && back.Height>=38,"Restart before menu on aligned footer");
                         Check(Children(form).OfType<Label>().Any(l=>l.Text=="Менеджер системных библиотек Windows"),"Localized content heading preserves product window title");

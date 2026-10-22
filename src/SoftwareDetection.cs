@@ -14,7 +14,7 @@ namespace ServiceTool
     {
         internal static bool Matches(string id, string display)
         {
-            return id=="notepad" ? display.StartsWith("Notepad++",StringComparison.OrdinalIgnoreCase) : id=="7zip" ? Regex.IsMatch(display,@"^7-Zip(?:\s|$)",RegexOptions.IgnoreCase) :
+            return id=="chrome" ? display.Equals("Google Chrome",StringComparison.OrdinalIgnoreCase) : id=="notepad" ? display.StartsWith("Notepad++",StringComparison.OrdinalIgnoreCase) : id=="7zip" ? Regex.IsMatch(display,@"^7-Zip(?:\s|$)",RegexOptions.IgnoreCase) :
                 id=="anydesk" ? display.Equals("AnyDesk",StringComparison.OrdinalIgnoreCase) : display.StartsWith("RuDesktop",StringComparison.OrdinalIgnoreCase);
         }
         private static string IconPath(string value)
@@ -94,7 +94,7 @@ namespace ServiceTool
             var doc=new XmlDocument{XmlResolver=null};using(var reader=XmlReader.Create(new StringReader(xml),new XmlReaderSettings{DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null,MaxCharactersInDocument=12000}))doc.Load(reader);
             if(doc.DocumentElement==null||doc.DocumentElement.Name!="programs")throw new InvalidDataException("Неверный ответ проверки");
             var result=new List<SoftwareCheck>();foreach(XmlNode node in doc.DocumentElement.ChildNodes){string id=node.Attributes["id"].Value;SoftwareCatalog.Find(id);LibraryState state;if(!Enum.TryParse<LibraryState>(node.Attributes["state"].Value,out state)||!Enum.IsDefined(typeof(LibraryState),state))throw new InvalidDataException("Неверное состояние");result.Add(new SoftwareCheck{Id=id,Version=node.Attributes["version"].Value,Executable=node.Attributes["exe"].Value,State=state,Detail=node.Attributes["detail"].Value});}
-            if(result.Count!=4||result.Select(v=>v.Id).Distinct().Count()!=4)throw new InvalidDataException("Неполный ответ проверки");return result.ToArray();
+            if(result.Count!=SoftwareCatalog.Apps.Length||result.Select(v=>v.Id).Distinct().Count()!=SoftwareCatalog.Apps.Length)throw new InvalidDataException("Неполный ответ проверки");return result.ToArray();
         }
         internal static bool ShouldInstall(SoftwareCheck installed, SoftwarePackage package)
         {

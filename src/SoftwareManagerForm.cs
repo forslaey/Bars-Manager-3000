@@ -29,11 +29,11 @@ namespace ServiceTool
         private LibrarySession session;
         internal bool MenuRequested {get;private set;}
         internal SoftwareManagerForm(bool previewMode) : this(previewMode,SoftwareSources.Latest) {}
-        internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,920))
+        internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,980))
         {
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
-            preview=previewMode; MinimumSize=new Size(1080,860); Root.AutoScroll=true;
-            var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=new Size(0,788)}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            preview=previewMode; MinimumSize=new Size(1080,920); Root.AutoScroll=true;
+            var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=new Size(0,848)}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(float height in new[]{134F,326F,108F,100F,0F,52F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,10)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,38));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,20));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var title=Label("Программы для рабочего места пользователя",false);title.Font=new Font("Segoe UI",15,FontStyle.Bold);heading.Controls.Add(title,0,0);
@@ -54,8 +54,8 @@ namespace ServiceTool
             grid.RowHeightChanged+=delegate{fitTable();};grid.RowsAdded+=delegate{fitTable();};grid.ColumnWidthChanged+=delegate{fitTable();};tableCard.SizeChanged+=delegate{fitTable();};
             var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=new Padding(4,0,0,0),Padding=new Padding(0,16,0,16)};options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(var item in new[]{defaults,remote}) {options.RowStyles.Add(new RowStyle(SizeType.Percent,50F));item.Dock=DockStyle.Fill;item.Margin=Padding.Empty;item.Palette=Colors;}
-            defaults.Text="Применить ассоциации Notepad++ и 7-Zip для всех пользователей при входе";defaults.Checked=true;
-            remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=true;
+            defaults.Text="Применить ассоциации Notepad++ и 7-Zip для всех пользователей при входе";defaults.Checked=false;
+            remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=false;
             options.Controls.Add(defaults,0,0);options.Controls.Add(remote,0,1);body.Controls.Add(options,0,2);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=new Padding(0,0,0,10)};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
             install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=true;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
@@ -172,7 +172,7 @@ namespace ServiceTool
                 foreach(var candidate in updates.Where(p=>p!=null)){SoftwarePackage old;if(!packages.TryGetValue(candidate.Id,out old)||SoftwareCatalog.Compare(candidate.Version,old.Version)>=0)packages[candidate.Id]=candidate;}
                 if(cancelled)throw new OperationCanceledException();
                 selection.Clear();foreach(var app in SoftwareCatalog.Apps){if(packages.ContainsKey(app.Id)&&(checks[app.Id].State==LibraryState.Missing || checks[app.Id].State==LibraryState.Installed && packages[app.Id].Version!="0.0" && SoftwareCatalog.Compare(packages[app.Id].Version,checks[app.Id].Version)>0))selection.Add(app.Id);}
-                Log("Проверка завершена. Если официальный источник недоступен, предлагается проверенный _soft или кэш");activity.Text="Выбери программы и проверь источник установщиков";
+                Log("Проверка завершена. Если официальный интернет-источник недоступен, предлагается установка проверенной локальной копии программ.");activity.Text="Выбери программы и проверь источник установщиков";
             }
             catch(OperationCanceledException){Log("Проверка отменена");}catch(Exception ex){Log("Проверка не завершена: "+ex.Message);}
             finally{checking=false;Lock(false);}
@@ -233,13 +233,23 @@ namespace ServiceTool
             }catch(OperationCanceledException){Log("Удаление отменено. Проверь состояние программ");}catch(Exception ex){Log("Удаление или очистка настроек не завершены: "+ex.Message);}finally{session=null;Lock(false);}
             if(reboot&&!closeAfter)await RestartOffer.Show(this);
         }
+        internal string InstallConfirmation(string[] ids)
+        {
+            string text="Установить или обновить выбранные программы?";
+            var remoteUpdates=ids.Where(id=>SoftwareCatalog.Find(id).Remote&&checks.ContainsKey(id)&&checks[id].State==LibraryState.Installed).Select(id=>SoftwareCatalog.Find(id).Name).ToArray();
+            if(remoteUpdates.Length>0)text+="\r\n\r\nОбновление "+String.Join(" / ",remoteUpdates)+" может прервать текущий удалённый сеанс.";
+            if(defaults.Checked&&(ids.Any(id=>id=="notepad"||id=="7zip")||new[]{"notepad","7zip"}.Any(id=>checks.ContainsKey(id)&&checks[id].State==LibraryState.Installed)))
+                text+="\r\n\r\nБудут применены ассоциации Notepad++ и 7-Zip. Для применения потребуется повторный вход пользователей в Windows.";
+            if(remote.Checked&&ids.Any(id=>SoftwareCatalog.Find(id).Remote))text+="\r\n\r\nДля выбранных программ удалённого доступа будет настроен постоянный пароль.";
+            return text;
+        }
         private async Task Install()
         {
             if(busy||preview)return;var ids=ChosenInstallable();if(ids.Length==0){activity.Text="Отметь программы для установки";return;}
             if(String.IsNullOrWhiteSpace(source)&&ids.Any(id=>!Path.IsPathRooted(packages[id].File)||!File.Exists(packages[id].File))&&!ChooseSource())return;
             var secrets=new Dictionary<string,string>();
             if(remote.Checked)foreach(string id in ids.Where(id=>SoftwareCatalog.Find(id).Remote))using(var dialog=new SoftwareRemoteDialog(Colors,Icon,id)) {if(dialog.ShowDialog(this)!=DialogResult.OK)return;secrets[id]=dialog.Password;}
-            if(MessageBox.Show(this,"Установить или обновить выбранные программы?\r\n\r\nОбновление AnyDesk / RuDesktop может прервать текущий удалённый сеанс. Изменение ассоциаций потребует повторного входа пользователей в Windows.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(MessageBox.Show(this,InstallConfirmation(ids),Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             cancelled=false;Lock(true);bool reboot=false;
             var ready=new List<SoftwarePackage>();
             try
@@ -305,38 +315,65 @@ namespace ServiceTool
         protected override void Dispose(bool disposing){base.Dispose(disposing);if(disposing)headerFont.Dispose();}
         private void FillPreview()
         {
-            foreach(var app in SoftwareCatalog.Apps){checks[app.Id]=new SoftwareCheck {Id=app.Id,Version=app.Id=="notepad"?"8.9.8.1":"26.04",State=app.Id=="notepad"?LibraryState.Installed:LibraryState.Missing,Detail=app.Id=="notepad"?"Установлена, x64":"Не установлено"};packages[app.Id]=new SoftwarePackage {Id=app.Id,Version=app.Id=="notepad"?"8.9.8.1":app.Id=="7zip"?"26.04":app.Id=="rudesktop"?"3.0.1563":"9.8",Architecture=app.Id=="anydesk"?"x86":"x64",Source=app.Id=="notepad"?"Официальный релиз на GitHub":"Локальный _soft"};}
+            foreach(var app in SoftwareCatalog.Apps){checks[app.Id]=new SoftwareCheck {Id=app.Id,Version=app.Id=="chrome"?"156.0.8078.48":app.Id=="notepad"?"8.9.8.1":"26.04",State=app.Id=="notepad"?LibraryState.Installed:LibraryState.Missing,Detail=app.Id=="notepad"?"Установлена, x64":"Не установлено"};packages[app.Id]=new SoftwarePackage {Id=app.Id,Version=app.Id=="chrome"?"156.0.8078.48":app.Id=="notepad"?"8.9.8.1":app.Id=="7zip"?"26.04":app.Id=="rudesktop"?"3.0.1563":"9.8",Architecture=app.Id=="anydesk"?"x86":"x64",Source=app.Id=="notepad"?"Официальный релиз на GitHub":"Локальный _soft"};}
             UpdateRows();Log("Проверка завершена. Для отсутствующих программ доступны установщики");
         }
     }
     internal sealed class SoftwareRemoteDialog : Form
     {
         private readonly BrandTextBox input=new BrandTextBox(),confirmation=new BrandTextBox();
-        private readonly BrandCheckBox remember=new BrandCheckBox();private readonly string id;
+        private readonly BrandCheckBox remember=new BrandCheckBox(),standard=new BrandCheckBox();private readonly string id;
+        private readonly System.Windows.Forms.Timer keyboardTimer=new System.Windows.Forms.Timer();
+        private readonly ToolTip keyboardTips=new ToolTip();
+        private string customPassword="",customConfirmation="";
         private readonly BrandButton ok;private readonly Label validation;private readonly Image logo;
         internal string Password {get{return input.Text;}}
         internal static bool PasswordsMatch(string password,string repeated){return password!=null&&password.Length>=8&&password.Length<=128&&!password.Any(Char.IsControl)&&String.Equals(password,repeated,StringComparison.Ordinal);}
         internal SoftwareRemoteDialog(ThemePalette colors,Icon icon,string appId,bool loadSaved=true)
         {
-            id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();ClientSize=new Size(620,410);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
-            var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=9};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{76,24,36,24,36,30,36,48,48})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
+            id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;ClientSize=new Size(660,458);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
+            var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=10};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{76,28,40,28,40,30,38,38,56,48})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,64));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             heading.Controls.Add(new Label {Text="Постоянный пароль для "+SoftwareCatalog.Find(id).Name+"\r\nПодключение без подтверждения на этом компьютере",Dock=DockStyle.Fill,ForeColor=colors.Text,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,0);
             logo=BrandAssets.LoadSoftwareIcon(id);heading.Controls.Add(new PictureBox {Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Dock=DockStyle.Fill,Margin=new Padding(8,8,0,8)},1,0);layout.Controls.Add(heading,0,0);
             layout.Controls.Add(new Label {Text="Пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty},0,1);layout.Controls.Add(new Label {Text="Подтверди пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty},0,3);
             foreach(var box in new[]{input,confirmation}){box.Dock=DockStyle.Fill;box.UseSystemPasswordChar=true;box.MaxLength=128;box.Palette=colors;box.BackColor=colors.SurfaceAlt;box.ForeColor=colors.Text;box.Margin=new Padding(0,0,0,4);}
-            layout.Controls.Add(input,0,2);layout.Controls.Add(confirmation,0,4);
+            layout.Controls.Add(PasswordRow(input,colors),0,2);layout.Controls.Add(PasswordRow(confirmation,colors),0,4);
             validation=new Label {Text="От 8 до 128 символов",Dock=DockStyle.Fill,ForeColor=colors.Muted,Margin=Padding.Empty,Font=new Font("Segoe UI",9)};layout.Controls.Add(validation,0,5);
-            remember.Text="Запомнить на этом компьютере для моей учётной записи";remember.Dock=DockStyle.Fill;remember.Palette=colors;remember.Margin=Padding.Empty;layout.Controls.Add(remember,0,6);
-            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,ForeColor=colors.Muted,Font=new Font("Segoe UI",9),Margin=Padding.Empty},0,7);
+            remember.Text="Запомнить на этом компьютере для моей учётной записи";remember.Dock=DockStyle.Fill;remember.Palette=colors;remember.Margin=Padding.Empty;layout.Controls.Add(remember,0,7);
+            standard.Text="Использовать стандартный пароль BARS";standard.Dock=DockStyle.Fill;standard.Palette=colors;standard.Margin=Padding.Empty;layout.Controls.Add(standard,0,6);
+            standard.CheckedChanged+=delegate{if(standard.Checked){customPassword=input.Text;customConfirmation=confirmation.Text;input.Text=confirmation.Text="Dk3651340";}else{input.Text=customPassword;confirmation.Text=customConfirmation;}input.Enabled=confirmation.Enabled=!standard.Checked;input.UseSystemPasswordChar=confirmation.UseSystemPasswordChar=true;foreach(var eye in eyes){eye.Enabled=!standard.Checked;eye.Revealed=false;eye.AccessibleName="Показать пароль";eye.Invalidate();}};
+            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,ForeColor=colors.Muted,Font=new Font("Segoe UI",9),Margin=Padding.Empty},0,8);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var cancel=new BrandButton {Text="Отмена",Palette=colors,Dock=DockStyle.Fill,DialogResult=DialogResult.Cancel,Margin=new Padding(0,0,10,0)};actions.Controls.Add(cancel,0,0);
             ok=new BrandButton {Text="Продолжить",Palette=colors,Primary=true,Dock=DockStyle.Fill,Margin=Padding.Empty,Enabled=false};
             Action validate=delegate{ok.Enabled=PasswordsMatch(input.Text,confirmation.Text);validation.Text=input.Text.Length<8?"Введи не менее 8 символов":!String.Equals(input.Text,confirmation.Text,StringComparison.Ordinal)?"Пароли не совпадают":"Пароли совпадают";};input.TextChanged+=delegate{validate();};confirmation.TextChanged+=delegate{validate();};
             ok.Click+=delegate{if(!PasswordsMatch(input.Text,confirmation.Text))return;try{if(remember.Checked)SoftwarePasswordStore.Save(id,input.Text);else SoftwarePasswordStore.Forget(id);DialogResult=DialogResult.OK;}catch(Exception){validation.Text="Не удалось сохранить пароль: отключи запоминание и повтори";}};
-            actions.Controls.Add(ok,1,0);layout.Controls.Add(actions,0,8);Controls.Add(layout);CancelButton=cancel;AcceptButton=ok;
+            actions.Controls.Add(ok,1,0);layout.Controls.Add(actions,0,9);Controls.Add(layout);CancelButton=cancel;AcceptButton=ok;
+            keyboardTips.IsBalloon=true;keyboardTips.ToolTipIcon=ToolTipIcon.Warning;keyboardTips.ToolTipTitle="Caps Lock включён";keyboardTimer.Interval=200;keyboardTimer.Tick+=delegate{UpdateKeyboard();};Shown+=delegate{keyboardTimer.Start();UpdateKeyboard();};InputLanguageChanged+=delegate{UpdateKeyboard();};
             if(loadSaved)try{input.Text=SoftwarePasswordStore.Load(id);remember.Checked=input.Text.Length>0;}catch(Exception){}
         }
-        protected override void Dispose(bool disposing){base.Dispose(disposing);if(disposing&&logo!=null)logo.Dispose();}
+        private readonly List<PasswordEyeButton> eyes=new List<PasswordEyeButton>();
+        private readonly List<Label> languages=new List<Label>(),caps=new List<Label>();
+        private bool capsWasOn;
+        private Control PasswordRow(BrandTextBox box,ThemePalette colors)
+        {
+            var row=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,40));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,50));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,28));row.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            box.Anchor=AnchorStyles.Left|AnchorStyles.Right;box.Dock=DockStyle.None;row.Controls.Add(box,0,0);
+            var eye=new PasswordEyeButton{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,4),Palette=colors};eyes.Add(eye);eye.Click+=delegate{eye.Revealed=!eye.Revealed;box.UseSystemPasswordChar=!eye.Revealed;eye.AccessibleName=eye.Revealed?"Скрыть пароль":"Показать пароль";eye.Invalidate();box.Focus();};row.Controls.Add(eye,1,0);
+            var language=new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,ForeColor=colors.Muted,Margin=Padding.Empty};languages.Add(language);row.Controls.Add(language,2,0);
+            var warning=new Label{Dock=DockStyle.Fill,Text="⚠",Font=new Font("Segoe UI Symbol",13),ForeColor=Color.Goldenrod,TextAlign=ContentAlignment.MiddleCenter,Margin=Padding.Empty,Visible=false};caps.Add(warning);keyboardTips.SetToolTip(warning,"Caps Lock включён. Проверь регистр букв пароля.");row.Controls.Add(warning,3,0);
+            box.Enter+=delegate{capsWasOn=false;UpdateKeyboard();};return row;
+        }
+        internal static string LanguageLabel(string code){return code=="ru"?"РУС":code=="en"?"ENG":(code??"").ToUpperInvariant();}
+        private void UpdateKeyboard() {UpdateKeyboardState(InputLanguage.CurrentInputLanguage.Culture.TwoLetterISOLanguageName,Control.IsKeyLocked(Keys.CapsLock));}
+        internal void UpdateKeyboardState(string code,bool capsLocked)
+        {
+            string text=LanguageLabel(code);foreach(var label in languages)label.Text=text;
+            bool on=capsLocked&&!standard.Checked;foreach(var label in caps){label.Visible=on;if(!on)keyboardTips.Hide(label);}
+            if(on&&!capsWasOn&&(input.Focused||confirmation.Focused)){var label=caps[input.Focused?0:1];keyboardTips.Show("Caps Lock включён: проверь регистр букв",label,0,label.Height,3000);}capsWasOn=on;
+        }
+        protected override void Dispose(bool disposing){if(disposing){keyboardTimer.Dispose();keyboardTips.Dispose();}base.Dispose(disposing);if(disposing&&logo!=null)logo.Dispose();}
     }
 }

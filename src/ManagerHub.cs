@@ -67,14 +67,15 @@ namespace ServiceTool
     }
     internal sealed class ManagerHub : ManagerModuleForm
     {
-        public ManagerHub() : base("BARS Manager 3000", new Size(840, 600))
+        public ManagerHub() : base("BARS Manager 3000", new Size(900, 770))
         {
-            MinimumSize = new Size(800, 580); ClientSize = new Size(840, 600);
+            MinimumSize = new Size(860, 740); ClientSize = new Size(900, 770);
             Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 60;
-            // Four modules in an even 2x2 grid.
-            var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
+            Root.AutoScroll=true;
+            // Four modules in an even 2x2 grid, plus a full-width settings card.
+            var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty, MinimumSize=new Size(0,650) };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 168)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
             var title = Label("Инструменты BARS", false); title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleCenter; title.Margin = new Padding(0, 0, 0, 20); body.Controls.Add(title, 0, 0);
             // Windows components are reached from the component manager.
             var modules = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
@@ -85,7 +86,7 @@ namespace ServiceTool
             modules.SizeChanged += delegate { EqualRows(modules, 2); };
             modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер служб", delegate { using (var form = new MainForm(null, false)) OpenModule(form); }), 0, 0);
             modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер библиотек", delegate { using (var form = new LibraryManagerForm(false)) OpenModule(form); }), 1, 0);
-            modules.Controls.Add(ModuleCard("Установка программ", "Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nАссоциации файлов и удалённый доступ", "Установка программ", delegate { using (var form = new SoftwareManagerForm(false)) OpenModule(form); }), 0, 1);
+            modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nАссоциации файлов и удалённый доступ", "Установка программ", delegate { using (var form = new SoftwareManagerForm(false)) OpenModule(form); }), 0, 1);
             modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { using (var form = new ToolsDeploymentForm(false)) OpenModule(form); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
@@ -94,7 +95,8 @@ namespace ServiceTool
             BrandButton guide = Button("Инструкция", false); guide.AccessibleName = "Открыть инструкцию";
             guide.Click += delegate { using (var dialog = new UserGuideForm()) { dialog.SetTheme(Colors.Dark, false); dialog.ShowDialog(this); } SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
             BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 2, 0);
-            body.Controls.Add(footer, 0, 2); Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false);
+            body.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { using(var form=new InitialSystemSettingsForm()) OpenModule(form); }),0,2);
+            body.Controls.Add(footer, 0, 3); Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false);
         }
         private const int ModuleRowHeight = 160;
         private static void EqualRows(TableLayoutPanel panel, int rows)

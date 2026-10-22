@@ -47,6 +47,11 @@ $taskUiSources += Join-Path $taskSource 'AssemblyInfo.cs'
 $taskUiSources += Join-Path $taskSource 'ApplicationStorage.cs'
 $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
 $taskUiSources += Join-Path $taskSource 'SoftwarePackageStorage.cs'
+$taskUiSources += Join-Path $taskSource 'GuideSectionListBox.cs'
+$taskUiSources += Join-Path $taskSource 'TouchGrid.cs'
+$taskUiSources += Join-Path $taskSource 'LibraryJournal.cs'
+$taskUiSources += Join-Path $taskSource 'BarsFolderPermissions.cs'
+$taskUiSources += @('PasswordEyeButton.cs','InitialSystemSettings.cs','InitialSystemSettingsForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
 $taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','UserGuideForm.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs','SoftwareCatalog.cs','SoftwareSources.cs','SoftwareDetection.cs','SoftwareInstaller.cs','SoftwareDefaults.cs','SoftwareManagerForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
 Invoke-TaskTests 'UtilityModuleTests' 'ServiceTool.UtilityModuleTests' ($taskUiSources + (Join-Path $taskTests 'UtilityModuleTests.cs'))
 if ($UtilitySmoke) { Invoke-TaskTests 'UtilitySmokeTests' 'ServiceTool.UtilitySmokeTests' ($taskUiSources + (Join-Path $taskTests 'UtilitySmokeTests.cs')) }
@@ -55,6 +60,10 @@ Invoke-TaskTests 'SoftwareMaintenanceTests' 'ServiceTool.SoftwareMaintenanceTest
 Invoke-TaskTests 'LayoutFitTests' 'ServiceTool.LayoutFitTests' ($taskUiSources + (Join-Path $taskTests 'LayoutFitTests.cs'))
 Invoke-TaskTests 'RapidSelectionTests' 'ServiceTool.RapidSelectionTests' ($taskUiSources + (Join-Path $taskTests 'RapidSelectionTests.cs'))
 Invoke-TaskTests 'StartupModeUiTests' 'ServiceTool.StartupModeUiTests' ($taskUiSources + (Join-Path $taskTests 'StartupModeUiTests.cs'))
+Invoke-TaskTests 'NewSettingsTests' 'ServiceTool.NewSettingsTests' ($taskUiSources + (Join-Path $taskTests 'NewSettingsTests.cs'))
+& (Join-Path $taskTests 'InitialSystemSettings.Tests.ps1') -ScriptFolder $taskBuild
+& (Join-Path $taskTests 'BarsFolderPermissions.Tests.ps1') -ScriptFolder $taskBuild
+Invoke-TaskTests 'GuideDpiTests' 'ServiceTool.GuideDpiTests' ($taskUiSources + (Join-Path $taskTests 'GuideDpiTests.cs'))
 Invoke-TaskTests 'UserGuideTests' 'ServiceTool.UserGuideTests' ($taskUiSources + (Join-Path $taskTests 'UserGuideTests.cs'))
 Invoke-TaskTests 'WindowsRestartTests' 'ServiceTool.WindowsRestartTests' ($taskUiSources + (Join-Path $taskTests 'WindowsRestartTests.cs'))
 if ($SoftwareSmoke) { Invoke-TaskTests 'SoftwareStartupTests' 'ServiceTool.SoftwareStartupTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareStartupTests.cs')) }
@@ -78,3 +87,10 @@ Invoke-TaskTests 'ProductTests' 'ServiceTool.ProductTests' ($taskUiSources + (Jo
 Invoke-TaskTests 'RegressionTests' 'ServiceTool.RegressionTests' ($taskUiSources + (Join-Path $taskTests 'RegressionTests.cs'))
 Write-Output "Все проверки пройдены. Временные сборки: $taskBuild"
 Write-Output 'Реальные процедуры установки, удаления и управления службами не выполнялись.'
+
+Invoke-TaskTests 'TouchGridTests' 'ServiceTool.TouchGridTests' ($taskUiSources + (Join-Path $taskTests 'TouchGridTests.cs'))
+Invoke-TaskTests 'LibraryJournalTests' 'ServiceTool.LibraryJournalTests' ($taskUiSources + (Join-Path $taskTests 'LibraryJournalTests.cs'))
+
+Invoke-TaskTests 'SoftwareConfirmationTests' 'ServiceTool.SoftwareConfirmationTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareConfirmationTests.cs'))
+
+Invoke-TaskTests 'SystemSettingsRegressionTests' 'ServiceTool.SystemSettingsRegressionTests' ($taskUiSources + (Join-Path $taskTests 'SystemSettingsRegressionTests.cs'))

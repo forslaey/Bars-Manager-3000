@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -54,9 +54,9 @@ namespace ServiceTool
                         for(round=0;round<3;round++)
                         {
                             int before=lookups;var task=(Task)form.GetType().GetMethod("RefreshPackages",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(form,new object[]{true});Wait(()=>task.IsCompleted);task.GetAwaiter().GetResult();
-                            Check(lookups-before==4,"Explicit check obtains metadata for four programs");
+                            Check(lookups-before==5,"Explicit check obtains metadata for four programs");
                             Check(requests==0,"Successful metadata check, including unknown/newer AnyDesk, never requests installer");
-                            Check(Field<ServiceGrid>(form,"grid").Rows.Count==4&&Field<BrandButton>(form,"refresh").Enabled,"Rows and controls remain available");
+                            Check(Field<ServiceGrid>(form,"grid").Rows.Count==5&&Field<BrandButton>(form,"refresh").Enabled,"Rows and controls remain available");
                             var packages=Field<Dictionary<string,SoftwarePackage>>(form,"packages");
                             Check(packages.ContainsKey("anydesk"),"AnyDesk metadata available");
                             if(round==1)Check(!SoftwareMaintenance.CanInstall(installed,packages["anydesk"]),"Same installed version cannot be offered as an update");

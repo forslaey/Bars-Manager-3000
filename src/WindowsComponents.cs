@@ -70,15 +70,19 @@ namespace ServiceTool
         // Windows servicing is allowed to finish; killing TrustedInstaller is never attempted.
         internal static LibraryInstallResult Run(string script, Action<string> progress)
         {
-            var start = new ProcessStartInfo(PowerShellPath, "-NoLogo -NoProfile -NonInteractive -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script))) {
+            // Only a small bootstrap goes on the command line. The real script
+            // travels as ASCII base64 on stdin, without a temporary script file.
+            const string bootstrap = "$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false);$ErrorActionPreference='Stop';try{$s=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd())); & ([scriptblock]::Create($s))}catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}";
+            var start = new ProcessStartInfo(PowerShellPath, "-NoLogo -NoProfile -NonInteractive -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(bootstrap))) {
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
-                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+                RedirectStandardInput = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
             };
             // Explicit UTF-8 on the child streams, independent of the machine's ANSI/OEM code page.
-            start.Arguments = "-NoLogo -NoProfile -NonInteractive -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes("[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); " + script));
             using (var process = Process.Start(start))
             {
                 var output = process.StandardOutput.ReadToEndAsync(); var errors = process.StandardError.ReadToEndAsync();
+                process.StandardInput.Write(Convert.ToBase64String(Encoding.Unicode.GetBytes("[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); $ProgressPreference='SilentlyContinue'; " + script)));
+                process.StandardInput.Close();
                 while (!process.WaitForExit(1000)) progress("Windows обрабатывает запрос. Дождись завершения…");
                 string text = output.GetAwaiter().GetResult(), error = errors.GetAwaiter().GetResult();
                 if (process.ExitCode != 0) throw new InvalidOperationException(String.IsNullOrWhiteSpace(error) ? "Ошибка Windows: " + process.ExitCode : error.Trim());
@@ -115,7 +119,7 @@ namespace ServiceTool
     }
     internal static class ManagerSystemActions
     {
-        internal static bool Known(string action) { return action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "tools-remove" || action == "system-restart" || action == "software-install" || action == "software-defaults" || action == "software-query" || action == "software-remove" || action == "software-access"; }
+        internal static bool Known(string action) { return action == "initial-settings" || action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "tools-remove" || action == "system-restart" || action == "software-install" || action == "software-defaults" || action == "software-query" || action == "software-remove" || action == "software-access"; }
         internal static LibraryInstallResult Execute(string action, string data, string path, Action<string> progress)
         {
             if (!Known(action)) throw new InvalidDataException("Неизвестное действие менеджера");
@@ -126,6 +130,7 @@ namespace ServiceTool
                 if (!acquired) throw new InvalidOperationException("Другая операция менеджера ещё выполняется");
                 try
                 {
+                    if (action == "initial-settings") return InitialSystemSettings.Run(data,progress);
                     if (action == "software-remove") return SoftwareMaintenance.Remove(data,progress);
                     if (action == "software-access") return SoftwareMaintenance.ConfigureAccess(data,progress);
                     if (action == "software-query") return new LibraryInstallResult {ExitCode=0,State=LibraryState.Unknown,Message=SoftwareDetection.Query(data)};

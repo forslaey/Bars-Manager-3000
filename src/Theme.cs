@@ -79,7 +79,7 @@ namespace ServiceTool
         public BufferedLayoutPanel() { SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.ResizeRedraw, true); }
     }
 
-    internal sealed class ServiceGrid : DataGridView
+    internal sealed partial class ServiceGrid : DataGridView
     {
         public ServiceGrid() { DoubleBuffered = true; SetStyle(ControlStyles.ResizeRedraw, true); }
     }

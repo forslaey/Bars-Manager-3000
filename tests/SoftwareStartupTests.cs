@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -39,7 +39,7 @@ namespace ServiceTool
                 {
                     string source=repeat==1&&Directory.Exists(@"C:\Библиотеки\_soft")?@"C:\Библиотеки\_soft":temp;
                     form.SetTheme(dark,false);form.GetType().GetField("source",BindingFlags.NonPublic|BindingFlags.Instance).SetValue(form,source);
-                    var grid=Field<ServiceGrid>(form,"grid");Check(grid.Rows.Count==4,"All four programs exist before Shown and before any asynchronous scan");
+                    var grid=Field<ServiceGrid>(form,"grid");Check(grid.Rows.Count==5,"All four programs exist before Shown and before any asynchronous scan");
                     Check(!Field<BrandButton>(form,"install").Enabled&&!Field<BrandButton>(form,"remove").Enabled,"Unverified startup rows cannot install or remove anything");
                     var timer=Stopwatch.StartNew();form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-22000,-22000);form.Show();
                     Application.DoEvents();PumpUntil(()=>!Field<bool>(form,"busy"));
@@ -51,7 +51,7 @@ namespace ServiceTool
                     {
                         var task=(Task)form.GetType().GetMethod("RefreshPackages",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(form,new object[]{true});
                         PumpUntil(()=>task.IsCompleted);task.GetAwaiter().GetResult();Check(requests>=3,"Explicit version check still queries official metadata");
-                        Check(grid.Rows.Count==4&&Field<BrandButton>(form,"refresh").Enabled,"Unavailable internet leaves visible rows and usable controls");
+                        Check(grid.Rows.Count==5&&Field<BrandButton>(form,"refresh").Enabled,"Unavailable internet leaves visible rows and usable controls");
                     }
                     form.Close();
                 }

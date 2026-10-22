@@ -17,6 +17,7 @@ namespace ServiceTool
         {
             if (uri == null || uri.Scheme != "https" || !uri.IsDefaultPort || !String.IsNullOrEmpty(uri.UserInfo)) return false;
             string host = uri.DnsSafeHost.ToLowerInvariant();
+            if(id=="chrome")return host=="versionhistory.googleapis.com" && uri.AbsolutePath.StartsWith("/v1/chrome/platforms/win64/channels/stable/",StringComparison.Ordinal) || host=="dl.google.com" && uri.AbsolutePath.Equals("/dl/chrome/install/googlechromestandaloneenterprise64.msi",StringComparison.OrdinalIgnoreCase);
             if (id == "notepad" || id == "7zip")
             {
                 string repo = id == "notepad" ? "notepad-plus-plus/notepad-plus-plus" : "ip7z/7zip";
@@ -102,8 +103,18 @@ namespace ServiceTool
             Match selected=matches[0]; foreach (Match match in matches) if (SoftwareCatalog.Compare(match.Groups[1].Value,selected.Groups[1].Value)>0) selected=match;
             return new SoftwarePackage { Id="rudesktop", Version=selected.Groups[1].Value, Architecture="x64", File=Path.GetFileName(new Uri(selected.Value).AbsolutePath), Url=selected.Value, Source="Официальный сайт RuDesktop", Sha256="" };
         }
+        internal static SoftwarePackage ParseChrome(string json)
+        {
+            var doc=new JavaScriptSerializer{MaxJsonLength=4*1024*1024,RecursionLimit=24}.DeserializeObject(json) as Dictionary<string,object>;
+            object value; if(doc==null||!doc.TryGetValue("versions",out value))throw new InvalidDataException("Google не вернул версии Chrome");
+            var versions=value as object[]; if(versions==null||versions.Length==0)throw new InvalidDataException("Не найдена стабильная версия Chrome");
+            string selected=null;
+            foreach(var item in versions){var entry=item as Dictionary<string,object>;object raw;Version v;if(entry==null||!entry.TryGetValue("version",out raw)||!Version.TryParse(Convert.ToString(raw),out v)||v.Revision<0)throw new InvalidDataException("Некорректная версия Chrome");string version=Convert.ToString(raw);if(selected==null||SoftwareCatalog.Compare(version,selected)>0)selected=version;}
+            return new SoftwarePackage{Id="chrome",Version=selected,Architecture="x64",File="googlechromestandaloneenterprise64.msi",Url="https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",Source="Google · официальный автономный установщик",Sha256=""};
+        }
         internal static SoftwarePackage Latest(string id)
         {
+            if(id=="chrome")return ParseChrome(Text(id,"https://versionhistory.googleapis.com/v1/chrome/platforms/win64/channels/stable/versions?pageSize=1"));
             if (id=="notepad" || id=="7zip") return GitHub(id);
             if (id=="rudesktop") return ParseRuDesktop(Text(id,"https://rudesktop.ru/downloads/"));
             if (id=="anydesk") return ParseAnyDesk(Text(id,"https://download.anydesk.com/changelog.txt"));

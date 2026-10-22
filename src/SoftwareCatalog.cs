@@ -31,6 +31,7 @@ namespace ServiceTool
     internal static class SoftwareCatalog
     {
         internal static readonly SoftwareDefinition[] Apps = {
+            new SoftwareDefinition { Id="chrome", Name="Google Chrome", Exe="chrome.exe", Folder=@"Google\Chrome\Application", Publisher="Google LLC" },
             new SoftwareDefinition { Id="notepad", Name="Notepad++", Exe="notepad++.exe", Folder="Notepad++", Publisher="NOTEPAD++" },
             new SoftwareDefinition { Id="7zip", Name="7-Zip", Exe="7zFM.exe", Folder="7-Zip", Publisher="" },
             new SoftwareDefinition { Id="anydesk", Name="AnyDesk", Exe="AnyDesk.exe", Folder="AnyDesk", Publisher="AnyDesk Software GmbH", Remote=true },
@@ -62,12 +63,13 @@ namespace ServiceTool
             var app = Find(id); ToolsDeployment.SafePath(file); var info = new FileInfo(file);
             if (!info.Exists || info.Length < 65536 || info.Length > 300L*1024*1024) throw new InvalidDataException("Некорректный размер установщика");
             string name = info.Name, version, arch;
-            if (id == "rudesktop")
+            if (id == "rudesktop" || id == "chrome")
             {
-                if (!name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Нужен MSI RuDesktop x64");
+                if (!name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Нужен MSI " + app.Name + " x64");
                 var properties = LibraryDiscovery.MsiProperties(file, out arch);
-                if (!properties.ContainsKey("ProductName") || properties["ProductName"].IndexOf("RuDesktop", StringComparison.OrdinalIgnoreCase) < 0 || arch != "x64") throw new InvalidDataException("Нужен установщик RuDesktop x64");
+                if (!properties.ContainsKey("ProductName") || !String.Equals(properties["ProductName"],app.Name,StringComparison.OrdinalIgnoreCase) || arch != "x64") throw new InvalidDataException("Нужен установщик " + app.Name + " x64");
                 version = properties["ProductVersion"];
+                if(id=="chrome" && version.Split('.').Length!=4)throw new InvalidDataException("Версия старого MSI Chrome закодирована; используй актуальный автономный установщик Google");
             }
             else
             {
@@ -124,7 +126,7 @@ namespace ServiceTool
         internal static string PackageId(string file)
         {
             string name=Path.GetFileName(file).ToLowerInvariant();
-            return name.StartsWith("npp.")?"notepad":Regex.IsMatch(name,@"^7z\d+-x64\.exe$")?"7zip":name=="anydesk.exe"?"anydesk":name.StartsWith("rudesktop-")&&name.EndsWith("-x64.msi")?"rudesktop":null;
+            return name=="googlechromestandaloneenterprise64.msi"?"chrome":name.StartsWith("npp.")?"notepad":Regex.IsMatch(name,@"^7z\d+-x64\.exe$")?"7zip":name=="anydesk.exe"?"anydesk":name.StartsWith("rudesktop-")&&name.EndsWith("-x64.msi")?"rudesktop":null;
         }
     }
     internal static class SoftwareTrust
