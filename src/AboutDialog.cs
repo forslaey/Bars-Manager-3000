@@ -16,6 +16,7 @@ namespace ServiceTool
         {
             SuspendLayout();
             ThemePalette colors = palette ?? ThemePalette.Create(false);
+            NativeWindowTheme.Bind(this,()=>colors.Dark);
             Text = "О софтине";
             Font = bodyFont;
             BackColor = colors.Canvas;

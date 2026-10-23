@@ -38,3 +38,6 @@ LibraryReports/
 
 # User-requested signed release
 !releases/v2.3.13/Bars Manager 3000 2.3.13.exe
+
+# User-requested unsigned release 2.3.20
+!releases/v2.3.20/Bars Manager 3000 2.3.20.exe

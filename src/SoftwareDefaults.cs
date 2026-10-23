@@ -17,6 +17,32 @@ namespace ServiceTool
         // Archive/container extensions only. Executables, DLLs, installers and help files
         // retain their Windows handlers even though 7-Zip can inspect their contents.
         internal static readonly string[] ArchiveExtensions={".7z",".zip",".zipx",".z01",".rar",".r00",".001",".arj",".bz2",".bzip2",".cab",".cpio",".deb",".dmg",".gz",".gzip",".iso",".lzh",".lha",".lzma",".lzma86",".rpm",".tar",".taz",".tbz",".tbz2",".tgz",".tpz",".txz",".tzst",".udf",".wim",".swm",".esd",".xar",".xip",".xz",".z",".zst",".zstd",".ar",".udeb",".ova",".cramfs",".squashfs",".mslz",".pmd"};
+        internal static string[] Extensions(string id)
+        {
+            if(id!="chrome")return id=="notepad" ? TextExtensions : ArchiveExtensions;
+            var result=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using(var machine=RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,RegistryView.Registry64))
+            using(var apps=machine.OpenSubKey(@"Software\RegisteredApplications"))
+            {
+                string path=apps==null ? "" : Convert.ToString(apps.GetValue("Google Chrome"));
+                if(path.Length>0)using(var capabilities=machine.OpenSubKey(path))
+                {
+                    if(capabilities!=null)foreach(string group in new[]{"FileAssociations","URLAssociations"})
+                        using(var associations=capabilities.OpenSubKey(group))
+                        {
+                            if(associations==null)continue;
+                            foreach(string name in associations.GetValueNames())
+                            {
+                                string prog=Convert.ToString(associations.GetValue(name));
+                                if(name.Length>0&&prog.Length>0)using(var command=machine.OpenSubKey(@"Software\Classes\"+prog+@"\shell\open\command"))
+                                    if(command!=null&&!String.IsNullOrWhiteSpace(Convert.ToString(command.GetValue(""))))result.Add(name);
+                            }
+                        }
+                }
+            }
+            if(!result.Contains("http")||!result.Contains("https"))throw new InvalidOperationException("Chrome не зарегистрировал поддерживаемые ассоциации для всех пользователей. Восстанови установку Chrome");
+            return result.OrderBy(value=>value,StringComparer.OrdinalIgnoreCase).ToArray();
+        }
         internal const string PolicyKey=@"Software\Policies\Microsoft\Windows\System";
         internal static bool SupportsPolicy()
         {
@@ -30,14 +56,14 @@ namespace ServiceTool
             if(document.DocumentElement==null || document.DocumentElement.Name!="DefaultAssociations") throw new InvalidDataException("Неверный XML ассоциаций Windows");
             return document;
         }
-        internal static string ProgId(string id) {return id=="notepad" ? "BARS.NotepadPlusPlus.Text" : "BARS.SevenZip.Archive";}
+        internal static string ProgId(string id) {return id=="chrome" ? "BARS.Chrome.Html" : id=="notepad" ? "BARS.NotepadPlusPlus.Text" : "BARS.SevenZip.Archive";}
         internal static XmlDocument Merge(string xml,IEnumerable<string> ids)
         {
             var document=Read(xml);
             foreach(string id in ids)
             {
-                if(id!="notepad" && id!="7zip") throw new InvalidDataException("Неизвестный профиль ассоциаций");
-                foreach(string extension in id=="notepad" ? TextExtensions : ArchiveExtensions)
+                if(id!="chrome" && id!="notepad" && id!="7zip") throw new InvalidDataException("Неизвестный профиль ассоциаций");
+                foreach(string extension in Extensions(id))
                 {
                     foreach(XmlNode node in document.DocumentElement.SelectNodes("Association")) if(String.Equals(node.Attributes["Identifier"]==null ? "" : node.Attributes["Identifier"].Value,extension,StringComparison.OrdinalIgnoreCase)) document.DocumentElement.RemoveChild(node);
                     var association=document.CreateElement("Association"); association.SetAttribute("Identifier",extension); association.SetAttribute("ProgId",ProgId(id)); association.SetAttribute("ApplicationName",SoftwareCatalog.Find(id).Name); document.DocumentElement.AppendChild(association);
@@ -47,25 +73,27 @@ namespace ServiceTool
         }
         internal static void Register(RegistryKey machine,string id,string exe)
         {
-            if(id!="notepad" && id!="7zip") throw new InvalidDataException("Неизвестный профиль ассоциаций");
+            if(id!="chrome" && id!="notepad" && id!="7zip") throw new InvalidDataException("Неизвестный профиль ассоциаций");
             string prog=ProgId(id),app=SoftwareCatalog.Find(id).Name;
             using(var key=machine.CreateSubKey(@"Software\Classes\"+prog))
             {
-                key.SetValue("",id=="notepad" ? "Текстовый файл" : "Архив");
+                if(id=="chrome")key.SetValue("URL Protocol","");
+                key.SetValue("",id=="chrome" ? "Документ HTML" : id=="notepad" ? "Текстовый файл" : "Архив");
                 using(var icon=key.CreateSubKey("DefaultIcon")) icon.SetValue("",LibraryPlan.Quote(exe)+",0");
-                using(var command=key.CreateSubKey(@"shell\open\command")) command.SetValue("",LibraryPlan.Quote(exe)+" \"%1\"");
+                using(var command=key.CreateSubKey(@"shell\open\command")) command.SetValue("",LibraryPlan.Quote(exe)+(id=="chrome" ? " --single-argument" : "")+" \"%1\"");
             }
             string capabilities=@"Software\BARS\Manager\Defaults\"+id+@"\Capabilities";
             using(var key=machine.CreateSubKey(capabilities))
             {
-                key.SetValue("ApplicationName",app); key.SetValue("ApplicationDescription",id=="notepad" ? "Текстовые файлы и настройки BARS" : "Архивы"); key.SetValue("ApplicationIcon",LibraryPlan.Quote(exe)+",0");
-                using(var associations=key.CreateSubKey("FileAssociations")) foreach(string ext in id=="notepad" ? TextExtensions : ArchiveExtensions) associations.SetValue(ext,prog);
+                key.SetValue("ApplicationName",app); key.SetValue("ApplicationDescription",id=="chrome" ? "Поддерживаемые Chrome файлы и ссылки" : id=="notepad" ? "Текстовые файлы и настройки BARS" : "Архивы"); key.SetValue("ApplicationIcon",LibraryPlan.Quote(exe)+",0");
+                using(var associations=key.CreateSubKey("FileAssociations")) foreach(string ext in Extensions(id).Where(e=>e.StartsWith("."))) associations.SetValue(ext,prog);
+                if(id=="chrome")using(var urls=key.CreateSubKey("URLAssociations"))foreach(string protocol in Extensions(id).Where(e=>!e.StartsWith(".")))urls.SetValue(protocol,prog);
             }
             using(var key=machine.CreateSubKey(@"Software\RegisteredApplications")) key.SetValue("BARS."+id,capabilities);
         }
         internal static void RemoveRegistration(string id,Action<string> progress)
         {
-            if(id!="notepad"&&id!="7zip")return;
+            if(id!="chrome"&&id!="notepad"&&id!="7zip")return;
             string final=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),@"BARS\Manager\DefaultAssociations\BARS.xml");
             using(var machine=RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,RegistryView.Registry64))
             {
@@ -92,7 +120,7 @@ namespace ServiceTool
         }
         internal static LibraryInstallResult Apply(string data,Action<string> progress)
         {
-            var ids=(data??"").Split(','); if(ids.Length==0 || ids.Any(id=>id!="notepad" && id!="7zip") || ids.Distinct().Count()!=ids.Length) throw new InvalidDataException("Неверный список ассоциаций");
+            var ids=(data??"").Split(','); if(ids.Length==0 || ids.Any(id=>id!="chrome" && id!="notepad" && id!="7zip") || ids.Distinct().Count()!=ids.Length) throw new InvalidDataException("Неверный список ассоциаций");
             var apps=ids.Select(id=>SoftwareDetection.Check(id,false,true)).ToArray();
             if(apps.Any(a=>a.State!=LibraryState.Installed)) throw new InvalidOperationException("Сначала установи выбранные программы x64 для всех пользователей");
             string directory=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),@"BARS\Manager\DefaultAssociations"); ToolsDeployment.SafePath(directory);
@@ -120,7 +148,7 @@ namespace ServiceTool
                     if(File.Exists(final))
                     {
                         var old=Read(File.ReadAllText(final));
-                        foreach(string previousId in new[]{"notepad","7zip"})
+                        foreach(string previousId in new[]{"chrome","notepad","7zip"})
                             if(!ids.Contains(previousId) && old.DocumentElement.SelectNodes("Association").Cast<XmlNode>().Any(n=>n.Attributes["ProgId"]!=null && n.Attributes["ProgId"].Value==ProgId(previousId)) && SoftwareDetection.Check(previousId,false,true).State==LibraryState.Installed)
                                 profile=Merge(profile.OuterXml,new[]{previousId});
                     }

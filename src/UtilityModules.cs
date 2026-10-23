@@ -27,7 +27,7 @@ namespace ServiceTool
             Body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); Body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            var heading = Label(title, false); heading.Font = new Font("Segoe UI", 15, FontStyle.Bold); Body.Controls.Add(heading, 0, 0);
+            var heading = Label(title, false); heading.Margin = new Padding(12, 12, 12, 4); heading.Font = new Font("Segoe UI", 15, FontStyle.Bold); Body.Controls.Add(heading, 0, 0);
             var footer = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 8, 0, 0), Margin = Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -227,6 +227,7 @@ namespace ServiceTool
             preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,460));ClientSize=new Size(640,460);
             Root.RowStyles[0].Height=76;Root.Padding=new Padding(20,8,20,10);
             Body.RowStyles[0].Height=42;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=46;
+            Body.GetControlFromPosition(0,0).Margin=new Padding(12,6,12,0);
             var card=new Card {Dock=DockStyle.Fill,Padding=new Padding(16,16,16,8),Margin=new Padding(0,0,0,8)};
             var content=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=6,Margin=Padding.Empty};
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));
@@ -244,6 +245,7 @@ namespace ServiceTool
             deploy=Button("Установить",true);deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
             remove=Button("Удалить",false);remove.Destructive=true;remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,1,0);Body.Controls.Add(actions,0,2);
             if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=ex.Message;}
+            LimitContent(new Size(640, 460));
             SetTheme(Colors.Dark,false);
         }
         protected override void OnThemeChanged(){shortcuts.Palette=Colors;}

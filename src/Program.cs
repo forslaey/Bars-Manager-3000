@@ -125,7 +125,6 @@ namespace ServiceTool
     internal sealed class MainForm : Form
     {
         internal bool MenuRequested { get; private set; }
-        [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
         [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
         private readonly Color ink = Color.FromArgb(26, 39, 60);
         private readonly Color muted = Color.FromArgb(91, 107, 128);
@@ -258,12 +257,12 @@ namespace ServiceTool
             viewport.Controls.Add(layout);
             Controls.Add(viewport);
 
-            TableLayoutPanel header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 0, 0, 12) };
+            TableLayoutPanel header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 0, 0, 12), Padding = new Padding(0, 8, 0, 0) };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            Panel brandSlot = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
+            Panel brandSlot = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0), Padding = new Padding(0, 6, 0, 6) };
             lightBrandLogo = BrandAssets.LoadLogo(false);
             darkBrandLogo = BrandAssets.LoadLogo(true);
             brandImage.Image = lightBrandLogo;
@@ -381,7 +380,7 @@ namespace ServiceTool
             autoRefreshToggle.AccessibleDescription = "По умолчанию включено; обновление каждые 10 секунд";
             autoRefreshToggle.Checked = true;
             autoRefreshToggle.Dock = DockStyle.None;
-            autoRefreshToggle.Anchor = AnchorStyles.None;
+            autoRefreshToggle.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
             autoRefreshToggle.Margin = Padding.Empty;
             autoRefreshToggle.Font = new Font("Segoe UI", 8.5F);
             autoRefreshToggle.Size = new Size(54 + TextRenderer.MeasureText(autoRefreshToggle.Text, autoRefreshToggle.Font,
@@ -693,11 +692,11 @@ namespace ServiceTool
         {
             if (slot.ClientSize.Width < 1 || slot.ClientSize.Height < 1 || brandImage.Image == null) return;
             double aspect = (double)brandImage.Image.Width / brandImage.Image.Height;
-            int height = Math.Max(1, (int)Math.Floor(slot.ClientSize.Height * 0.9));
+            int height = Math.Max(1, slot.ClientSize.Height - slot.Padding.Vertical);
             int width = Math.Max(1, (int)Math.Round(height * aspect));
-            if (width > slot.ClientSize.Width)
+            if (width > slot.ClientSize.Width - slot.Padding.Horizontal)
             {
-                width = slot.ClientSize.Width;
+                width = slot.ClientSize.Width - slot.Padding.Horizontal;
                 height = Math.Max(1, (int)Math.Round(width / aspect));
             }
             Rectangle bounds = new Rectangle((slot.ClientSize.Width - width) / 2,
@@ -818,14 +817,7 @@ namespace ServiceTool
 
         private void ApplyNativeTheme()
         {
-            if (!IsHandleCreated) return;
-            try
-            {
-                int dark = palette.Dark ? 1 : 0;
-                DwmSetWindowAttribute(Handle, 20, ref dark, sizeof(int));
-            }
-            catch (DllNotFoundException) { }
-            catch (EntryPointNotFoundException) { }
+            NativeWindowTheme.Apply(this, palette.Dark);
         }
 
         private void ApplyStatusColor()

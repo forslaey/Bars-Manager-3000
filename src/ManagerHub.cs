@@ -21,12 +21,13 @@ namespace ServiceTool
             MinimumSize = new Size(860, 620); StartPosition = FormStartPosition.CenterScreen;
             DoubleBuffered = true; Icon = BrandAssets.LoadIcon();
             Colors = ThemePalette.Create(ThemePreference.LoadDark());
+            NativeWindowTheme.Bind(this,()=>Colors.Dark);
             lightLogo = BrandAssets.LoadLogo(false); darkLogo = BrandAssets.LoadLogo(true);
             Root = new BufferedLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 12, 26, 12), ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
             Root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96)); Root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Controls.Add(Root);
-            var header = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 0, 0, 12) };
+            var header = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 0, 0, 12), Padding = new Padding(0, 8, 0, 0) };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             logo.Dock = DockStyle.Fill; logo.SizeMode = PictureBoxSizeMode.Zoom; logo.Margin = new Padding(0, 6, 0, 6); logo.Cursor = Cursors.Hand;
@@ -34,6 +35,11 @@ namespace ServiceTool
             header.Controls.Add(logo, 1, 0);
             theme.Size = new Size(86, 40); theme.Anchor = AnchorStyles.None; theme.AccessibleName = "Сменить тему";
             theme.Click += delegate { SetTheme(!Colors.Dark, true); }; header.Controls.Add(theme, 2, 0); Root.Controls.Add(header, 0, 0);
+        }
+        protected void LimitContent(Size maximum)
+        {
+            Controls.Remove(Root);
+            Controls.Add(new BoundedContentPanel(Root, maximum));
         }
         protected BrandButton Button(string text, bool primary)
         { return new BrandButton { Text = text, Primary = primary, Palette = Colors, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 10, 0), Font = Font }; }
@@ -43,7 +49,7 @@ namespace ServiceTool
         {
             Colors = ThemePalette.Create(dark); BackColor = Colors.Canvas; ForeColor = Colors.Text;
             logo.Image = dark ? darkLogo : lightLogo; theme.Palette = Colors; theme.Dark = dark;
-            ApplyTree(this, Colors.Canvas); OnThemeChanged(); Invalidate(true);
+            ApplyTree(this, Colors.Canvas); NativeWindowTheme.Apply(this, dark); OnThemeChanged(); Invalidate(true);
             if (persist) ThemePreference.TrySave(dark);
         }
         private void ApplyTree(Control control, Color background)
@@ -96,7 +102,10 @@ namespace ServiceTool
             guide.Click += delegate { using (var dialog = new UserGuideForm()) { dialog.SetTheme(Colors.Dark, false); dialog.ShowDialog(this); } SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
             BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 2, 0);
             body.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { using(var form=new InitialSystemSettingsForm()) OpenModule(form); }),0,2);
-            body.Controls.Add(footer, 0, 3); Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false);
+            body.Controls.Add(footer, 0, 3);
+            Root.Controls.Add(body, 0, 1);
+            LimitContent(new Size(1160, 860));
+            SetTheme(Colors.Dark, false);
         }
         private const int ModuleRowHeight = 160;
         private static void EqualRows(TableLayoutPanel panel, int rows)

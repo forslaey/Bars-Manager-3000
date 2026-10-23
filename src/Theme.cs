@@ -7,6 +7,29 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
+    internal static class NativeWindowTheme
+    {
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+        internal static void Bind(Form form, Func<bool> dark)
+        {
+            form.HandleCreated += delegate { Apply(form, dark()); };
+            Apply(form, dark());
+        }
+        internal static void Apply(Form form, bool dark)
+        {
+            if (!form.IsHandleCreated) return;
+            try
+            {
+                int value = dark ? 1 : 0;
+                if (DwmSetWindowAttribute(form.Handle, 20, ref value, sizeof(int)) < 0)
+                    DwmSetWindowAttribute(form.Handle, 19, ref value, sizeof(int));
+            }
+            catch (DllNotFoundException) { }
+            catch (EntryPointNotFoundException) { }
+        }
+    }
+
     internal sealed class ThemePalette
     {
         public bool Dark;

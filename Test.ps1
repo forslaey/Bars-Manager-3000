@@ -49,6 +49,7 @@ $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
 $taskUiSources += Join-Path $taskSource 'SoftwarePackageStorage.cs'
 $taskUiSources += Join-Path $taskSource 'GuideSectionListBox.cs'
 $taskUiSources += Join-Path $taskSource 'TouchGrid.cs'
+$taskUiSources += Join-Path $taskSource 'BoundedContentPanel.cs'
 $taskUiSources += Join-Path $taskSource 'LibraryJournal.cs'
 $taskUiSources += Join-Path $taskSource 'BarsFolderPermissions.cs'
 $taskUiSources += @('PasswordEyeButton.cs','InitialSystemSettings.cs','InitialSystemSettingsForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
@@ -58,6 +59,8 @@ if ($UtilitySmoke) { Invoke-TaskTests 'UtilitySmokeTests' 'ServiceTool.UtilitySm
 Invoke-TaskTests 'SoftwareTests' 'ServiceTool.SoftwareTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareTests.cs'))
 Invoke-TaskTests 'SoftwareMaintenanceTests' 'ServiceTool.SoftwareMaintenanceTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareMaintenanceTests.cs'))
 Invoke-TaskTests 'LayoutFitTests' 'ServiceTool.LayoutFitTests' ($taskUiSources + (Join-Path $taskTests 'LayoutFitTests.cs'))
+Invoke-TaskTests 'ResponsiveLayoutTests' 'ServiceTool.ResponsiveLayoutTests' ($taskUiSources + (Join-Path $taskTests 'ResponsiveLayoutTests.cs'))
+Invoke-TaskTests 'HeaderStyleTests' 'ServiceTool.HeaderStyleTests' ($taskUiSources + (Join-Path $taskTests 'HeaderStyleTests.cs'))
 Invoke-TaskTests 'RapidSelectionTests' 'ServiceTool.RapidSelectionTests' ($taskUiSources + (Join-Path $taskTests 'RapidSelectionTests.cs'))
 Invoke-TaskTests 'StartupModeUiTests' 'ServiceTool.StartupModeUiTests' ($taskUiSources + (Join-Path $taskTests 'StartupModeUiTests.cs'))
 Invoke-TaskTests 'NewSettingsTests' 'ServiceTool.NewSettingsTests' ($taskUiSources + (Join-Path $taskTests 'NewSettingsTests.cs'))

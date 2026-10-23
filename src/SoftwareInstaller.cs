@@ -225,7 +225,7 @@ namespace ServiceTool
             }
             // Vendor uninstall must complete before any settings are touched.
             foreach(string path in MachineSettings(id))DeleteSettings(path,Path.GetDirectoryName(path));
-            if(id=="notepad"||id=="7zip")SoftwareDefaults.RemoveRegistration(id,progress);
+            if(id=="chrome"||id=="notepad"||id=="7zip")SoftwareDefaults.RemoveRegistration(id,progress);
             return new LibraryInstallResult{ExitCode=0,State=LibraryState.Missing,Message="Программа удалена, общие настройки очищены",LogPath=File.Exists(log)?log:""};
         }
         internal static string[] MachineSettings(string id)

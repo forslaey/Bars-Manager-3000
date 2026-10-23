@@ -11,6 +11,7 @@ namespace ServiceTool
         internal LibraryActionDialog(ThemePalette colors, Icon icon, IEnumerable<LibraryCheck> selected)
         {
             var items = selected.ToList();
+            NativeWindowTheme.Bind(this,()=>colors.Dark);
             Text = "Действие с компонентами"; Icon = icon; Font = new Font("Segoe UI", 10);
             AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(760, 470); MinimumSize = new Size(700, 450); StartPosition = FormStartPosition.CenterParent;

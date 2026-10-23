@@ -61,7 +61,7 @@ namespace ServiceTool
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
             statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
-            Label title = Label("Менеджер системных библиотек Windows", false); title.Font = new Font("Segoe UI", 13, FontStyle.Bold); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
+            Label title = Label("Менеджер системных библиотек Windows", false); title.Font = new Font("Segoe UI", 15, FontStyle.Bold); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
             monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.None; monitor.Anchor = AnchorStyles.Right | AnchorStyles.Bottom; monitor.Checked = true; monitor.Margin = Padding.Empty; monitor.Height = 28;
             monitor.CheckedChanged += delegate { timer.Enabled = monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 2); statusLayout.SetRowSpan(monitor, 2);
             statusLayout.Layout += delegate

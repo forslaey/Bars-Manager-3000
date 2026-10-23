@@ -16,7 +16,7 @@ namespace ServiceTool
         private readonly Font headerFont=new Font("Segoe UI",10.5F,FontStyle.Bold);
         private readonly Dictionary<string,SoftwarePackage> packages=new Dictionary<string,SoftwarePackage>(), offline=new Dictionary<string,SoftwarePackage>();
         private readonly Dictionary<string,SoftwareCheck> checks=new Dictionary<string,SoftwareCheck>();
-        private readonly BrandCheckBox defaults=new BrandCheckBox(), remote=new BrandCheckBox();
+        private readonly BrandCheckBox chromeDefaults=new BrandCheckBox(), defaults=new BrandCheckBox(), remote=new BrandCheckBox();
         private readonly BrandTextBox sourceLabel;
         private readonly Label activity;
         private readonly BrandButton refresh,install,cancel,folderButton,back,associations,remove,access;
@@ -34,29 +34,30 @@ namespace ServiceTool
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
             preview=previewMode; MinimumSize=new Size(1080,920); Root.AutoScroll=true;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=new Size(0,848)}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{134F,326F,108F,100F,0F,52F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
-            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,10)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,38));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,20));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            var title=Label("Программы для рабочего места пользователя",false);title.Font=new Font("Segoe UI",15,FontStyle.Bold);heading.Controls.Add(title,0,0);
+            foreach(float height in new[]{146F,326F,148F,100F,0F,52F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
+            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,10),Padding=new Padding(12,12,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,36));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,20));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var title=Label("Программы для рабочего места пользователя",false);title.Font=new Font("Segoe UI",15,FontStyle.Bold);title.Margin=new Padding(0,0,12,0);heading.Controls.Add(title,0,0);
             var folderGroup=new BufferedLayoutPanel {Dock=DockStyle.Right,Width=520,ColumnCount=1,RowCount=2,Margin=Padding.Empty};folderGroup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folderGroup.RowStyles.Add(new RowStyle(SizeType.Absolute,24));folderGroup.RowStyles.Add(new RowStyle(SizeType.Percent,100));folderGroup.Controls.Add(Label("Папка установщиков:",true),0,0);
             sourceLabel=new BrandTextBox {Text="Папка не выбрана",ReadOnly=true,AutoSize=false,Palette=Colors};
             folderButton=Button("Выбрать папку...",false);folderButton.Click+=async delegate {if(!busy&&ChooseSource())await RefreshPackages();};
             var sourceRow=new PathPickerRow(sourceLabel,folderButton,176){Dock=DockStyle.Fill};folderGroup.Controls.Add(sourceRow,0,1);
             folderGroup.Layout+=delegate{int width=Math.Min(heading.ClientSize.Width,sourceRow.PreferredRowWidth);if(folderGroup.Width!=width)folderGroup.Width=width;};
             heading.Controls.Add(folderGroup,0,2);body.Controls.Add(heading,0,0);
-            var tableCard=new Card {Dock=DockStyle.Fill,Padding=new Padding(12,10,12,12),Margin=Padding.Empty};
+            var tableCard=new Panel {Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
             ConfigureGrid();tableCard.Controls.Add(grid);body.Controls.Add(tableCard,0,1);
             bool fitting=false;
             Action fitTable=delegate {
                 if(fitting||grid.RowCount==0)return;fitting=true;
-                try{int required=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(r=>r.Height)+tableCard.Padding.Vertical+2;if(Math.Abs(body.RowStyles[1].Height-required)>0.5F)body.RowStyles[1].Height=required;}
+                try{int required=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(r=>r.Height)+tableCard.Padding.Vertical;if(Math.Abs(body.RowStyles[1].Height-required)>0.5F)body.RowStyles[1].Height=required;}
                 finally{fitting=false;}
             };
             grid.RowHeightChanged+=delegate{fitTable();};grid.RowsAdded+=delegate{fitTable();};grid.ColumnWidthChanged+=delegate{fitTable();};tableCard.SizeChanged+=delegate{fitTable();};
-            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=new Padding(4,0,0,0),Padding=new Padding(0,16,0,16)};options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(var item in new[]{defaults,remote}) {options.RowStyles.Add(new RowStyle(SizeType.Percent,50F));item.Dock=DockStyle.Fill;item.Margin=Padding.Empty;item.Palette=Colors;}
+            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(4,0,0,0),Padding=new Padding(0,16,0,16)};options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            foreach(var item in new[]{defaults,chromeDefaults,remote}) {options.RowStyles.Add(new RowStyle(SizeType.Percent,100F/3));item.Dock=DockStyle.Fill;item.Margin=Padding.Empty;item.Palette=Colors;}
             defaults.Text="Применить ассоциации Notepad++ и 7-Zip для всех пользователей при входе";defaults.Checked=false;
             remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=false;
-            options.Controls.Add(defaults,0,0);options.Controls.Add(remote,0,1);body.Controls.Add(options,0,2);
+            chromeDefaults.Text="Сделать Chrome браузером по умолчанию для всех поддерживаемых файлов и ссылок";chromeDefaults.Checked=false;
+            options.Controls.Add(defaults,0,0);options.Controls.Add(chromeDefaults,0,1);options.Controls.Add(remote,0,2);body.Controls.Add(options,0,2);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=new Padding(0,0,0,10)};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
             install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=true;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
             refresh=Button("Проверить версии",false);refresh.Click+=async delegate{await RefreshPackages(true);};associations=Button("Ассоциации файлов",false);associations.Click+=async delegate{await ApplyDefaults();};
@@ -122,7 +123,7 @@ namespace ServiceTool
         }
         protected override void OnThemeChanged()
         {
-            foreach(var item in new[]{defaults,remote})item.Palette=Colors;journal.BackColor=Colors.Surface;journal.ForeColor=Colors.Text;
+            foreach(var item in new[]{defaults,chromeDefaults,remote})item.Palette=Colors;journal.BackColor=Colors.Surface;journal.ForeColor=Colors.Text;
             grid.BackgroundColor=Colors.Surface;grid.GridColor=Colors.Border;
             grid.DefaultCellStyle.BackColor=Colors.Surface;grid.DefaultCellStyle.ForeColor=Colors.Text;grid.DefaultCellStyle.SelectionBackColor=Colors.Selection;grid.DefaultCellStyle.SelectionForeColor=Colors.SelectionText;
             grid.ColumnHeadersDefaultCellStyle.BackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.ForeColor=Colors.Text;grid.ColumnHeadersDefaultCellStyle.SelectionBackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.SelectionForeColor=Colors.Text;
@@ -143,7 +144,7 @@ namespace ServiceTool
         private void RequestCancel(bool close){closeAfter|=close;cancelled=true;cancel.Enabled=false;if(session!=null)session.Cancel();activity.Text="Отменяем операцию…";}
         private void Lock(bool value)
         {
-            busy=value;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=defaults.Enabled=remote.Enabled=!value;cancel.Enabled=value&&!applyingDefaults;
+            busy=value;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=defaults.Enabled=chromeDefaults.Enabled=remote.Enabled=!value;cancel.Enabled=value&&!applyingDefaults;
 
             if(!value){UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
         }
@@ -240,6 +241,7 @@ namespace ServiceTool
             if(remoteUpdates.Length>0)text+="\r\n\r\nОбновление "+String.Join(" / ",remoteUpdates)+" может прервать текущий удалённый сеанс.";
             if(defaults.Checked&&(ids.Any(id=>id=="notepad"||id=="7zip")||new[]{"notepad","7zip"}.Any(id=>checks.ContainsKey(id)&&checks[id].State==LibraryState.Installed)))
                 text+="\r\n\r\nБудут применены ассоциации Notepad++ и 7-Zip. Для применения потребуется повторный вход пользователей в Windows.";
+            if(chromeDefaults.Checked&&(ids.Contains("chrome")||(checks.ContainsKey("chrome")&&checks["chrome"].State==LibraryState.Installed)))text+="\r\n\r\nChrome будет назначен для всех зарегистрированных им типов файлов и ссылок при входе пользователей. В Windows Home потребуется подтверждение в параметрах Windows.";
             if(remote.Checked&&ids.Any(id=>SoftwareCatalog.Find(id).Remote))text+="\r\n\r\nДля выбранных программ удалённого доступа будет настроен постоянный пароль.";
             return text;
         }
@@ -287,7 +289,7 @@ namespace ServiceTool
                         Log(SoftwareCatalog.Find(id).Name+": "+result.Message);bool allow=true;checks[id]=await Task.Run(()=>SoftwareDetection.Check(id,allow));UpdateRows();
                         if(result.Reboot){reboot=true;complete=false;break;}if(!LibraryPlan.Success(result.ExitCode)||result.State!=LibraryState.Installed){complete=false;break;}
                     }
-                    if(complete&&!cancelled&&!reboot&&defaults.Checked)await DefaultsCore(active);
+                    if(complete&&!cancelled&&!reboot&&(defaults.Checked||chromeDefaults.Checked))await DefaultsCore(active);
                 }
             }
             catch(OperationCanceledException){Log("Отменено. Проверь программы перед повтором");}catch(Exception ex){Log("Очередь остановлена: "+ex.Message);}
@@ -296,7 +298,7 @@ namespace ServiceTool
         }
         private async Task DefaultsCore(LibrarySession existing=null)
         {
-            var ids=new[]{"notepad","7zip"}.Where(id=>checks.ContainsKey(id)&&checks[id].State==LibraryState.Installed).ToArray();if(ids.Length==0){Log("Ассоциации не изменены: Notepad++ и 7-Zip x64 не подтверждены");return;}
+            var ids=new[]{"chrome","notepad","7zip"}.Where(id=>id=="chrome"?chromeDefaults.Checked:defaults.Checked).Where(id=>checks.ContainsKey(id)&&checks[id].State==LibraryState.Installed).ToArray();if(ids.Length==0){Log("Ассоциации не изменены: отметь нужный профиль и установи соответствующие программы x64");return;}
             applyingDefaults=true;cancel.Enabled=false;
             try
             {
@@ -304,12 +306,18 @@ namespace ServiceTool
                 if(existing!=null)result=await Task.Run(()=>existing.ExecuteSystem("software-defaults",String.Join(",",ids),"",Progress));
                 else using(var active=await Task.Run(()=>LibrarySession.Start())){session=active;result=await Task.Run(()=>active.ExecuteSystem("software-defaults",String.Join(",",ids),"",Progress));}
                 if(result.ExitCode!=0)throw new InvalidOperationException(result.Message);Log(result.Message);activity.Text=result.Message;
+                if(ids.Contains("chrome"))
+                {
+                    Log("Открываем приложения по умолчанию Windows: подтверди Chrome для текущего пользователя и проверь типы файлов и ссылок");
+                    try{System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ms-settings:defaultapps?registeredAppMachine="+Uri.EscapeDataString("Google Chrome")){UseShellExecute=true});}
+                    catch(Exception ex){Log("Не удалось открыть параметры Windows: "+ex.Message+". Открой Параметры → Приложения → Приложения по умолчанию → Google Chrome");}
+                }
             }
             finally{session=null;applyingDefaults=false;}
         }
         private async Task ApplyDefaults()
         {
-            if(busy||preview)return;if(MessageBox.Show(this,"Применить системный профиль Notepad++ и 7-Zip для пользователей компьютера? Сохраним исходные ассоциации. Для применения существующим пользователям нужен повторный вход в Windows.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(busy||preview)return;if(MessageBox.Show(this,"Применить отмеченные профили ассоциаций для пользователей компьютера? Сохраним исходные ассоциации. Для применения существующим пользователям нужен повторный вход в Windows. В Windows Home потребуется подтверждение в параметрах Windows.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             Lock(true);try{await DefaultsCore();}catch(Exception ex){Log(ex.Message);}finally{Lock(false);}
         }
         protected override void Dispose(bool disposing){base.Dispose(disposing);if(disposing)headerFont.Dispose();}
@@ -331,6 +339,7 @@ namespace ServiceTool
         internal static bool PasswordsMatch(string password,string repeated){return password!=null&&password.Length>=8&&password.Length<=128&&!password.Any(Char.IsControl)&&String.Equals(password,repeated,StringComparison.Ordinal);}
         internal SoftwareRemoteDialog(ThemePalette colors,Icon icon,string appId,bool loadSaved=true)
         {
+            NativeWindowTheme.Bind(this,()=>colors.Dark);
             id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;ClientSize=new Size(660,458);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
             var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=10};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{76,28,40,28,40,30,38,38,56,48})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,64));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));

@@ -25,6 +25,7 @@ namespace ServiceTool
         {
             SuspendLayout();
             palette = colors;
+            NativeWindowTheme.Bind(this,()=>palette.Dark);
             folders = available ?? new List<LogDateFolder>();
             today = localToday.Date;
             Text = "Сбор логов";

@@ -31,6 +31,7 @@ namespace ServiceTool
             original = profile.Clone(); original.Validate();
             this.installing = installing;
             colors = palette ?? ThemePalette.Create(false);
+            NativeWindowTheme.Bind(this,()=>colors.Dark);
             SuspendLayout();
             Text = installing ? "Установка с учётной записью" : "Настройки установки службы";
             Font = new Font("Segoe UI", 10F);
