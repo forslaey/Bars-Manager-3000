@@ -164,7 +164,7 @@ namespace ServiceTool
                         var labels = Children(form).OfType<Label>().ToArray();
                         var telnet = labels.First(l => l.Text.Contains("fiLinn")); var iis = labels.First(l => l.Text.Contains("арендаторов"));
                         Check(telnet.PointToScreen(Point.Empty).Y < iis.PointToScreen(Point.Empty).Y, "Telnet/TFTP block placed above IIS");
-                        Check(form.ClientSize.Width <= 760 * scale + 1 && form.ClientSize.Height <= 590 * scale + 1, "Components window is compact");
+                        Check(form.ClientSize.Width <= 760 * scale * form.CurrentAutoScaleDimensions.Width/96F + 1 && form.ClientSize.Height <= 590 * scale * form.CurrentAutoScaleDimensions.Width/96F + 1, "Components window is compact");
                         Check(buttons.Any(b => b.Text == "Проверить компоненты") && buttons.Count(b => b.Text.StartsWith("Установить") || b.Text.StartsWith("Удалить")) == 1, "Exactly two actions: check and install/remove");
                     }
                     if (form is ToolsDeploymentForm)

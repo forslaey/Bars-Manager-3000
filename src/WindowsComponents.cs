@@ -68,7 +68,7 @@ namespace ServiceTool
         }
         // Read both pipes concurrently: DISM/PowerShell cannot deadlock on a full error pipe.
         // Windows servicing is allowed to finish; killing TrustedInstaller is never attempted.
-        internal static LibraryInstallResult Run(string script, Action<string> progress)
+        internal static LibraryInstallResult Run(string script, Action<string> progress, bool cancellableRead=false)
         {
             // Only a small bootstrap goes on the command line. The real script
             // travels as ASCII base64 on stdin, without a temporary script file.
@@ -83,7 +83,16 @@ namespace ServiceTool
                 var output = process.StandardOutput.ReadToEndAsync(); var errors = process.StandardError.ReadToEndAsync();
                 process.StandardInput.Write(Convert.ToBase64String(Encoding.Unicode.GetBytes("[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); $ProgressPreference='SilentlyContinue'; " + script)));
                 process.StandardInput.Close();
-                while (!process.WaitForExit(1000)) progress("Windows обрабатывает запрос. Дождись завершения…");
+                while (!process.WaitForExit(cancellableRead?100:1000))
+                {
+                    if(cancellableRead&&LibraryCancellation.Requested)
+                    {
+                        try{process.Kill();}catch(InvalidOperationException){}
+                        process.WaitForExit();throw new OperationCanceledException("Проверка настроек отменена");
+                    }
+                    if(!cancellableRead)progress("Windows обрабатывает запрос. Дождись завершения…");
+                }
+                if(cancellableRead)LibraryCancellation.Check();
                 string text = output.GetAwaiter().GetResult(), error = errors.GetAwaiter().GetResult();
                 if (process.ExitCode != 0) throw new InvalidOperationException(String.IsNullOrWhiteSpace(error) ? "Ошибка Windows: " + process.ExitCode : error.Trim());
                 return new LibraryInstallResult { ExitCode = text.Contains("BARS_RESTART_REQUIRED") ? 3010 : 0, Message = text.Trim(), State = LibraryState.Unknown };

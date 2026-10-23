@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -35,7 +35,9 @@ namespace ServiceTool
                         var module=form as ManagerModuleForm;var services=form as MainForm;
                         if(module!=null)module.SetTheme(dark,false);if(services!=null)services.SetTheme(dark,false);
                         form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.ShowInTaskbar=false;
-                        form.Show();form.ClientSize=new Size(1080,1100);Application.DoEvents();form.PerformLayout();Caption(form,dark);
+                        // Compare equal usable widths above every module's minimum;
+                        // portrait/minimum-width behavior is covered separately.
+                        form.Show();form.ClientSize=new Size(2400,1800);Application.DoEvents();form.PerformLayout();Application.DoEvents();Caption(form,dark);
                         var root=Children(form).OfType<TableLayoutPanel>().First();
                         var logo=Children(form).OfType<PictureBox>().First();
                         Check(root.PointToClient(logo.PointToScreen(Point.Empty)).Y>=20,"Logo top inset: "+form.GetType().Name);
@@ -43,7 +45,7 @@ namespace ServiceTool
                         {
                             var title=Children(form).OfType<Label>().Single(l=>l.Text==names[i]);
                             var bounds=new Rectangle(root.PointToClient(title.PointToScreen(Point.Empty)),title.Size);
-                            if(expected==null)expected=bounds;else Check(bounds==expected.Value,"Common title geometry: "+form.GetType().Name+" "+bounds+" expected "+expected);
+                            if(expected==null)expected=bounds;else Check(bounds.X==expected.Value.X&&bounds.Width==expected.Value.Width,"Common horizontal title alignment with compact module heights: "+form.GetType().Name+" "+bounds+" expected "+expected);
                             Check(title.Font.SizeInPoints==15&&title.Font.Bold,"Common heading font");
                         }
                         if(form is SoftwareManagerForm)
@@ -53,7 +55,9 @@ namespace ServiceTool
                         }
                         if(module!=null){module.SetTheme(!dark,false);Caption(form,!dark);module.SetTheme(dark,false);Caption(form,dark);}
                         if(services!=null){services.SetTheme(!dark,false);Caption(form,!dark);services.SetTheme(dark,false);Caption(form,dark);}
+                        Padding beforeRecreate=root.Padding;
                         typeof(Control).GetMethod("RecreateHandle",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(form,null);
+                        Application.DoEvents();Check(root.Padding==beforeRecreate,"Recreated handle must not rescale header twice: "+form.GetType().Name);
                         Caption(form,dark);
                     }
                     var colors=ThemePalette.Create(dark);

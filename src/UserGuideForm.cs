@@ -103,7 +103,9 @@ namespace ServiceTool
     {
         private readonly BrandTextBox search = new BrandTextBox();
         private readonly GuideSectionListBox sections = new GuideSectionListBox();
-        private readonly RichTextBox reader = new RichTextBox();
+        private readonly GuideReader reader = new GuideReader();
+        private readonly GuideReaderScrollBar readerScroll=new GuideReaderScrollBar();
+        private readonly GuideSectionScrollBar sectionScroll=new GuideSectionScrollBar();
         private readonly Label results = new Label();
         private readonly BrandButton previous, next;
         private readonly List<Tuple<GuideSection, int>> hits = new List<Tuple<GuideSection, int>>();
@@ -117,24 +119,24 @@ namespace ServiceTool
             Root.RowStyles[0].Height = 72;
             var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 44)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 64)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-            var find = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, Margin = Padding.Empty };
-            find.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 225)); find.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            var find = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 2, Margin = Padding.Empty };
+            find.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); find.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             for (int i = 0; i < 3; i++) find.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
-            find.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            find.RowStyles.Add(new RowStyle(SizeType.Absolute,24));find.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             find.Controls.Add(Label("Поиск по всей инструкции", false), 0, 0);
-            search.Dock = DockStyle.Fill; search.AutoSize = false; search.Margin = new Padding(0, 4, 10, 4); search.AccessibleName = "Поиск по всей инструкции";
-            find.Controls.Add(search, 1, 0);
+            search.Dock = DockStyle.None;search.Anchor=AnchorStyles.Left|AnchorStyles.Right; search.AutoSize = true; search.Margin = new Padding(0, 0, 10, 0); search.AccessibleName = "Поиск по всей инструкции";
+            find.Controls.Add(search, 0, 1);search.Height=search.PreferredHeight;search.FontChanged+=delegate{search.Height=search.PreferredHeight;};
             previous = Button("Назад", false); next = Button("Далее", false); var clear = Button("Сбросить", false); clear.Margin = Padding.Empty;
             previous.Click += delegate { MoveHit(-1); }; next.Click += delegate { MoveHit(1); }; clear.Click += delegate { search.Clear(); search.Focus(); };
-            find.Controls.Add(previous, 2, 0); find.Controls.Add(next, 3, 0); find.Controls.Add(clear, 4, 0); body.Controls.Add(find, 0, 0);
+            find.Controls.Add(previous, 2, 1); find.Controls.Add(next, 3, 1); find.Controls.Add(clear, 4, 1); body.Controls.Add(find, 0, 0);
             results.Dock = DockStyle.Fill; results.TextAlign = ContentAlignment.MiddleLeft; results.Tag = "muted"; results.Margin = Padding.Empty; results.AccessibleName = "Результаты поиска";
             body.Controls.Add(results, 0, 1);
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 275)); content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            sections.Dock = DockStyle.Fill; sections.IntegralHeight = false; sections.BorderStyle = BorderStyle.FixedSingle; sections.Margin = new Padding(0, 0, 14, 0);
+            sections.Dock = DockStyle.Fill; sections.IntegralHeight = false; sections.BorderStyle = BorderStyle.FixedSingle; sections.Margin = Padding.Empty;
             sections.Font = new Font("Segoe UI", 10F); sections.AccessibleName = "Разделы инструкции";
             sections.DrawItem += delegate(object sender, DrawItemEventArgs e)
             {
@@ -148,11 +150,11 @@ namespace ServiceTool
                 if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
             };
             reader.Dock = DockStyle.Fill; reader.ReadOnly = true; reader.BorderStyle = BorderStyle.None; reader.Margin = Padding.Empty;
-            reader.Font = new Font("Segoe UI", 11F); reader.DetectUrls = false; reader.WordWrap = true; reader.HideSelection = false;
-            reader.ScrollBars = RichTextBoxScrollBars.Vertical; reader.AccessibleName = "Текст инструкции";
+            reader.Font = new Font("Segoe UI", 11F); reader.DetectUrls = false; reader.WordWrap = true; reader.HideSelection = true;
+            reader.ScrollBars = RichTextBoxScrollBars.None; reader.AccessibleName = "Текст инструкции";
             var readingCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(16), Margin = Padding.Empty };
-            readingCard.Controls.Add(reader);
-            content.Controls.Add(sections, 0, 0); content.Controls.Add(readingCard, 1, 0); body.Controls.Add(content, 0, 2);
+            readerScroll.Dock=DockStyle.Right;readerScroll.Width=14;readerScroll.Bind(reader);readingCard.Controls.Add(reader);readingCard.Controls.Add(readerScroll);
+            var sectionSlot=new Panel{Dock=DockStyle.Fill,Margin=new Padding(0,0,14,0)};sectionScroll.Dock=DockStyle.Right;sectionScroll.Width=14;sectionScroll.Bind(sections);sectionSlot.Controls.Add(sections);sectionSlot.Controls.Add(sectionScroll);content.Controls.Add(sectionSlot, 0, 0); content.Controls.Add(readingCard, 1, 0); body.Controls.Add(content, 0, 2);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(Label("Ctrl+F — поиск; F3 / Shift+F3 — переход к совпадению", true), 0, 0);
@@ -179,6 +181,7 @@ namespace ServiceTool
 
         private void ShowSection(bool selectFirst)
         {
+            reader.BeginFormatting();try{
             GuideSection section = sections.SelectedItem as GuideSection;
             reader.Text = section == null ? "Ничего не найдено. Сократи запрос или нажми «Сбросить»." : section.Document;
             reader.SelectAll(); reader.SelectionColor = Colors.Text; reader.SelectionBackColor = Colors.Surface;
@@ -193,6 +196,7 @@ namespace ServiceTool
             reader.Select(0, 0);
             if (selectFirst) activeHit = hits.FindIndex(hit => hit.Item1 == section);
             SelectHit();
+            }finally{reader.EndFormatting();}
         }
 
         private void MoveHit(int delta)
@@ -206,10 +210,11 @@ namespace ServiceTool
         private void SelectHit()
         {
             previous.Enabled = next.Enabled = hits.Count > 0;
-            results.Text = Query.Length == 0 ? "Выбери раздел слева или введи фразу для поиска" : hits.Count == 0 ? "Совпадений нет" :
+            ((TableLayoutPanel)results.Parent).RowStyles[1].Height=(float)((Query.Length==0?8:24)*Root.RowStyles[0].Height/72F);results.Visible=Query.Length>0;
+            results.Text = Query.Length == 0 ? "" : hits.Count == 0 ? "Совпадений нет" :
                 "Совпадение " + (activeHit + 1) + " из " + hits.Count + "; разделов: " + sections.Items.Count;
             if (activeHit >= 0 && activeHit < hits.Count)
-            { reader.Select(hits[activeHit].Item2, Query.Length); reader.ScrollToCaret(); }
+            { reader.Select(hits[activeHit].Item2, Query.Length); reader.ScrollToCaret();reader.Select(hits[activeHit].Item2,0); }
             else { reader.Select(0, 0); reader.ScrollToCaret(); }
         }
 
@@ -223,7 +228,7 @@ namespace ServiceTool
         protected override void OnThemeChanged()
         {
             if (reader == null || sections == null) return;
-            reader.BackColor = sections.BackColor = Colors.Surface; reader.ForeColor = sections.ForeColor = Colors.Text;
+            sectionScroll.Palette=Colors;sectionScroll.BackColor=Colors.Surface;readerScroll.Palette=Colors;readerScroll.BackColor=Colors.Surface;reader.BackColor = sections.BackColor = Colors.Surface; reader.ForeColor = sections.ForeColor = Colors.Text;
             if (reader.IsHandleCreated) ShowSection(false);
         }
     }

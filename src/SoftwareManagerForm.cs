@@ -12,6 +12,7 @@ namespace ServiceTool
     internal sealed class SoftwareManagerForm : ManagerModuleForm
     {
         private readonly ServiceGrid grid=new ServiceGrid();
+        private readonly LibraryGridScrollBar gridScroll=new LibraryGridScrollBar();
         private readonly HashSet<string> selection=new HashSet<string>(), selectable=new HashSet<string>();
         private readonly Font headerFont=new Font("Segoe UI",10.5F,FontStyle.Bold);
         private readonly Dictionary<string,SoftwarePackage> packages=new Dictionary<string,SoftwarePackage>(), offline=new Dictionary<string,SoftwarePackage>();
@@ -29,67 +30,80 @@ namespace ServiceTool
         private LibrarySession session;
         internal bool MenuRequested {get;private set;}
         internal SoftwareManagerForm(bool previewMode) : this(previewMode,SoftwareSources.Latest) {}
-        internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,980))
+        internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,780))
         {
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
-            preview=previewMode; MinimumSize=new Size(1080,920); Root.AutoScroll=true;
-            var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=new Size(0,848)}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{146F,326F,148F,100F,0F,52F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
-            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,10),Padding=new Padding(12,12,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,36));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,20));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
+            var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=Size.Empty}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            foreach(float height in new[]{98F,0F,80F,84F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
+            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,4),Padding=new Padding(12,8,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,36));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,2));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var title=Label("Программы для рабочего места пользователя",false);title.Font=new Font("Segoe UI",15,FontStyle.Bold);title.Margin=new Padding(0,0,12,0);heading.Controls.Add(title,0,0);
-            var folderGroup=new BufferedLayoutPanel {Dock=DockStyle.Right,Width=520,ColumnCount=1,RowCount=2,Margin=Padding.Empty};folderGroup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folderGroup.RowStyles.Add(new RowStyle(SizeType.Absolute,24));folderGroup.RowStyles.Add(new RowStyle(SizeType.Percent,100));folderGroup.Controls.Add(Label("Папка установщиков:",true),0,0);
+            var folderGroup=new BufferedLayoutPanel {Dock=DockStyle.Right,Width=520,ColumnCount=1,RowCount=2,Margin=Padding.Empty};folderGroup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folderGroup.RowStyles.Add(new RowStyle(SizeType.Absolute,18));folderGroup.RowStyles.Add(new RowStyle(SizeType.Percent,100));folderGroup.Controls.Add(Label("Папка установщиков:",true),0,0);
             sourceLabel=new BrandTextBox {Text="Папка не выбрана",ReadOnly=true,AutoSize=false,Palette=Colors};
             folderButton=Button("Выбрать папку...",false);folderButton.Click+=async delegate {if(!busy&&ChooseSource())await RefreshPackages();};
             var sourceRow=new PathPickerRow(sourceLabel,folderButton,176){Dock=DockStyle.Fill};folderGroup.Controls.Add(sourceRow,0,1);
-            folderGroup.Layout+=delegate{int width=Math.Min(heading.ClientSize.Width,sourceRow.PreferredRowWidth);if(folderGroup.Width!=width)folderGroup.Width=width;};
+            heading.Layout+=delegate{int width=Math.Min(heading.ClientSize.Width,sourceRow.PreferredRowWidth);if(folderGroup.Width!=width)folderGroup.Width=width;};
             heading.Controls.Add(folderGroup,0,2);body.Controls.Add(heading,0,0);
             var tableCard=new Panel {Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
-            ConfigureGrid();tableCard.Controls.Add(grid);body.Controls.Add(tableCard,0,1);
-            bool fitting=false;
-            Action fitTable=delegate {
-                if(fitting||grid.RowCount==0)return;fitting=true;
-                try{int required=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(r=>r.Height)+tableCard.Padding.Vertical;if(Math.Abs(body.RowStyles[1].Height-required)>0.5F)body.RowStyles[1].Height=required;}
-                finally{fitting=false;}
+            ConfigureGrid();gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.Bind(grid);tableCard.Controls.Add(grid);tableCard.Controls.Add(gridScroll);
+            tableCard.Layout+=delegate{gridScroll.Visible=grid.RowCount>0&&grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(row=>row.Height)>tableCard.ClientSize.Height;};body.Controls.Add(tableCard,0,1);
+            bool arrangingTable=false;
+            body.Layout+=delegate {
+                if(arrangingTable||grid.Rows.Count==0)return;arrangingTable=true;
+                try {
+                    int available=body.ClientSize.Height-(int)body.RowStyles[0].Height-(int)body.RowStyles[3].Height;
+                    int desired=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(row=>row.Height);
+                    int optionMinimum=(int)Math.Ceiling(84*body.RowStyles[3].Height/84F);
+                    int tableHeight=Math.Max(1,Math.Min(desired,available-optionMinimum));
+                    body.RowStyles[1].SizeType=SizeType.Absolute;body.RowStyles[1].Height=tableHeight;
+                    body.RowStyles[2].SizeType=SizeType.Percent;body.RowStyles[2].Height=100;
+                }finally{arrangingTable=false;}
             };
-            grid.RowHeightChanged+=delegate{fitTable();};grid.RowsAdded+=delegate{fitTable();};grid.ColumnWidthChanged+=delegate{fitTable();};tableCard.SizeChanged+=delegate{fitTable();};
-            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(4,0,0,0),Padding=new Padding(0,16,0,16)};options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(var item in new[]{defaults,chromeDefaults,remote}) {options.RowStyles.Add(new RowStyle(SizeType.Percent,100F/3));item.Dock=DockStyle.Fill;item.Margin=Padding.Empty;item.Palette=Colors;}
+            grid.RowHeightChanged+=delegate{body.PerformLayout();};grid.ColumnWidthChanged+=delegate{body.PerformLayout();};
+            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Margin=new Padding(4,0,0,0),Padding=new Padding(0,6,0,6)};options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            options.RowStyles.Add(new RowStyle(SizeType.Percent,50));foreach(var item in new[]{defaults,chromeDefaults,remote}) {options.RowStyles.Add(new RowStyle(SizeType.Absolute,24));item.Dock=DockStyle.Fill;item.Margin=Padding.Empty;item.Palette=Colors;}
             defaults.Text="Применить ассоциации Notepad++ и 7-Zip для всех пользователей при входе";defaults.Checked=false;
             remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=false;
-            chromeDefaults.Text="Сделать Chrome браузером по умолчанию для всех поддерживаемых файлов и ссылок";chromeDefaults.Checked=false;
-            options.Controls.Add(defaults,0,0);options.Controls.Add(chromeDefaults,0,1);options.Controls.Add(remote,0,2);body.Controls.Add(options,0,2);
+            chromeDefaults.Text="Сделать Chrome браузером по умолчанию для всех поддерживаемых файлов и ссылок";chromeDefaults.Checked=true;
+            options.RowStyles.Add(new RowStyle(SizeType.Percent,50));options.Controls.Add(chromeDefaults,0,1);options.Controls.Add(defaults,0,2);options.Controls.Add(remote,0,3);body.Controls.Add(options,0,2);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=new Padding(0,0,0,10)};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
-            install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=true;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
-            refresh=Button("Проверить версии",false);refresh.Click+=async delegate{await RefreshPackages(true);};associations=Button("Ассоциации файлов",false);associations.Click+=async delegate{await ApplyDefaults();};
-            cancel=Button("Отменить",false);cancel.Margin=Padding.Empty;cancel.Enabled=false;cancel.Click+=delegate{if(busy&&!applyingDefaults&&MessageBox.Show(this,LibraryManagerForm.CancelWarning,"Отмена",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)RequestCancel(false);};
+            install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=true;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить удалённый доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
+            refresh=Button("Проверить версии в сети",false);refresh.Click+=async delegate{await RefreshPackages(true);};associations=Button("Применить ассоциации",false);associations.Click+=async delegate{await ApplyDefaults();};
+            cancel=Button("Отменить",false);cancel.Margin=Padding.Empty;cancel.Enabled=false;cancel.Click+=delegate{if(busy&&!applyingDefaults&&BrandMessageBox.Show(this,LibraryManagerForm.CancelWarning,"Отмена",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)RequestCancel(false);};
             foreach(var button in new[]{install,remove,access})button.Margin=new Padding(button.Margin.Left,0,button.Margin.Right,6);
             actions.Controls.Add(install,0,0);actions.Controls.Add(remove,1,0);actions.Controls.Add(access,2,0);actions.Controls.Add(refresh,0,1);actions.Controls.Add(associations,1,1);actions.Controls.Add(cancel,2,1);body.Controls.Add(actions,0,3);
-            var logCard=new Card {Dock=DockStyle.Fill,Padding=new Padding(12,8,12,8),Margin=Padding.Empty};journal.Dock=DockStyle.Fill;journal.Font=new Font("Consolas",9);var scroll=new JournalScrollBar {Dock=DockStyle.Right,Width=14};scroll.Bind(journal);logCard.Controls.Add(journal);logCard.Controls.Add(scroll);body.Controls.Add(logCard,0,4);
-            var footer=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,0)};footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,150));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var logCard=JournalPanel.Create(journal,"Журнал установки программ",Colors);
+            var footer=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,0)};footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             activity=Label("Установка начнётся только по кнопке",true);activity.Font=new Font("Segoe UI",9);footer.Controls.Add(activity,0,0);
 
-            back=Button("В меню",false);back.Margin=Padding.Empty;back.Click+=delegate{MenuRequested=true;Close();};footer.Controls.Add(back,1,0);body.Controls.Add(footer,0,5);Root.Controls.Add(body,0,1);
+            back=Button("В меню",false);ModuleNavigation.Configure(back);back.Click+=delegate{MenuRequested=true;Close();};footer.Controls.Add(back,1,0);
+            // Navigation and the journal stay outside the scrolling work area.
+            // Only unusually short screens or large text require scrolling it.
+            body.RowCount=4;while(body.RowStyles.Count>4)body.RowStyles.RemoveAt(body.RowStyles.Count-1);body.MinimumSize=new Size(0,520);
+            var outer=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=Padding.Empty};outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            outer.RowStyles.Add(new RowStyle(SizeType.Percent,100));outer.RowStyles.Add(new RowStyle(SizeType.Absolute,78));outer.RowStyles.Add(new RowStyle(SizeType.Absolute,50));
+            outer.Controls.Add(new FillContentPanel(body){Margin=Padding.Empty},0,0);outer.Controls.Add(logCard,0,1);outer.Controls.Add(footer,0,2);Root.Controls.Add(outer,0,1);
             try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){Log(ex.Message);}
             SetTheme(Colors.Dark,false);
             UpdateRows();
-            Shown+=async delegate {if(preview)FillPreview();else await RefreshPackages();};
+            Shown+=async delegate {grid.PerformLayout();grid.AutoResizeRows(DataGridViewAutoSizeRowsMode.AllCells);if(preview)FillPreview();else await RefreshPackages();grid.PerformLayout();body.PerformLayout();};
             FormClosing+=delegate(object sender,FormClosingEventArgs e)
             {
-                if(!busy)return;e.Cancel=true;
-                if(applyingDefaults){MenuRequested=false;MessageBox.Show(this,"Дождись завершения применения системного профиля",Text);return;}
+                if(!busy)return;if(checking){cancelled=true;if(session!=null)session.Cancel();return;}e.Cancel=true;
+                if(applyingDefaults){MenuRequested=false;BrandMessageBox.Show(this,"Дождись завершения применения системного профиля",Text);return;}
                 if(cancelled){closeAfter=true;return;}
-                if(checking || MessageBox.Show(this,LibraryManagerForm.CancelWarning+"\r\n\r\nЗакрыть менеджер после отмены?","Завершение работы",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)RequestCancel(true);else MenuRequested=false;
+                if(checking || BrandMessageBox.Show(this,LibraryManagerForm.CancelWarning+"\r\n\r\nЗакрыть менеджер после отмены?","Завершение работы",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)RequestCancel(true);else MenuRequested=false;
             };
         }
         private void ConfigureGrid()
         {
             grid.Dock=DockStyle.Fill;grid.Margin=Padding.Empty;grid.BorderStyle=BorderStyle.None;
             grid.AllowUserToAddRows=grid.AllowUserToDeleteRows=grid.AllowUserToResizeRows=grid.AllowUserToResizeColumns=grid.AllowUserToOrderColumns=false;
-            grid.ReadOnly=true;grid.RowHeadersVisible=false;grid.MultiSelect=false;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;
+            grid.ReadOnly=true;grid.TouchScrollingEnabled=true;grid.RowHeadersVisible=false;grid.MultiSelect=false;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;
             grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.AllCells;
-            grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=56;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=44;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             grid.ColumnHeadersDefaultCellStyle.Font=headerFont;grid.ColumnHeadersDefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;
-            grid.DefaultCellStyle.Padding=new Padding(6);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
+            grid.DefaultCellStyle.Font=new Font("Segoe UI",9.5F);grid.DefaultCellStyle.Padding=new Padding(4);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
             grid.CellBorderStyle=DataGridViewCellBorderStyle.Single;grid.ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.Single;grid.ScrollBars=ScrollBars.None;
             grid.Columns.Add(new DataGridViewCheckBoxColumn {Name="Selected",HeaderText="",Width=46,MinimumWidth=46,AutoSizeMode=DataGridViewAutoSizeColumnMode.None});
             string[] names={"Программа","В системе","Доступно / источник"};int[] weights={24,20,56};
@@ -124,7 +138,7 @@ namespace ServiceTool
         protected override void OnThemeChanged()
         {
             foreach(var item in new[]{defaults,chromeDefaults,remote})item.Palette=Colors;journal.BackColor=Colors.Surface;journal.ForeColor=Colors.Text;
-            grid.BackgroundColor=Colors.Surface;grid.GridColor=Colors.Border;
+            gridScroll.Palette=Colors;gridScroll.BackColor=Colors.Canvas;grid.BackgroundColor=Colors.Canvas;grid.GridColor=Colors.Border;
             grid.DefaultCellStyle.BackColor=Colors.Surface;grid.DefaultCellStyle.ForeColor=Colors.Text;grid.DefaultCellStyle.SelectionBackColor=Colors.Selection;grid.DefaultCellStyle.SelectionForeColor=Colors.SelectionText;
             grid.ColumnHeadersDefaultCellStyle.BackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.ForeColor=Colors.Text;grid.ColumnHeadersDefaultCellStyle.SelectionBackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.SelectionForeColor=Colors.Text;
             grid.Invalidate();
@@ -146,7 +160,8 @@ namespace ServiceTool
         {
             busy=value;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=defaults.Enabled=chromeDefaults.Enabled=remote.Enabled=!value;cancel.Enabled=value&&!applyingDefaults;
 
-            if(!value){UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
+            back.Enabled=!value||checking;
+            if(!value&&!IsDisposed){UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
         }
         private async Task RefreshPackages(bool resolveUnknownVersion=false)
         {
@@ -155,32 +170,32 @@ namespace ServiceTool
             {
                 offline.Clear();packages.Clear();checks.Clear();selection.Clear();UpdateRows();
                 var installed=await Task.Run(()=>SoftwareCatalog.Apps.Select(app=>SoftwareDetection.Check(app.Id,allowAny)).ToArray());
-                foreach(var check in installed)checks[check.Id]=check;
+                if(cancelled||IsDisposed)return;foreach(var check in installed)checks[check.Id]=check;
                 UpdateRows();
                 if(checks.Values.Any(c=>c.State==LibraryState.Unknown && c.Detail.Contains("доступ")))
                 {
                     Progress("Уточняем регистрацию с правами администратора");
-                    using(var elevated=await Task.Run(()=>LibrarySession.Start(()=>cancelled))){session=elevated;var snapshot=await Task.Run(()=>elevated.ExecuteSystem("software-query",allowAny?"allow-anydesk32":"x64-only","",Progress));if(snapshot.ExitCode!=0)throw new InvalidOperationException(snapshot.Message);foreach(var check in SoftwareDetection.ParseQuery(snapshot.Message))checks[check.Id]=check;session=null;}
+                    using(var elevated=await Task.Run(()=>LibrarySession.Start(()=>cancelled))){session=elevated;var snapshot=await Task.Run(()=>elevated.ExecuteSystem("software-query",allowAny?"allow-anydesk32":"x64-only","",Progress));if(snapshot.ExitCode!=0)throw new InvalidOperationException(snapshot.Message);if(cancelled||IsDisposed)return;foreach(var check in SoftwareDetection.ParseQuery(snapshot.Message))checks[check.Id]=check;session=null;}
                 }
                 var local=await Task.Run(()=>{LibraryCancellation.Current=()=>cancelled; try {var list=SoftwareCatalog.Local(source,Progress,"Локальный _soft",resolveUnknownVersion);if(Directory.Exists(SoftwareSources.CacheFolder))foreach(string folder in Directory.GetDirectories(SoftwareSources.CacheFolder))list.AddRange(SoftwareCatalog.Local(folder,Progress,"Кэш менеджера",resolveUnknownVersion));return list;} finally {LibraryCancellation.Current=null;}});
-                foreach(var app in SoftwareCatalog.Apps){var candidate=SoftwareSources.Best(local,app.Id);if(candidate!=null){offline[app.Id]=candidate;packages[app.Id]=candidate;}}
+                if(cancelled||IsDisposed)return;foreach(var app in SoftwareCatalog.Apps){var candidate=SoftwareSources.Best(local,app.Id);if(candidate!=null){offline[app.Id]=candidate;packages[app.Id]=candidate;}}
                 UpdateRows();
                 var updates=resolveUnknownVersion ? await Task.WhenAll(SoftwareCatalog.Apps.Select(app=>Task.Run(()=>
                 {
                     LibraryCancellation.Current=()=>cancelled;
                     try{return latestSource(app.Id);}catch(Exception ex){Progress(app.Name+": официальный источник недоступен. "+ex.Message);return null;}finally{LibraryCancellation.Current=null;}
                 }))) : new SoftwarePackage[0];
-                foreach(var candidate in updates.Where(p=>p!=null)){SoftwarePackage old;if(!packages.TryGetValue(candidate.Id,out old)||SoftwareCatalog.Compare(candidate.Version,old.Version)>=0)packages[candidate.Id]=candidate;}
+                if(cancelled||IsDisposed)return;foreach(var candidate in updates.Where(p=>p!=null)){SoftwarePackage old;if(!packages.TryGetValue(candidate.Id,out old)||SoftwareCatalog.Compare(candidate.Version,old.Version)>=0)packages[candidate.Id]=candidate;}
                 if(cancelled)throw new OperationCanceledException();
                 selection.Clear();foreach(var app in SoftwareCatalog.Apps){if(packages.ContainsKey(app.Id)&&(checks[app.Id].State==LibraryState.Missing || checks[app.Id].State==LibraryState.Installed && packages[app.Id].Version!="0.0" && SoftwareCatalog.Compare(packages[app.Id].Version,checks[app.Id].Version)>0))selection.Add(app.Id);}
                 Log("Проверка завершена. Если официальный интернет-источник недоступен, предлагается установка проверенной локальной копии программ.");activity.Text="Выбери программы и проверь источник установщиков";
             }
-            catch(OperationCanceledException){Log("Проверка отменена");}catch(Exception ex){Log("Проверка не завершена: "+ex.Message);}
-            finally{checking=false;Lock(false);}
+            catch(OperationCanceledException){if(!IsDisposed)Log("Проверка отменена");}catch(Exception ex){if(!IsDisposed)Log("Проверка не завершена: "+ex.Message);}
+            finally{checking=false;if(!IsDisposed)Lock(false);}
         }
         private void UpdateRows()
         {
-            if(grid.Rows.Count==0)foreach(var app in SoftwareCatalog.Apps){int index=grid.Rows.Add(false,app.Name,"Не проверено","");grid.Rows[index].Tag=app.Id;grid.Rows[index].MinimumHeight=60;}
+            if(grid.Rows.Count==0)foreach(var app in SoftwareCatalog.Apps){int index=grid.Rows.Add(false,app.Name,"Не проверено","");grid.Rows[index].Tag=app.Id;grid.Rows[index].MinimumHeight=44;}
             selectable.Clear();
             foreach(DataGridViewRow row in grid.Rows)
             {
@@ -217,7 +232,7 @@ namespace ServiceTool
         private async Task RemoveSelected()
         {
             if(busy||preview)return;string[] ids=ChosenInstalled();if(ids.Length==0)return;
-            if(MessageBox.Show(this,"Удалить программы и их настройки?\r\n"+String.Join("\r\n",ids.Select(id=>SoftwareCatalog.Find(id).Name))+"\r\n\r\nНастройки текущего пользователя и общие настройки будут очищены. Параметры удалённого доступа и ID могут сброситься. Текущий удалённый сеанс может прерваться. Документы не удаляются.","Удаление программ",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(BrandMessageBox.Show(this,"Удалить программы и их настройки?\r\n"+String.Join("\r\n",ids.Select(id=>SoftwareCatalog.Find(id).Name))+"\r\n\r\nНастройки текущего пользователя и общие настройки будут очищены. Параметры удалённого доступа и ID могут сброситься. Текущий удалённый сеанс может прерваться. Документы не удаляются.","Удаление программ",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             cancelled=false;Lock(true);bool reboot=false;
             try
             {
@@ -251,7 +266,7 @@ namespace ServiceTool
             if(String.IsNullOrWhiteSpace(source)&&ids.Any(id=>!Path.IsPathRooted(packages[id].File)||!File.Exists(packages[id].File))&&!ChooseSource())return;
             var secrets=new Dictionary<string,string>();
             if(remote.Checked)foreach(string id in ids.Where(id=>SoftwareCatalog.Find(id).Remote))using(var dialog=new SoftwareRemoteDialog(Colors,Icon,id)) {if(dialog.ShowDialog(this)!=DialogResult.OK)return;secrets[id]=dialog.Password;}
-            if(MessageBox.Show(this,InstallConfirmation(ids),Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(BrandMessageBox.Show(this,InstallConfirmation(ids),Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             cancelled=false;Lock(true);bool reboot=false;
             var ready=new List<SoftwarePackage>();
             try
@@ -271,7 +286,7 @@ namespace ServiceTool
                         {
                             SoftwarePackage fallback;if(!offline.TryGetValue(id,out fallback))throw new IOException(SoftwareCatalog.Find(id).Name+": загрузка не удалась, проверенного локального пакета нет. "+ex.Message);
                             Log(SoftwareCatalog.Find(id).Name+": загрузка не удалась. Локальный пакет "+fallback.Version);
-                            if(MessageBox.Show(this,"Использовать локальный "+SoftwareCatalog.Find(id).Name+" "+fallback.Version+" вместо сетевого пакета?",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)throw new OperationCanceledException();package=fallback;
+                            if(BrandMessageBox.Show(this,"Использовать локальный "+SoftwareCatalog.Find(id).Name+" "+fallback.Version+" вместо сетевого пакета?",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)throw new OperationCanceledException();package=fallback;
                         }
                     }
                     SoftwareCatalog.Validate(package,true);
@@ -317,7 +332,7 @@ namespace ServiceTool
         }
         private async Task ApplyDefaults()
         {
-            if(busy||preview)return;if(MessageBox.Show(this,"Применить отмеченные профили ассоциаций для пользователей компьютера? Сохраним исходные ассоциации. Для применения существующим пользователям нужен повторный вход в Windows. В Windows Home потребуется подтверждение в параметрах Windows.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(busy||preview)return;if(BrandMessageBox.Show(this,"Применить отмеченные профили ассоциаций для пользователей компьютера? Сохраним исходные ассоциации. Для применения существующим пользователям нужен повторный вход в Windows. В Windows Home потребуется подтверждение в параметрах Windows.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             Lock(true);try{await DefaultsCore();}catch(Exception ex){Log(ex.Message);}finally{Lock(false);}
         }
         protected override void Dispose(bool disposing){base.Dispose(disposing);if(disposing)headerFont.Dispose();}
@@ -340,27 +355,31 @@ namespace ServiceTool
         internal SoftwareRemoteDialog(ThemePalette colors,Icon icon,string appId,bool loadSaved=true)
         {
             NativeWindowTheme.Bind(this,()=>colors.Dark);
-            id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.Dpi;ClientSize=new Size(660,458);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
-            var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=10};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{76,28,40,28,40,30,38,38,56,48})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
+            SuspendLayout();id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(660,460);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
+            var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=11};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{70,24,38,24,38,24,26,36,36,64,44})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,64));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             heading.Controls.Add(new Label {Text="Постоянный пароль для "+SoftwareCatalog.Find(id).Name+"\r\nПодключение без подтверждения на этом компьютере",Dock=DockStyle.Fill,ForeColor=colors.Text,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,0);
             logo=BrandAssets.LoadSoftwareIcon(id);heading.Controls.Add(new PictureBox {Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Dock=DockStyle.Fill,Margin=new Padding(8,8,0,8)},1,0);layout.Controls.Add(heading,0,0);
-            layout.Controls.Add(new Label {Text="Пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty},0,1);layout.Controls.Add(new Label {Text="Подтверди пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty},0,3);
+            layout.Controls.Add(new Label {Text="Пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty,TextAlign=ContentAlignment.BottomLeft,Padding=new Padding(0,0,0,2)},0,1);layout.Controls.Add(new Label {Text="Подтверди пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty,TextAlign=ContentAlignment.BottomLeft,Padding=new Padding(0,0,0,2)},0,3);
             foreach(var box in new[]{input,confirmation}){box.Dock=DockStyle.Fill;box.UseSystemPasswordChar=true;box.MaxLength=128;box.Palette=colors;box.BackColor=colors.SurfaceAlt;box.ForeColor=colors.Text;box.Margin=new Padding(0,0,0,4);}
             layout.Controls.Add(PasswordRow(input,colors),0,2);layout.Controls.Add(PasswordRow(confirmation,colors),0,4);
-            validation=new Label {Text="От 8 до 128 символов",Dock=DockStyle.Fill,ForeColor=colors.Muted,Margin=Padding.Empty,Font=new Font("Segoe UI",9)};layout.Controls.Add(validation,0,5);
-            remember.Text="Запомнить на этом компьютере для моей учётной записи";remember.Dock=DockStyle.Fill;remember.Palette=colors;remember.Margin=Padding.Empty;layout.Controls.Add(remember,0,7);
-            standard.Text="Использовать стандартный пароль BARS";standard.Dock=DockStyle.Fill;standard.Palette=colors;standard.Margin=Padding.Empty;layout.Controls.Add(standard,0,6);
+            var languageRow=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
+            languageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int width in new[]{10,40,28})languageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,width));languageRow.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var language=new Label{Name="keyboardLanguage",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleRight,ForeColor=colors.Dark?colors.Warning:Color.FromArgb(190,35,35),Font=new Font("Segoe UI",10F,FontStyle.Bold),Margin=Padding.Empty};languages.Add(language);languageRow.Controls.Add(language,0,0);layout.Controls.Add(languageRow,0,5);
+            validation=new Label {Text="От 8 до 128 символов",Dock=DockStyle.Fill,ForeColor=colors.Muted,Margin=Padding.Empty,Font=new Font("Segoe UI",9)};layout.Controls.Add(validation,0,6);
+            remember.Text="Запомнить на этом компьютере для моей учётной записи";remember.Dock=DockStyle.Fill;remember.Palette=colors;remember.Margin=Padding.Empty;layout.Controls.Add(remember,0,8);
+            standard.Text="Использовать стандартный пароль BARS";standard.Dock=DockStyle.Fill;standard.Palette=colors;standard.Margin=Padding.Empty;layout.Controls.Add(standard,0,7);
             standard.CheckedChanged+=delegate{if(standard.Checked){customPassword=input.Text;customConfirmation=confirmation.Text;input.Text=confirmation.Text="Dk3651340";}else{input.Text=customPassword;confirmation.Text=customConfirmation;}input.Enabled=confirmation.Enabled=!standard.Checked;input.UseSystemPasswordChar=confirmation.UseSystemPasswordChar=true;foreach(var eye in eyes){eye.Enabled=!standard.Checked;eye.Revealed=false;eye.AccessibleName="Показать пароль";eye.Invalidate();}};
-            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,ForeColor=colors.Muted,Font=new Font("Segoe UI",9),Margin=Padding.Empty},0,8);
+            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,Name="passwordNotice",TextAlign=ContentAlignment.MiddleCenter,ForeColor=colors.Dark?colors.Warning:Color.FromArgb(190,35,35),Font=new Font("Segoe UI",9),Margin=new Padding(0,12,0,4)},0,9);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var cancel=new BrandButton {Text="Отмена",Palette=colors,Dock=DockStyle.Fill,DialogResult=DialogResult.Cancel,Margin=new Padding(0,0,10,0)};actions.Controls.Add(cancel,0,0);
             ok=new BrandButton {Text="Продолжить",Palette=colors,Primary=true,Dock=DockStyle.Fill,Margin=Padding.Empty,Enabled=false};
             Action validate=delegate{ok.Enabled=PasswordsMatch(input.Text,confirmation.Text);validation.Text=input.Text.Length<8?"Введи не менее 8 символов":!String.Equals(input.Text,confirmation.Text,StringComparison.Ordinal)?"Пароли не совпадают":"Пароли совпадают";};input.TextChanged+=delegate{validate();};confirmation.TextChanged+=delegate{validate();};
             ok.Click+=delegate{if(!PasswordsMatch(input.Text,confirmation.Text))return;try{if(remember.Checked)SoftwarePasswordStore.Save(id,input.Text);else SoftwarePasswordStore.Forget(id);DialogResult=DialogResult.OK;}catch(Exception){validation.Text="Не удалось сохранить пароль: отключи запоминание и повтори";}};
-            actions.Controls.Add(ok,1,0);layout.Controls.Add(actions,0,9);Controls.Add(layout);CancelButton=cancel;AcceptButton=ok;
+            actions.Controls.Add(ok,1,0);layout.Controls.Add(actions,0,10);Controls.Add(layout);CancelButton=cancel;AcceptButton=ok;
             keyboardTips.IsBalloon=true;keyboardTips.ToolTipIcon=ToolTipIcon.Warning;keyboardTips.ToolTipTitle="Caps Lock включён";keyboardTimer.Interval=200;keyboardTimer.Tick+=delegate{UpdateKeyboard();};Shown+=delegate{keyboardTimer.Start();UpdateKeyboard();};InputLanguageChanged+=delegate{UpdateKeyboard();};
             if(loadSaved)try{input.Text=SoftwarePasswordStore.Load(id);remember.Checked=input.Text.Length>0;}catch(Exception){}
+            AutoScaleMode=AutoScaleMode.Dpi;ResumeLayout(true);
         }
         private readonly List<PasswordEyeButton> eyes=new List<PasswordEyeButton>();
         private readonly List<Label> languages=new List<Label>(),caps=new List<Label>();
@@ -368,10 +387,9 @@ namespace ServiceTool
         private Control PasswordRow(BrandTextBox box,ThemePalette colors)
         {
             var row=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
-            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,40));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,50));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,28));row.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,10));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,40));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,28));row.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             box.Anchor=AnchorStyles.Left|AnchorStyles.Right;box.Dock=DockStyle.None;row.Controls.Add(box,0,0);
-            var eye=new PasswordEyeButton{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,4),Palette=colors};eyes.Add(eye);eye.Click+=delegate{eye.Revealed=!eye.Revealed;box.UseSystemPasswordChar=!eye.Revealed;eye.AccessibleName=eye.Revealed?"Скрыть пароль":"Показать пароль";eye.Invalidate();box.Focus();};row.Controls.Add(eye,1,0);
-            var language=new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,ForeColor=colors.Muted,Margin=Padding.Empty};languages.Add(language);row.Controls.Add(language,2,0);
+            var eye=new PasswordEyeButton{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,4),Palette=colors};eyes.Add(eye);eye.Click+=delegate{eye.Revealed=!eye.Revealed;box.UseSystemPasswordChar=!eye.Revealed;eye.AccessibleName=eye.Revealed?"Скрыть пароль":"Показать пароль";eye.Invalidate();box.Focus();};row.Controls.Add(eye,2,0);
             var warning=new Label{Dock=DockStyle.Fill,Text="⚠",Font=new Font("Segoe UI Symbol",13),ForeColor=Color.Goldenrod,TextAlign=ContentAlignment.MiddleCenter,Margin=Padding.Empty,Visible=false};caps.Add(warning);keyboardTips.SetToolTip(warning,"Caps Lock включён. Проверь регистр букв пароля.");row.Controls.Add(warning,3,0);
             box.Enter+=delegate{capsWasOn=false;UpdateKeyboard();};return row;
         }

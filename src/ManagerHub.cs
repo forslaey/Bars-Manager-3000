@@ -13,17 +13,21 @@ namespace ServiceTool
         private readonly PictureBox logo = new PictureBox();
         private readonly ThemeToggleButton theme = new ThemeToggleButton();
         private readonly Image lightLogo, darkLogo;
+        private bool initialScaleApplied;
         private readonly ToolTip tips = new ToolTip();
         protected ManagerModuleForm(string title, Size size)
         {
-            AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.Dpi;
+            // Do not let Font/ClientSize trigger DPI scaling before the derived
+            // module has added its controls, otherwise only the base header scales.
+            SuspendLayout();
+            AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.None;
             Font = new Font("Segoe UI", 10F); Text = title; ClientSize = size;
             MinimumSize = new Size(860, 620); StartPosition = FormStartPosition.CenterScreen;
             DoubleBuffered = true; Icon = BrandAssets.LoadIcon();
             Colors = ThemePalette.Create(ThemePreference.LoadDark());
             NativeWindowTheme.Bind(this,()=>Colors.Dark);
             lightLogo = BrandAssets.LoadLogo(false); darkLogo = BrandAssets.LoadLogo(true);
-            Root = new BufferedLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(26, 12, 26, 12), ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
+            Root = new BufferedLayoutPanel { Size = size, Dock = DockStyle.Fill, Padding = new Padding(26, 12, 26, 12), ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
             Root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96)); Root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Controls.Add(Root);
@@ -35,6 +39,33 @@ namespace ServiceTool
             header.Controls.Add(logo, 1, 0);
             theme.Size = new Size(86, 40); theme.Anchor = AnchorStyles.None; theme.AccessibleName = "Сменить тему";
             theme.Click += delegate { SetTheme(!Colors.Dark, true); }; header.Controls.Add(theme, 2, 0); Root.Controls.Add(header, 0, 0);
+        }
+        protected override void OnLoad(EventArgs e)
+        {
+            if(!initialScaleApplied)
+            {
+                initialScaleApplied=true;
+                AutoScaleMode=AutoScaleMode.Dpi;
+                AutoScaleDimensions=new SizeF(96,96);
+                PerformAutoScale();
+                ResumeLayout(true);
+                if(Root.AutoScroll&&Root.Parent==this)
+                {
+                    // A Dock.Fill body with a minimum height does not reliably
+                    // create scrollbars in TableLayoutPanel.AutoScroll.
+                    Control body=Root.GetControlFromPosition(0,1);
+                    if(body!=null&&body.MinimumSize.Height>0)
+                    {
+                        Root.AutoScroll=false;
+                        Root.MinimumSize=new Size(Root.MinimumSize.Width,body.MinimumSize.Height+Root.Padding.Vertical+(int)Math.Ceiling(Root.RowStyles[0].Height));
+                        Controls.Remove(Root);Controls.Add(new FillContentPanel(Root));
+                    }
+                }
+                Rectangle area=Screen.FromControl(this).WorkingArea;
+                MinimumSize=new Size(Math.Min(MinimumSize.Width,area.Width),Math.Min(MinimumSize.Height,area.Height));
+                if(WindowState==FormWindowState.Normal)Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));
+            }
+            base.OnLoad(e);
         }
         protected void LimitContent(Size maximum)
         {
@@ -76,7 +107,8 @@ namespace ServiceTool
         public ManagerHub() : base("BARS Manager 3000", new Size(900, 770))
         {
             MinimumSize = new Size(860, 740); ClientSize = new Size(900, 770);
-            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 60;
+            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 84;
+            var launcherHeader=(TableLayoutPanel)Root.GetControlFromPosition(0,0);launcherHeader.Padding=new Padding(0,18,0,0);
             Root.AutoScroll=true;
             // Four modules in an even 2x2 grid, plus a full-width settings card.
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty, MinimumSize=new Size(0,650) };

@@ -65,7 +65,7 @@ namespace ServiceTool
             if(matches.Count==0)throw new InvalidDataException("В официальном списке выпусков не найдена стабильная версия AnyDesk для Windows");
             string version=matches[0].Groups[1].Value;
             foreach(Match match in matches)if(SoftwareCatalog.Compare(match.Groups[1].Value,version)>0)version=match.Groups[1].Value;
-            return new SoftwarePackage{Id="anydesk",Architecture="x86",Version=version,File="AnyDesk.exe",Url="https://download.anydesk.com/AnyDesk.exe",Source="Официальный AnyDesk для Windows",Sha256=""};
+            return new SoftwarePackage{Id="anydesk",Architecture="x86",Version=version,File="AnyDesk.exe",Url="https://download.anydesk.com/AnyDesk.exe",Source="Релиз на официальном сайте AnyDesk",Sha256=""};
         }
         internal static SoftwarePackage ParseGitHub(string id, string json)
         {
@@ -101,7 +101,7 @@ namespace ServiceTool
             var matches=Regex.Matches(html,@"https://storage\.rudesktop\.ru/download/rudesktop-(\d+(?:\.\d+){1,3})-x64\.msi",RegexOptions.IgnoreCase);
             if (matches.Count==0) throw new InvalidDataException("На официальной странице не найден MSI x64");
             Match selected=matches[0]; foreach (Match match in matches) if (SoftwareCatalog.Compare(match.Groups[1].Value,selected.Groups[1].Value)>0) selected=match;
-            return new SoftwarePackage { Id="rudesktop", Version=selected.Groups[1].Value, Architecture="x64", File=Path.GetFileName(new Uri(selected.Value).AbsolutePath), Url=selected.Value, Source="Официальный сайт RuDesktop", Sha256="" };
+            return new SoftwarePackage { Id="rudesktop", Version=selected.Groups[1].Value, Architecture="x64", File=Path.GetFileName(new Uri(selected.Value).AbsolutePath), Url=selected.Value, Source="Релиз на официальном сайте RuDesktop", Sha256="" };
         }
         internal static SoftwarePackage ParseChrome(string json)
         {
@@ -110,7 +110,7 @@ namespace ServiceTool
             var versions=value as object[]; if(versions==null||versions.Length==0)throw new InvalidDataException("Не найдена стабильная версия Chrome");
             string selected=null;
             foreach(var item in versions){var entry=item as Dictionary<string,object>;object raw;Version v;if(entry==null||!entry.TryGetValue("version",out raw)||!Version.TryParse(Convert.ToString(raw),out v)||v.Revision<0)throw new InvalidDataException("Некорректная версия Chrome");string version=Convert.ToString(raw);if(selected==null||SoftwareCatalog.Compare(version,selected)>0)selected=version;}
-            return new SoftwarePackage{Id="chrome",Version=selected,Architecture="x64",File="googlechromestandaloneenterprise64.msi",Url="https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",Source="Google · официальный автономный установщик",Sha256=""};
+            return new SoftwarePackage{Id="chrome",Version=selected,Architecture="x64",File="googlechromestandaloneenterprise64.msi",Url="https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",Source="Релиз на официальном сайте Google Chrome",Sha256=""};
         }
         internal static SoftwarePackage Latest(string id)
         {

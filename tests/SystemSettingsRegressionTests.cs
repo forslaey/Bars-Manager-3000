@@ -36,9 +36,9 @@ namespace ServiceTool
                         var cell=grid.GetCellDisplayRectangle(0,grid.FirstDisplayedScrollingRowIndex,false);var point=new Point(cell.Left+20,cell.Top+20);
                         grid.TouchPan(point,true,false);grid.TouchPan(new Point(point.X,point.Y-500),false,true);Check(grid.FirstDisplayedScrollingRowIndex>=0,"Swipe remains valid after resize");
                     }
-                    for(int row=0;row<6;row++){grid.CurrentCell=grid.Rows[row].Cells[0];Application.DoEvents();Check(Field<BrandButton>(form,"applyButton").Enabled,"Selected setting has action");Check(Field<BrandButton>(form,"standardButton").Text==(row==5?"Проверить папки":row==3?"Включить защиту":row==2?"Включить все профили":"Стандарт Windows"),"Secondary action matches selected row");}
+                    for(int row=0;row<6;row++){grid.CurrentCell=grid.Rows[row].Cells[0];Application.DoEvents();Check(Field<BrandButton>(form,"applyButton").Enabled,"Selected setting has action");Check(Field<BrandButton>(form,"standardButton").Text==(row==5?"Проверить папки":row==3?"Включить защиту":row==2?"Включить все профили":"Вернуть стандартные политики"),"Secondary action matches selected row");}
                     Call(form,"ShowState","admin.EnableLUA=0\r\nfirewall.Domain=True\r\nfirewall.Private=False\r\nfirewall.Public=True\r\ndefender.Error=Недоступен\r\nsmartscreen.Mode=Включён");
-                    Check(Convert.ToString(grid.Rows[1].Cells[2].Value).Contains("отключён"),"UAC state updated in grid");Check(Convert.ToString(grid.Rows[3].Cells[2].Value).Contains("не выполнена"),"Query error not reported as disabled");
+                    Check(Convert.ToString(grid.Rows[1].Cells[2].Value).Contains("Отключено"),"UAC state updated in grid");Check(Convert.ToString(grid.Rows[3].Cells[2].Value).Contains("не выполнена"),"Query error not reported as disabled");
                     Call(form,"Lock",true);Check(!Field<BrandButton>(form,"applyButton").Enabled&&!Field<BrandButton>(form,"refresh").Enabled,"Busy blocks actions");Call(form,"Lock",false);
                     using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"settings-grid-"+dark+".png"));}
                     form.Close();

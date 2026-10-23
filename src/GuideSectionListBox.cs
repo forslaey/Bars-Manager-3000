@@ -8,6 +8,16 @@ namespace ServiceTool
     internal sealed class GuideSectionListBox : ListBox
     {
         private bool measuring;
+        private bool hidingScroll;
+        internal event EventHandler ViewportChanged;
+        [DllImport("user32.dll")] private static extern bool ShowScrollBar(IntPtr handle,int bar,bool show);
+        protected override void WndProc(ref Message message)
+        {
+            base.WndProc(ref message);
+            if(message.Msg==0x02E0||message.Msg==0x02E3)RefreshHeights();
+            if(IsHandleCreated&&!hidingScroll&&(message.Msg==0xF||message.Msg==5||message.Msg==0x20A||message.Msg==0x115||message.Msg==0x180||message.Msg==0x186))
+            {hidingScroll=true;try{ShowScrollBar(Handle,1,false);}finally{hidingScroll=false;}if(ViewportChanged!=null)ViewportChanged(this,EventArgs.Empty);}
+        }
         private const int SetItemHeight=0x01A0;
         internal const TextFormatFlags TitleFlags=TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix|TextFormatFlags.NoPadding;
         [DllImport("user32.dll",CharSet=CharSet.Auto)]
@@ -49,10 +59,5 @@ namespace ServiceTool
         protected override void OnFontChanged(EventArgs e){base.OnFontChanged(e);RefreshHeights();}
         protected override void OnSizeChanged(EventArgs e){base.OnSizeChanged(e);RefreshHeights();}
         protected override void ScaleControl(SizeF factor,BoundsSpecified specified){base.ScaleControl(factor,specified);RefreshHeights();}
-        protected override void WndProc(ref Message message)
-        {
-            base.WndProc(ref message);
-            if(message.Msg==0x02E0||message.Msg==0x02E3)RefreshHeights();
-        }
     }
 }

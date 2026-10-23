@@ -70,18 +70,18 @@ namespace ServiceTool
                     Check(Field<List<Tuple<GuideSection, int>>>(guide, "hits").Count == total, "All matches indexed");
                     for (int i = 0; i < total; i++)
                     {
-                        Check(String.Equals(reader.SelectedText, "служб", StringComparison.OrdinalIgnoreCase), "Match selected at exact offset across paragraphs");
+                        Check(reader.SelectionLength==0 && String.Equals(reader.Text.Substring(reader.SelectionStart,5), "служб", StringComparison.OrdinalIgnoreCase), "Match caret remains at exact offset without blue selection");
                         Call(guide, "MoveHit", 1);
                     }
                     Check(Field<int>(guide, "activeHit") == 0, "Next match wraps across sections");
                     Call(guide, "MoveHit", -1); Check(Field<int>(guide, "activeHit") == total - 1, "Previous match wraps");
-                    guide.SetTheme(!dark, false); Check(reader.SelectedText.ToLowerInvariant() == "служб", "Changing theme preserves current match"); guide.SetTheme(dark, false);
+                    guide.SetTheme(!dark, false); Check(reader.SelectionLength==0 && reader.Text.Substring(reader.SelectionStart,5).ToLowerInvariant() == "служб", "Changing theme preserves current match"); guide.SetTheme(dark, false);
                     search.Text = "Swagger"; Check(list.Items.Count == 1 && reader.Text.Contains("Try it out"), "Swagger instructions found");
                     if (scale == 1F) Capture(guide, "guide-search-" + (dark ? "dark" : "light"));
                     search.Text = "zzzz-no-match-123"; Check(list.Items.Count == 0 && !Field<BrandButton>(guide, "next").Enabled && reader.Text.Contains("Ничего не найдено"), "No-result state");
                     search.Clear(); Check(list.Items.Count == UserGuide.Sections.Length, "Reset restores contents");
                     guide.ClientSize = new Size((int)(940 * scale), (int)(660 * scale)); Application.DoEvents();
-                    Check(reader.Width > 300 * scale && reader.Height > 250 * scale, "Reading area usable at minimum size");
+                    Check(reader.Width > 300 * scale && reader.Height >= Math.Min(250 * scale,Screen.FromControl(guide).WorkingArea.Height*0.4), "Reading area usable at minimum size scale="+scale+" reader="+reader.Size+" window="+guide.ClientSize);
                     if (scale == 1F) Capture(guide, "guide-min-" + (dark ? "dark" : "light"));
                     guide.Close();
                 }

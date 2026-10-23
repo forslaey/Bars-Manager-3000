@@ -149,7 +149,7 @@ namespace ServiceTool
                         { Show(dialog); Children(dialog).OfType<BrandButton>().First(b => b.Text == "Переустановить").PerformClick(); Check(dialog.Operation == LibraryOperation.Reinstall, "Reinstall choice separate from removal"); dialog.Close(); }
                         form.Close();
                     }
-                    using (var hub = new ManagerHub()) { hub.SetTheme(dark, false); Show(hub); Check(hub.ClientSize.Width <= 900 && hub.ClientSize.Height <= 790, "Launcher accommodates the fifth full-width settings card"); var headings = Children(hub).OfType<Label>().Where(c => c.Text == "Менеджер служб" || c.Text == "Менеджер библиотек").ToArray(); Check(headings.Length == 2 && headings[0].PointToScreen(Point.Empty).Y == headings[1].PointToScreen(Point.Empty).Y, "Launcher top-row headings share exact baseline in two-column layout"); hub.Close(); }
+                    using (var hub = new ManagerHub()) { hub.SetTheme(dark, false); Show(hub); Check(hub.ClientSize.Width <= 900*hub.CurrentAutoScaleDimensions.Width/96F && hub.ClientSize.Height <= 790*hub.CurrentAutoScaleDimensions.Height/96F, "Launcher accommodates the fifth full-width settings card"); var headings = Children(hub).OfType<Label>().Where(c => c.Text == "Менеджер служб" || c.Text == "Менеджер библиотек").ToArray(); Check(headings.Length == 2 && headings[0].PointToScreen(Point.Empty).Y == headings[1].PointToScreen(Point.Empty).Y, "Launcher top-row headings share exact baseline in two-column layout"); hub.Close(); }
                 }
                 Console.WriteLine("PASS: " + count + " maintenance command/matching/UI checks. No deinstaller, UAC, or installer started."); return 0;
             }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -219,8 +219,9 @@ namespace ServiceTool
                 }
                 Check(Field<Label>(form, "statusTitle").Parent.Parent.Parent == grid.Parent.Parent, "Status summary and service list share one card");
                 Check(Field<Button>(form, "installButton").Margin.Top == Field<Button>(form, "installButton").Margin.Bottom, "Action buttons have symmetric vertical spacing");
+                Application.DoEvents();
                 Check(Field<PictureBox>(form, "brandImage").Top == (Field<PictureBox>(form, "brandImage").Parent.ClientSize.Height - Field<PictureBox>(form, "brandImage").Height) / 2,
-                    "Logo vertically centered in its header slot");
+                    "Logo vertically centered in its header slot: "+Field<PictureBox>(form,"brandImage").Bounds+" parent="+Field<PictureBox>(form,"brandImage").Parent.ClientSize);
             }
         }
         private static void Select(DataGridView grid, string name)

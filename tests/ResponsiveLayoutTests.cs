@@ -30,7 +30,7 @@ namespace ServiceTool
                         new SoftwareManagerForm(true), new ToolsDeploymentForm(true),
                         new WindowsFeaturesForm(true, true), new InitialSystemSettingsForm(true) };
                     Size[] limits = { new Size(1160,860), new Size(1440,1040), new Size(1520,1040),
-                        new Size(1280,1040), new Size(640,460), new Size(1000,760), new Size(1280,960) };
+                        new Size(1280,1040), new Size(640,500), new Size(1000,760), new Size(1280,960) };
                     for (int i = 0; i < forms.Length; i++) using (var form = forms[i])
                     {
                         var module = form as ManagerModuleForm;
@@ -39,9 +39,29 @@ namespace ServiceTool
                         if (services != null) services.SetTheme(dark, false);
                         form.StartPosition = FormStartPosition.Manual; form.Location = new Point(-20000,-20000);
                         form.ShowInTaskbar = false; form.Show(); Application.DoEvents();
+                        Rectangle working=Screen.FromControl(form).WorkingArea;
+                        Check(form.Width<=working.Width&&form.Height<=working.Height,"Initial window fits actual desktop: "+form.GetType().Name);
+                        if(i==1||i==3)
+                        {
+                            var viewport=Children(form).OfType<TableLayoutPanel>().First().Parent as ScrollableControl;
+                            var menu=Children(form).OfType<BrandButton>().Single(b=>b.Text=="В меню");
+                            viewport.ScrollControlIntoView(menu);Application.DoEvents();
+                            Rectangle menuBounds=viewport.RectangleToClient(menu.RectangleToScreen(menu.ClientRectangle));
+                            Check(viewport.ClientRectangle.Contains(menuBounds),"Bottom menu reachable at native DPI: "+form.GetType().Name);
+                            viewport.AutoScrollPosition=Point.Empty;Application.DoEvents();
+                        }
+                        // Normalize the real desktop DPI first; otherwise 125% Windows
+                        // multiplied by the test's 125% silently tests 156%, and limits
+                        // expressed in 96-DPI units are compared with physical pixels.
+                        float nativeScale=form.CurrentAutoScaleDimensions.Width/96F;
+                        if(Math.Abs(nativeScale-1F)>0.001F)form.Scale(new SizeF(1F/nativeScale,1F/nativeScale));
+                        Application.DoEvents();
                         Size original = form.ClientSize;
                         if (scale != 1F) form.Scale(new SizeF(scale,scale));
-                        Application.DoEvents();
+                        // Scale may clamp a top-level window to the physical monitor.
+                        // Establish the same explicit client size used on restore.
+                        form.ClientSize=new Size((int)(original.Width*scale),(int)(original.Height*scale));
+                        Application.DoEvents();form.PerformLayout();Application.DoEvents();
                         var content = Children(form).OfType<TableLayoutPanel>().First();
                         var frame = (ScrollableControl)content.Parent;
                         bool compact = i==0 || i==4;
@@ -50,7 +70,7 @@ namespace ServiceTool
                         foreach (Size size in new[] { new Size(1920,1080), new Size(3840,2160), new Size(2560,1440), new Size(1080,1920), new Size(1200,1920), original, new Size(3840,2160), original })
                         {
                             form.ClientSize = new Size((int)(size.Width*scale), (int)(size.Height*scale));
-                            Application.DoEvents(); form.PerformLayout();
+                            Application.DoEvents(); form.PerformLayout();Application.DoEvents();
                             string context = form.GetType().Name + " / " + scale + " / " + size;
                             if(compact)Check(content.Width <= limits[i].Width*scale+1 && content.Height <= limits[i].Height*scale+1, "Unbounded content: " + context);
                             else Check(content.Width>=frame.ClientSize.Width-1 && content.Height>=frame.ClientSize.Height-1, "Module no longer fills window: " + context + " content="+content.Bounds+" parent="+frame.ClientRectangle);

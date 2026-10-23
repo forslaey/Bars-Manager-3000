@@ -22,7 +22,7 @@ namespace ServiceTool
             banner.Click += delegate
             {
                 try { if (launch != null) launch(WebsiteStartInfo()); else Process.Start(WebsiteStartInfo()); }
-                catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Не удалось открыть сайт ДАТАКРАТ", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                catch (Exception ex) { BrandMessageBox.Show(owner, ex.Message, "Не удалось открыть сайт ДАТАКРАТ", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
             };
         }
 

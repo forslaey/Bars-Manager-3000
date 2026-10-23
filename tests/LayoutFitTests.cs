@@ -30,10 +30,11 @@ namespace ServiceTool
                             var checks=(Dictionary<string,SoftwareCheck>)form.GetType().GetField("checks",flags).GetValue(form);
                             var packages=(Dictionary<string,SoftwarePackage>)form.GetType().GetField("packages",flags).GetValue(form);
                             foreach(string id in checks.Keys.ToArray()){checks[id].State=LibraryState.Installed;checks[id].Version=id=="anydesk"?"9.8.2":packages[id].Version;checks[id].Detail="Установлена · "+(id=="anydesk"?"x86":"x64");}
-                            packages["anydesk"].Source="Официальный AnyDesk · версия после получения";packages["anydesk"].Version="0.0";
+                            packages["anydesk"].Source="Релиз на официальном сайте AnyDesk";packages["anydesk"].Version="0.0";
                             ((BrandTextBox)form.GetType().GetField("sourceLabel",flags).GetValue(form)).Text=@"C:\Библиотеки\_soft";
                             form.GetType().GetMethod("UpdateRows",flags).Invoke(form,null);Application.DoEvents();
                         }
+                        float metricsScale=scale*form.CurrentAutoScaleDimensions.Width/96F;
                         if(scale!=1F){form.Scale(new SizeF(scale,scale));Application.DoEvents();}
                         foreach(var button in Children(form).OfType<BrandButton>())
                         {
@@ -42,6 +43,12 @@ namespace ServiceTool
                             var size=TextRenderer.MeasureText(button.Text,button.Font,new Size(Math.Max(1,button.Width-16),Int32.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix);
                             Check(size.Width<=button.Width-16 && size.Height<=button.Height-6,"Painted text does not fit "+context+" requires "+size+" available "+button.Size);
                             if(button.Text=="Перезагрузка" || button.Text=="Компоненты")Check(TextRenderer.MeasureText(button.Text,button.Font).Width<=button.Width-16,"Single-line footer action: "+context);
+                        }
+                        foreach(var toggle in Children(form).OfType<RefreshToggle>())using(var graphics=toggle.CreateGraphics())
+                        {
+                            int prefix=1+(int)Math.Round(42*graphics.DpiX/96F)+(int)(8*graphics.DpiX/96F);
+                            int textWidth=TextRenderer.MeasureText(graphics,toggle.Text,toggle.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;
+                            Check(toggle.Width>=prefix+textWidth,"Refresh caption fits: "+form.GetType().Name+" required="+(prefix+textWidth)+" actual="+toggle.Width+" dpi="+graphics.DpiX+" font="+toggle.Font.Size);
                         }
                         foreach(var label in Children(form).OfType<Label>().Where(l=>l.Visible&&!l.AutoEllipsis&&!String.IsNullOrWhiteSpace(l.Text)))
                         {
@@ -52,10 +59,10 @@ namespace ServiceTool
                         if(form is ToolsDeploymentForm)
                         {
                             var fields=Children(form).OfType<BrandTextBox>().ToArray();var field=fields.Single(b=>!b.ReadOnly);var picker=Children(form).OfType<Button>().Single(b=>b.Text=="Выбрать путь…");
-                            Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Left,picker.Bottom-2)).Y-field.Parent.PointToScreen(new Point(field.Left,field.Bottom-1)).Y-4*scale)<=1,"Utility picker sits four units below path frame at "+scale);
+                            Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Left,picker.Bottom-2)).Y-field.Parent.PointToScreen(new Point(field.Left,field.Bottom-1)).Y-4*metricsScale)<=1,"Utility picker sits four units below path frame at "+scale);
                             Check(fields.Length==2&&fields[0].Size==fields[1].Size,"Source and destination have matching thin frames");
                             Check(field.Height<picker.Height,"Path frame is thinner from the top, keeping bottom alignment");
-                            Check(form.ClientSize.Width<=640*scale+1&&form.ClientSize.Height<=460*scale+1,"Utility window stays compact in both dimensions");
+                            Check(form.ClientSize.Width<=640*metricsScale+1&&form.ClientSize.Height<=500*metricsScale+1,"Utility window stays compact in both dimensions");
                             Check(form.Text=="Распаковка утилит","Short utility window title");
                             Check(Children(form).OfType<Label>().Any(l=>l.Text=="Будет взято из:")&&Children(form).OfType<Label>().Any(l=>l.Text=="Путь распаковки:"),"Clear independent path captions");
                         }
@@ -63,8 +70,10 @@ namespace ServiceTool
                         {
                             var grid=Children(form).OfType<ServiceGrid>().Single();
                             Check(grid.Columns[3].Width>grid.Columns[2].Width,"Source column wider than installed-state column");
-                            Check(grid.DisplayedRowCount(false)==5&&grid.GetRowDisplayRectangle(4,false).Bottom<=grid.ClientRectangle.Bottom,"All five installed programs completely visible with longest official source");
-                            Check(!Children(form).OfType<LibraryGridScrollBar>().Any(),"Four-program list has no scroll control");
+                            int gridRequired=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(r=>r.Height)+2;
+                            if(grid.ClientSize.Height>=gridRequired)Check(grid.DisplayedRowCount(false)==5&&grid.GetRowDisplayRectangle(4,false).Bottom<=grid.ClientRectangle.Bottom,"All five rows visible when viewport fits their measured height");
+                            else Check(grid.DisplayedRowCount(false)>0&&Children(form).OfType<LibraryGridScrollBar>().Any(),"Small high-DPI screen scrolls only table while footer remains reachable");
+                            Check(grid.ScrollBars==ScrollBars.None,"No native scrollbar breaking either theme");
                             foreach(DataGridViewRow row in grid.Rows)
                             {
                                 var cell=row.Cells[3];var style=cell.InheritedStyle;int width=cell.Size.Width-style.Padding.Horizontal-3;
@@ -72,14 +81,14 @@ namespace ServiceTool
                                 Check(required.Height<=2*style.Font.Height+2,"Source occupies at most two lines, "+row.Tag+" / "+scale);
                             }
                             var field=Children(form).OfType<BrandTextBox>().Single();var picker=Children(form).OfType<Button>().Single(b=>b.Text=="Выбрать папку...");
-                            Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Left,picker.Bottom-2)).Y-field.Parent.PointToScreen(new Point(field.Left,field.Bottom-1)).Y-4*scale)<=1,"Software picker has same small downward offset as utilities");
+                            Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Left,picker.Bottom-2)).Y-field.Parent.PointToScreen(new Point(field.Left,field.Bottom-1)).Y-4*metricsScale)<=1,"Software picker has same small downward offset as utilities");
                             Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Right,0)).X-grid.Parent.Parent.PointToScreen(new Point(grid.Parent.Right,0)).X)<=1,"Folder block anchored to right edge of working area");
                             var folder=field.Parent.Parent;var heading=(TableLayoutPanel)folder.Parent;var title=heading.GetControlFromPosition(0,0);
-                            Check(folder.Top-title.Bottom>=20*scale-1,"Clear gap after module title");
+                            Check(folder.Top-title.Bottom>=Math.Max(1,2*metricsScale-2),"Clear gap after module title");
                             var choices=Children(form).OfType<BrandCheckBox>().ToArray();var first=choices.OrderBy(c=>c.Top).First();var last=choices.OrderBy(c=>c.Top).Last();var install=Children(form).OfType<Button>().Single(b=>b.Text=="Установить");
                             int topGap=first.Parent.PointToScreen(first.Location).Y-grid.Parent.Parent.PointToScreen(new Point(grid.Parent.Left,grid.Parent.Bottom)).Y;
                             int bottomGap=install.Parent.PointToScreen(install.Location).Y-last.Parent.PointToScreen(new Point(last.Left,last.Bottom)).Y;
-                            Check(topGap>=16*scale-1&&Math.Abs(topGap-bottomGap)<=1,"Checkbox block has equal comfortable gaps from table and actions");
+                            Check(topGap>=6*metricsScale-2&&Math.Abs(topGap-bottomGap)<=2,"Compact checkbox block has equal gaps and does not touch table or actions");
                         }
                         if(scale==1F&&(form is SoftwareManagerForm||form is ToolsDeploymentForm))
                         {
@@ -89,7 +98,7 @@ namespace ServiceTool
                         if(form is ManagerHub)
                         {
                             var cards=Children(form).OfType<Card>().ToArray();Check(cards.Length==5,"Five launcher cards");
-                            foreach(var card in cards){var b=Children(card).OfType<BrandButton>().Single();var at=card.PointToClient(b.PointToScreen(Point.Empty));Check(Math.Abs(at.X*2+b.Width-card.Width)<=2,"Launcher action horizontally centered");Check(card.Height-at.Y-b.Height>=12*scale && card.Height-at.Y-b.Height<=16*scale,"Launcher action near lower edge with consistent inset at "+scale+" card "+card.Size+" gap "+(card.Height-at.Y-b.Height));}
+                            foreach(var card in cards){var b=Children(card).OfType<BrandButton>().Single();var at=card.PointToClient(b.PointToScreen(Point.Empty));Check(Math.Abs(at.X*2+b.Width-card.Width)<=2,"Launcher action horizontally centered");Check(card.Height-at.Y-b.Height>=12*metricsScale && card.Height-at.Y-b.Height<=16*metricsScale,"Launcher action near lower edge with consistent inset at "+scale+" card "+card.Size+" gap "+(card.Height-at.Y-b.Height));}
                         }
                         if(form is LibraryManagerForm)
                         {

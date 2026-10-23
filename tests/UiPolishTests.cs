@@ -66,7 +66,7 @@ namespace ServiceTool
                         }
                         Button back = Button(form, "В меню"), report = Button(form, "Открыть журнал"), restart = Button(form,"Перезагрузка");
                         Check(!Children(form).OfType<Button>().Any(b=>b.Text=="О программе"),"About exists only in launcher");
-                        Check(restart.Left<back.Left && back.Top==report.Top && back.Height>=38,"Restart before menu on aligned footer");
+                        Check(restart.Left<back.Left && back.Bottom==report.Bottom && back.Height>=38,"Restart before menu on aligned footer");
                         Check(Children(form).OfType<Label>().Any(l=>l.Text=="Менеджер системных библиотек Windows"),"Localized content heading preserves product window title");
                         var all = Field<BrandButton>(form, "selectAll");
                         var allChecks = Field<Dictionary<string, LibraryCheck>>(form, "checks");

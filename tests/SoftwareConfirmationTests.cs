@@ -17,7 +17,7 @@ namespace ServiceTool
                 foreach(bool dark in new[]{false,true})using(var form=new SoftwareManagerForm(true))
                 {
                     form.SetTheme(dark,false);
-                    var chrome=Field<BrandCheckBox>(form,"chromeDefaults");Check(!chrome.Checked,"Chrome defaults initially unchecked");
+                    var chrome=Field<BrandCheckBox>(form,"chromeDefaults");Check(chrome.Checked,"Chrome defaults initially checked");chrome.Checked=false;
                     var defaults=Field<BrandCheckBox>(form,"defaults");var remote=Field<BrandCheckBox>(form,"remote");
                     Check(!defaults.Checked&&!remote.Checked,"Optional tasks initially unchecked");
                     var checks=Field<Dictionary<string,SoftwareCheck>>(form,"checks");

@@ -14,6 +14,7 @@ namespace ServiceTool
         protected readonly Label Activity;
         protected readonly BrandButton Back;
         protected bool Busy;
+        protected bool Scanning;
         protected LibrarySession Session;
         protected volatile bool CancelRequested = false;
         internal bool MenuRequested { get; private set; }
@@ -27,21 +28,22 @@ namespace ServiceTool
             Body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); Body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            var heading = Label(title, false); heading.Margin = new Padding(12, 12, 12, 4); heading.Font = new Font("Segoe UI", 15, FontStyle.Bold); Body.Controls.Add(heading, 0, 0);
+            var heading = Label(title, false); heading.Margin = new Padding(12, 8, 12, 4); heading.Font = new Font("Segoe UI", 15, FontStyle.Bold); Body.Controls.Add(heading, 0, 0);
             var footer = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 8, 0, 0), Margin = Padding.Empty };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Activity = Label("Готово к работе", true); Activity.AutoEllipsis = false; Activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(Activity, 0, 0);
-            Back = Button("В меню", false); Back.Margin = Padding.Empty; Back.Click += delegate { if (!Busy) { MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 1, 0);
+            Back = Button("В меню", false); ModuleNavigation.Configure(Back); Back.Click += delegate { if (!Busy||Scanning) { if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;} MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 1, 0);
             Body.Controls.Add(footer, 0, 3); Root.Controls.Add(Body, 0, 1);
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
                 if (!Busy) return;
+                if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;return;}
                 e.Cancel = true;
-                MessageBox.Show(this, "Дождись завершения операции. Обслуживание компонентов Windows нельзя безопасно оборвать закрытием окна.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                BrandMessageBox.Show(this, "Дождись завершения операции. Обслуживание компонентов Windows нельзя безопасно оборвать закрытием окна.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
         }
-        protected void Progress(string text)
+        protected virtual void Progress(string text)
         {
             if (IsDisposed || !IsHandleCreated) return;
             try { BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) Activity.Text = text; }); } catch (InvalidOperationException) { }
@@ -71,7 +73,7 @@ namespace ServiceTool
             }
             return results;
         }
-        protected void Failure(Exception ex) { Activity.Text = "Не выполнено"; MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        protected void Failure(Exception ex) { Activity.Text = "Не выполнено"; BrandMessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         protected async Task Restart()
         {
             await RestartOffer.Show(this);
@@ -194,7 +196,7 @@ namespace ServiceTool
             string question = install.Length > 0 && remove.Length > 0 ? "Установить одни и удалить другие выбранные компоненты Windows?"
                 : install.Length > 0 ? "Установить выбранные компоненты Windows? Может потребоваться доступ к Windows Update или установочному носителю."
                 : "Удалить выбранные компоненты Windows? Зависящие от них приложения перестанут работать.";
-            if (MessageBox.Show(this, question + "\r\nАвтоматическая перезагрузка не выполняется.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (BrandMessageBox.Show(this, question + "\r\nАвтоматическая перезагрузка не выполняется.", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             Lock(true); bool restart = false;
             try
             {
@@ -222,20 +224,20 @@ namespace ServiceTool
         private readonly BrandCheckBox shortcuts=new BrandCheckBox();
         private readonly bool preview;
         private string source;
-        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(640,460))
+        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(640,500))
         {
-            preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,460));ClientSize=new Size(640,460);
-            Root.RowStyles[0].Height=76;Root.Padding=new Padding(20,8,20,10);
-            Body.RowStyles[0].Height=42;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=46;
-            Body.GetControlFromPosition(0,0).Margin=new Padding(12,6,12,0);
+            preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,500));ClientSize=new Size(640,500);
+            Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,12);
+            Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
+            Body.GetControlFromPosition(0,0).Margin=new Padding(12,8,12,4);
             var card=new Card {Dock=DockStyle.Fill,Padding=new Padding(16,16,16,8),Margin=new Padding(0,0,0,8)};
             var content=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=6,Margin=Padding.Empty};
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));
             foreach(float height in new[]{26F,45F,8F,26F,45F,44F})content.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
-            var sourceCaption=Label("Будет взято из:",false);content.Controls.Add(sourceCaption,0,0);content.SetColumnSpan(sourceCaption,2);
+            var sourceCaption=Label("Будет взято из:",false);sourceCaption.TextAlign=ContentAlignment.BottomLeft;sourceCaption.Padding=new Padding(0,0,0,2);content.Controls.Add(sourceCaption,0,0);content.SetColumnSpan(sourceCaption,2);
             sourceLabel=new BrandTextBox {Text=preview?@"C:\Библиотеки\_tools":"Выбери папку с утилитами",ReadOnly=true,AutoSize=false,Palette=Colors};
             chooseSource=Button("Выбрать папку…",false);chooseSource.Click+=delegate{Choose();};var sourceRow=new PathPickerRow(sourceLabel,chooseSource,168){Dock=DockStyle.Fill};content.Controls.Add(sourceRow,0,1);content.SetColumnSpan(sourceRow,2);
-            var targetCaption=Label("Путь распаковки:",false);content.Controls.Add(targetCaption,0,3);content.SetColumnSpan(targetCaption,2);
+            var targetCaption=Label("Путь распаковки:",false);targetCaption.TextAlign=ContentAlignment.BottomLeft;targetCaption.Padding=new Padding(0,0,0,2);content.Controls.Add(targetCaption,0,3);content.SetColumnSpan(targetCaption,2);
             destination=new BrandTextBox {AutoSize=false,Palette=Colors,Text=ToolsDeployment.DefaultTarget};
             chooseTarget=Button("Выбрать путь…",false);chooseTarget.Click+=delegate{ChooseTarget();};var targetRow=new PathPickerRow(destination,chooseTarget,168){Dock=DockStyle.Fill};content.Controls.Add(targetRow,0,4);content.SetColumnSpan(targetRow,2);
             shortcuts.Text=PathFieldMetrics.ShortcutCaption;shortcuts.Checked=true;shortcuts.Dock=DockStyle.Fill;shortcuts.Margin=new Padding(0,16,0,0);shortcuts.Palette=Colors;content.Controls.Add(shortcuts,0,5);content.SetColumnSpan(shortcuts,2);
@@ -245,7 +247,7 @@ namespace ServiceTool
             deploy=Button("Установить",true);deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
             remove=Button("Удалить",false);remove.Destructive=true;remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,1,0);Body.Controls.Add(actions,0,2);
             if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=ex.Message;}
-            LimitContent(new Size(640, 460));
+            LimitContent(new Size(640, 500));
             SetTheme(Colors.Dark,false);
         }
         protected override void OnThemeChanged(){shortcuts.Palette=Colors;}
@@ -268,7 +270,7 @@ namespace ServiceTool
         {
             if(Busy||preview)return;if(!(source!=null&&Directory.Exists(source))&&!Choose())return;
             string target;try{target=ToolsDeployment.TargetFolder(destination.Text);ToolsDeployment.Discover(source);}catch(Exception ex){Failure(ex);return;}
-            if(MessageBox.Show(this,"Установить утилиты в "+target+"?\r\n"+(shortcuts.Checked?"Создадим ярлыки на рабочем столе.":"Ярлыки не создаются.")+"\r\nСуществующие настройки сохраняются, прежняя папка остаётся в резервной копии.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(BrandMessageBox.Show(this,"Установить утилиты в "+target+"?\r\n"+(shortcuts.Checked?"Создадим ярлыки на рабочем столе.":"Ярлыки не создаются.")+"\r\nСуществующие настройки сохраняются, прежняя папка остаётся в резервной копии.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             Lock(true);
             try
             {
@@ -289,7 +291,7 @@ namespace ServiceTool
                 tools=ToolsDeployment.Installed(target);if(tools.Count==0)throw new IOException("В выбранной папке утилиты не найдены");
             }
             catch(Exception ex){Failure(ex);return;}
-            if(MessageBox.Show(this,"Удалить из "+target+":\r\n"+String.Join("\r\n",tools.Select(t=>t.Directory))+"?\r\n\r\nНастройки и журналы внутри этих папок тоже будут удалены. Посторонние файлы и резервные копии сохранятся.","Удаление утилит",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            if(BrandMessageBox.Show(this,"Удалить из "+target+":\r\n"+String.Join("\r\n",tools.Select(t=>t.Directory))+"?\r\n\r\nНастройки и журналы внутри этих папок тоже будут удалены. Посторонние файлы и резервные копии сохранятся.","Удаление утилит",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             Lock(true);
             try
             {
@@ -303,9 +305,9 @@ namespace ServiceTool
     {
         internal static async Task Show(IWin32Window owner)
         {
-            if (MessageBox.Show(owner, "Для завершения изменений нужна перезагрузка Windows. Сохрани открытые документы.\r\n\r\nПерезагрузить компьютер сейчас? Нажми «Нет», чтобы сделать это позже.", "Перезагрузка Windows", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            if (BrandMessageBox.Show(owner, "Для завершения изменений нужна перезагрузка Windows. Сохрани открытые документы.\r\n\r\nПерезагрузить компьютер сейчас? Нажми «Нет», чтобы сделать это позже.", "Перезагрузка Windows", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
             try { using (var session = await Task.Run(() => LibrarySession.Start())) await Task.Run(() => session.ExecuteSystem("system-restart", "restart-confirmed", "", ignored => { })); }
-            catch (Exception ex) { MessageBox.Show(owner, ex.Message, "Перезагрузка Windows", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            catch (Exception ex) { BrandMessageBox.Show(owner, ex.Message, "Перезагрузка Windows", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
     }
 }

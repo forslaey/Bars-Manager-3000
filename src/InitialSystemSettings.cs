@@ -121,11 +121,11 @@ function ReadPolicies($file){$values=@{};$section='';foreach($line in Get-Conten
             return s.ToString();
         }
         internal static string QueryScript(){var query=new StringBuilder();foreach(string group in new[]{"admin","passwords","firewall","defender","smartscreen","folders"})query.Append("try{$lines=& {"+Script("query",group)+"};foreach($line in $lines){'"+group+".'+$line}}catch{'"+group+".Error='+$_.Exception.Message};");return query.ToString();}
-        private static LibraryInstallResult RunScript(string script,Action<string> progress){const string marker="BARS_SETTINGS_ERROR=";var result=WindowsComponents.Run("$ProgressPreference='SilentlyContinue';try{"+script+"}catch{[Console]::WriteLine('"+marker+"'+$_.Exception.Message)}",progress);int error=result.Message.IndexOf(marker,StringComparison.Ordinal);if(error>=0)throw new InvalidOperationException(result.Message.Substring(error+marker.Length).Trim());return result;}
+        private static LibraryInstallResult RunScript(string script,Action<string> progress,bool cancellableRead=false){const string marker="BARS_SETTINGS_ERROR=";var result=WindowsComponents.Run("$ProgressPreference='SilentlyContinue';try{"+script+"}catch{[Console]::WriteLine('"+marker+"'+$_.Exception.Message)}",progress,cancellableRead);int error=result.Message.IndexOf(marker,StringComparison.Ordinal);if(error>=0)throw new InvalidOperationException(result.Message.Substring(error+marker.Length).Trim());return result;}
         internal static LibraryInstallResult Run(string data,Action<string> progress)
         {
             var parts=(data??"").Split(':');if(parts.Length!=2)throw new InvalidDataException("Неверный запрос настроек");
-            if(parts[0]=="query"&&parts[1]=="all")return RunScript(QueryScript(),progress);
+            if(parts[0]=="query"&&parts[1]=="all")return RunScript(QueryScript(),progress,true);
             return RunScript(Script(parts[0],parts[1]),progress);
         }
     }

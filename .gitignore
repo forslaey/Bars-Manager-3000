@@ -1,4 +1,4 @@
-﻿# Generated files and local settings
+# Generated files and local settings
 bin/
 obj/
 work/
@@ -41,3 +41,6 @@ LibraryReports/
 
 # User-requested unsigned release 2.3.20
 !releases/v2.3.20/Bars Manager 3000 2.3.20.exe
+
+# User-requested unsigned release 2.3.24
+!releases/v2.3.24/Bars Manager 3000 2.3.24.exe

@@ -71,7 +71,7 @@ namespace ServiceTool
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Не удалось открыть утилиту.\r\n\r\n" + ex.Message,
+                BrandMessageBox.Show("Не удалось открыть утилиту.\r\n\r\n" + ex.Message,
                     "Bars Service Manager 3000", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 1;
             }
@@ -227,7 +227,7 @@ namespace ServiceTool
             installProfiles = profiles;
             foreach (string executable in store.GetExecutablePaths()) knownExecutables.Add(executable);
             preview = previewMode;
-            confirmBusyClose = delegate { return MessageBox.Show(this, BusyCloseMessage, "Процедура ещё выполняется",
+            confirmBusyClose = delegate { return BrandMessageBox.Show(this, BusyCloseMessage, "Процедура ещё выполняется",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2); };
             DoubleBuffered = true;
             Text = "Bars Service Manager 3000";
@@ -249,12 +249,11 @@ namespace ServiceTool
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             layout.RowCount = 5;
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 184));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 390));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-            Panel viewport = new BufferedPanel { Dock = DockStyle.Fill, AutoScroll = true };
-            viewport.Controls.Add(layout);
+            Panel viewport = new FillContentPanel(layout);
             Controls.Add(viewport);
 
             TableLayoutPanel header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0, 0, 0, 12), Padding = new Padding(0, 8, 0, 0) };
@@ -268,13 +267,19 @@ namespace ServiceTool
             brandImage.Image = lightBrandLogo;
             brandImage.SizeMode = PictureBoxSizeMode.Zoom;
             brandImage.SetBounds(0, 0, 310, 76);
-            brandImage.Anchor = AnchorStyles.None;
+            brandImage.Anchor = AnchorStyles.Top | AnchorStyles.Left;
             brandImage.Margin = new Padding(0);
             brandImage.BorderStyle = BorderStyle.None;
             BrandAssets.BindWebsite(brandImage, toolTips, this);
             brandImage.Tag = "brand";
             brandSlot.Controls.Add(brandImage);
-            brandSlot.Layout += delegate { LayoutBrandImage(brandSlot); };
+            bool brandLayoutPending=false;
+            brandSlot.Layout += delegate
+            {
+                if(brandLayoutPending||!IsHandleCreated||IsDisposed)return;
+                brandLayoutPending=true;
+                BeginInvoke((MethodInvoker)delegate{brandLayoutPending=false;if(!IsDisposed&&!brandSlot.IsDisposed)LayoutBrandImage(brandSlot);});
+            };
             header.Controls.Add(brandSlot, 1, 0);
             TableLayoutPanel themeSelector = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = new Padding(0) };
             themeSelector.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -288,14 +293,14 @@ namespace ServiceTool
             layout.Controls.Add(header, 0, 0);
 
             Card fileCard = new Card { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10) };
-            fileCard.Padding = new Padding(12, 12, 12, 14);
+            fileCard.Padding = new Padding(12, 8, 12, 10);
             TableLayoutPanel fileLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = new Padding(0), Padding = new Padding(0) };
             fileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
+            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
-            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
             fileCard.Controls.Add(fileLayout);
             fileTitle.Text = "Перетащи сюда .exe-файл службы BARS или выбери файл кнопкой.";
             fileTitle.Font = new Font(Font, FontStyle.Bold);
@@ -386,17 +391,17 @@ namespace ServiceTool
             autoRefreshToggle.Size = new Size(54 + TextRenderer.MeasureText(autoRefreshToggle.Text, autoRefreshToggle.Font,
                 new Size(Int32.MaxValue, Int32.MaxValue), TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width, 28);
             autoRefreshToggle.CheckedChanged += delegate { UpdateRefreshTimer(); UpdateRefreshActivity(); };
-            statusLayout.Controls.Add(autoRefreshToggle, 1, 0);
-            statusLayout.Layout += delegate
+            var refreshSlot=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};
+            refreshSlot.Controls.Add(autoRefreshToggle);statusLayout.Controls.Add(refreshSlot,1,0);
+            refreshSlot.Layout+=delegate
             {
-                using (Graphics graphics = autoRefreshToggle.CreateGraphics())
+                using(var graphics=autoRefreshToggle.CreateGraphics())
                 {
-                    int textWidth = TextRenderer.MeasureText(graphics, autoRefreshToggle.Text, autoRefreshToggle.Font,
-                        Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
-                    int desired = (int)Math.Ceiling(54 * graphics.DpiX / 96F) + textWidth;
-                    int available = statusLayout.GetColumnWidths()[1];
-                    int width = Math.Max(1, Math.Min(desired, available));
-                    if (autoRefreshToggle.Width != width) autoRefreshToggle.Width = width;
+                    int prefix=1+(int)Math.Round(42*graphics.DpiX/96F)+(int)(8*graphics.DpiX/96F);
+                    int text=TextRenderer.MeasureText(graphics,autoRefreshToggle.Text,autoRefreshToggle.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;
+                    int width=Math.Min(refreshSlot.ClientSize.Width,prefix+text+4);
+                    int height=Math.Min(refreshSlot.ClientSize.Height,(int)Math.Round(28*graphics.DpiY/96F));
+                    autoRefreshToggle.Bounds=new Rectangle(Math.Max(0,refreshSlot.ClientSize.Width-width),Math.Max(0,refreshSlot.ClientSize.Height-height),width,height);
                 }
             };
             serviceLayout.Controls.Add(statusLayout, 0, 0);
@@ -618,7 +623,7 @@ namespace ServiceTool
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(activity, 0, 0);
             Button menuButton = MakeButton("В меню", false);
-            menuButton.Dock = DockStyle.Fill; menuButton.Margin = Padding.Empty;
+            ModuleNavigation.Configure(menuButton);
             menuButton.Click += delegate { MenuRequested = true; Close(); };
             footer.Controls.Add(menuButton, 1, 0);
             layout.Controls.Add(footer, 0, 4);
@@ -645,6 +650,19 @@ namespace ServiceTool
             SetTheme(!preview && ThemePreference.LoadDark(), false);
             UpdateActions();
             ResumeLayout(true);
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            Rectangle area=Screen.FromControl(this).WorkingArea;
+            MinimumSize=new Size(Math.Min(MinimumSize.Width,area.Width),Math.Min(MinimumSize.Height,area.Height));
+            if(WindowState==FormWindowState.Normal)Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));
+            base.OnLoad(e);
+        }
+        protected override void OnShown(EventArgs e)
+        {
+            LayoutBrandImage(brandImage.Parent);
+            base.OnShown(e);
         }
 
         private void UpdateRefreshTimer()
@@ -736,6 +754,7 @@ namespace ServiceTool
             ApplyStatusColor();
             ApplyNativeTheme();
             ResumeLayout(true);
+            if (brandImage.Parent != null) LayoutBrandImage(brandImage.Parent);
             Invalidate(true);
             if (persist && !preview && !ThemePreference.TrySave(dark))
                 AppendLog("Тема применена, но сохранить выбор для следующего запуска не удалось.");
@@ -998,7 +1017,7 @@ namespace ServiceTool
                 if (paths == null || paths.Length == 0) return;
                 if (paths.Length != 1)
                 {
-                    MessageBox.Show(this, "Перетащи один .exe службы BARS. Утилита выполняет процедуры для одного .exe за раз.", "Выбор службы", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    BrandMessageBox.Show(this, "Перетащи один .exe службы BARS. Утилита выполняет процедуры для одного .exe за раз.", "Выбор службы", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
                 await SetExecutableAsync(paths[0]);
@@ -1049,7 +1068,7 @@ namespace ServiceTool
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, ex.Message, "Не удалось выбрать .exe", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                BrandMessageBox.Show(this, ex.Message, "Не удалось выбрать .exe", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -1508,7 +1527,7 @@ namespace ServiceTool
             UpdateActions();
             string description = action == "start" ? "Запускаем службу…" : action == "stop" ? "Останавливаем службу…" : "Изменяем режим запуска…";
             SetStatus(description, entry.DisplayName + ", имя службы: " + serviceName, blue);
-            AppendLog("Служба " + serviceName + ": " + action + (action == "startup" ? " → " + mode : ""));
+            AppendLog(ServiceActionMessage(entry,action,mode));
             activity.Text = "Выполняется действие для выбранной службы.";
             int result = -1;
             Exception failure = null;
@@ -1574,10 +1593,19 @@ namespace ServiceTool
             }
         }
 
+        internal static string ServiceActionMessage(ServiceEntry entry,string action,string mode)
+        {
+            string verb=action=="start"?"Запрос на запуск":action=="stop"?"Запрос на остановку":"Изменение режима запуска";
+            string startup=mode=="auto"?"автоматически":mode=="auto-delayed"?"автоматически, с задержкой":mode=="manual"?"вручную":mode=="disabled"?"отключена":mode;
+            return verb+" службы «"+entry.DisplayName+"» ("+entry.Name+")"+(action=="startup"?": "+startup:"")+".";
+        }
+
         private void AppendLog(string message)
         {
             if (log.TextLength > 60000) log.Text = log.Text.Substring(log.TextLength - 40000);
             log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + message + Environment.NewLine);
+            log.SelectionStart=log.TextLength;log.SelectionLength=0;
+            ((JournalTextBox)log).ScrollToLine(Int32.MaxValue);
         }
 
         private void PostLog(string message)
@@ -1610,7 +1638,7 @@ namespace ServiceTool
             {
                 Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "mmc.exe"), "\"" + Path.Combine(Environment.SystemDirectory, "services.msc") + "\"") { UseShellExecute = true });
             }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "Не удалось открыть службы", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+            catch (Exception ex) { BrandMessageBox.Show(this, ex.Message, "Не удалось открыть службы", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
 
         internal static ProcessStartInfo BuildBrandLinkStartInfo()

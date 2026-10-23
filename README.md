@@ -1,6 +1,6 @@
 ﻿# BARS Manager 3000
 
-Текущий выпуск — **2.3.20**, без цифровой подписи. [Скачать программу](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.20) · [Изменения и границы проверок](RELEASE-2.3.20.md).
+Подготовленная версия — **2.3.24**: [изменения, проверки и ограничения](RELEASE-2.3.24.md). Последний опубликованный выпуск — **2.3.20**, без цифровой подписи. [Скачать программу](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.20) · [Изменения и границы проверок](RELEASE-2.3.20.md).
 
 Предыдущий опубликованный выпуск — [2.3.19, без подписи](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.19). Последний опубликованный подписанный выпуск — [2.3.13](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.13).
 

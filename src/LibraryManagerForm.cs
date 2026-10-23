@@ -56,7 +56,7 @@ namespace ServiceTool
             }
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 172)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
             var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 12) };
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
@@ -97,11 +97,11 @@ namespace ServiceTool
             journal.Dock = DockStyle.Fill; journal.Font = new Font("Consolas", 9); journalScroll.Dock = DockStyle.Right; journalScroll.Width = 14; journalScroll.Bind(journal);
             logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(logCard, 0, 2);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 2, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             restart = Button("Перезагрузка", false); restart.Margin = new Padding(0, 0, 10, 0); restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
             activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0); footer.SetColumnSpan(activity, 5);
             report = Button("Открыть журнал", false); report.Click += delegate { OpenJournal(); }; footer.Controls.Add(report, 1, 1);
-            BrandButton back = Button("В меню", false); back.Margin = Padding.Empty; back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
+            BrandButton back = Button("В меню", false); ModuleNavigation.Configure(back); back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
             windowsComponents = Button("Компоненты", false); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false); UpdateSource();
@@ -127,7 +127,7 @@ namespace ServiceTool
         }
         private bool ConfirmCancel(bool closing)
         {
-            return (confirmCancellation == null ? MessageBox.Show(this, (closing ? (MenuRequested ? "Отменить операцию и вернуться в меню?\r\n\r\n" : "Отменить операцию и закрыть программу?\r\n\r\n") : "") + CancelWarning,
+            return (confirmCancellation == null ? BrandMessageBox.Show(this, (closing ? (MenuRequested ? "Отменить операцию и вернуться в меню?\r\n\r\n" : "Отменить операцию и закрыть программу?\r\n\r\n") : "") + CancelWarning,
                 "Отмена операции", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) : confirmCancellation(closing)) == DialogResult.Yes;
         }
         internal void RequestCancellation(bool closing)
@@ -460,7 +460,7 @@ namespace ServiceTool
                     Log(pendingRestart ? "Windows или установщик сообщили, что нужна перезагрузка. Сохрани работу перед перезагрузкой." : "Установщики не сообщили об обязательной перезагрузке. При необходимости её можно запустить кнопкой «Перезагрузка».");
                     string savedPath = operationJournal.FilePath;
                     try { operationJournal.Save(); journalWriteFailed = false; }
-                    catch (Exception ex) { journalWriteFailed = true; if (!IsDisposed) MessageBox.Show(this, "Не удалось сохранить журнал: " + savedPath + "\r\n" + ex.Message + "\r\nЗаписи остаются в окне журнала. Проверь доступность папки и свободное место.", "Журнал не сохранён", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+                    catch (Exception ex) { journalWriteFailed = true; if (!IsDisposed) BrandMessageBox.Show(this, "Не удалось сохранить журнал: " + savedPath + "\r\n" + ex.Message + "\r\nЗаписи остаются в окне журнала. Проверь доступность папки и свободное место.", "Журнал не сохранён", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
                     operationJournal = null;
                     Log(journalWriteFailed ? "Внимание: журнал не сохранён на диск." : "Журнал сохранён: " + savedPath);
                 }

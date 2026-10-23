@@ -108,7 +108,7 @@ namespace ServiceTool
             form.Location = new Point(-20000, -20000);
             IntPtr handle = form.Handle;
             form.Show();
-            form.PerformLayout();
+            form.PerformLayout(); Application.DoEvents();
             Application.DoEvents(); // Dispatch the posted Shown event before waiting for its injected refresh.
             DateTime deadline = DateTime.UtcNow.AddSeconds(5);
             while (Field<bool>(form, "refreshing"))
@@ -167,7 +167,7 @@ namespace ServiceTool
             Assert(image.Image != null && image.Image.Width > 16 && image.Image.Height > 16, "Header displays a decoded BARS logo");
             Assert(image.SizeMode == PictureBoxSizeMode.Zoom, "BARS logo retains its proportions");
             using (Graphics graphics = form.CreateGraphics())
-                Assert(image.Width >= Math.Ceiling(250F * graphics.DpiX / 96F) && image.Height >= Math.Ceiling(60F * graphics.DpiY / 96F),
+                Assert(image.Width >= Math.Ceiling(60F * graphics.DpiY / 96F * image.Image.Width / image.Image.Height)-1 && image.Height >= Math.Ceiling(60F * graphics.DpiY / 96F),
                     "Logo remains readable at current DPI instead of collapsing to its preferred minimum (actual " + image.Width + " x " + image.Height + ")");
             VerifyFitsAncestors(image, "Header logo");
             Assert(image.Height <= image.Parent.ClientSize.Height * 0.95F, "Logo fits within header height with visible breathing room");
@@ -210,16 +210,16 @@ namespace ServiceTool
             try
             {
                 form.ClientSize = new Size(original.Width + 173, original.Height);
-                form.PerformLayout();
+                form.PerformLayout(); Application.DoEvents();
                 VerifyLogoCentered(form, "wider window");
                 form.ClientSize = new Size(Math.Max(1, original.Width - 61), original.Height);
-                form.PerformLayout();
+                form.PerformLayout(); Application.DoEvents();
                 VerifyLogoCentered(form, "narrower window");
             }
             finally
             {
                 form.ClientSize = original;
-                form.PerformLayout();
+                form.PerformLayout(); Application.DoEvents();
             }
         }
 
@@ -347,7 +347,7 @@ namespace ServiceTool
                     form.AutoScaleMode = AutoScaleMode.None;
                     form.MinimumSize = Size.Empty;
                     form.Scale(new SizeF(targetScale / systemScale, targetScale / systemScale));
-                    form.PerformLayout();
+                    form.PerformLayout(); Application.DoEvents();
                     VerifyFileSelectionLayout(form, "simulated " + (targetScale * 100F).ToString("0") + "%");
                     VerifyFitsAncestors(Field<Button>(form, "themeToggleButton"), "Theme toggle at simulated " + targetScale);
                     VerifyLogoCentered(form, "simulated " + (targetScale * 100F).ToString("0") + "%");
@@ -407,7 +407,7 @@ namespace ServiceTool
         private static void VerifyWrappedServiceText(MainForm form)
         {
             DataGridView grid = Field<DataGridView>(form, "servicesGrid");
-            form.PerformLayout();
+            form.PerformLayout(); Application.DoEvents();
             grid.AutoResizeRows(DataGridViewAutoSizeRowsMode.AllCells);
             Assert(grid.Rows.Count == 2, "Injected matching services are rendered");
             Assert(Convert.ToString(grid.Rows[0].Cells[0].Value) == SampleSnapshot().Entries[0].DisplayName, "Long display name is preserved without truncating data");
@@ -536,7 +536,7 @@ namespace ServiceTool
             if (!wasVisible) form.Show();
             Field<Timer>(form, "timer").Stop();
             Application.DoEvents();
-            form.PerformLayout();
+            form.PerformLayout(); Application.DoEvents();
             using (Bitmap bitmap = new Bitmap(form.ClientSize.Width, form.ClientSize.Height))
             using (Bitmap full = new Bitmap(form.Width, form.Height))
             {
@@ -569,7 +569,7 @@ namespace ServiceTool
         private static void SetTheme(MainForm form, bool dark)
         {
             Invoke(form, "SetTheme", dark, false);
-            form.PerformLayout();
+            form.PerformLayout(); Application.DoEvents();
         }
 
         private static object Invoke(MainForm form, string name, params object[] args)

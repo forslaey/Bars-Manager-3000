@@ -6,7 +6,7 @@ namespace ServiceTool
         internal static string Script(bool apply)
         {
             return @"$ErrorActionPreference='Stop';
-$errors=0;$issues=New-Object 'System.Collections.Generic.List[string]';
+$errors=0;$issues=New-Object 'System.Collections.Generic.List[string]';$auditErrors=0;$auditSkipped=0;
 $roots=New-Object 'System.Collections.Generic.List[string]';
 foreach($drive in [IO.DriveInfo]::GetDrives()){
  try{
@@ -15,11 +15,11 @@ foreach($drive in [IO.DriveInfo]::GetDrives()){
    $path=Join-Path $drive.RootDirectory.FullName $name;
    if(-not [IO.Directory]::Exists($path)){continue}
    $item=Get-Item -LiteralPath $path -Force;
-   if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){'Пропущена ссылка: '+$path;continue}
-   if($drive.DriveFormat -notin @('NTFS','ReFS')){'Разрешения Windows не поддерживаются: '+$path+' ('+$drive.DriveFormat+')';continue}
+   if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){$auditSkipped++;'Пропущена ссылка: '+$path;continue}
+   if($drive.DriveFormat -notin @('NTFS','ReFS')){$auditSkipped++;'Разрешения Windows не поддерживаются: '+$path+' ('+$drive.DriveFormat+')';continue}
    $roots.Add($path)
   }
- }catch{'Не удалось проверить диск '+$drive.Name+': '+$_.Exception.Message}
+ }catch{$auditErrors++;'Не удалось проверить диск '+$drive.Name+': '+$_.Exception.Message}
 }
 function GrantBarsFolder($root){
  $pending=New-Object 'System.Collections.Generic.Stack[string]';$pending.Push($root);$changed=0;$failed=0;$skipped=0;
@@ -48,14 +48,31 @@ function GrantBarsFolder($root){
  'Папка: '+$root+'; права подтверждены: '+$changed+'; ошибок / ограничений: '+$failed+'; ссылок пропущено: '+$skipped;
  return $failed
 }
-'Найдено папок: '+$roots.Count;
+'Count='+$roots.Count;$rootIndex=0;$auditChecked=0;$auditRestricted=0;
 foreach($root in $roots){'Папка: '+$root;
+'Root.'+$rootIndex+'='+$root;$rootIndex++;
 " + (apply ? @"
  $results=@(GrantBarsFolder $root);$results|Where-Object {$_ -is [string]};foreach($note in $results){if($note -is [string] -and $issues.Count -lt 50){$issues.Add($note)}};$errors+= [int]$results[-1];
 " : @"
- try{$acl=Get-Acl -LiteralPath $root;foreach($rule in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($rule.IdentityReference.Value -in @('S-1-5-32-545','S-1-5-32-544','S-1-5-18')){$rule.IdentityReference.Value+': '+$rule.AccessControlType+' '+$rule.FileSystemRights}}}catch{'Не удалось прочитать права: '+$_.Exception.Message}
+ $pending=New-Object 'System.Collections.Generic.Stack[string]';$pending.Push($root);
+ while($pending.Count -gt 0){
+  $path=$pending.Pop();$item=$null;
+  try{
+   $item=Get-Item -LiteralPath $path -Force;
+   if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){$auditSkipped++;continue}
+   $acl=Get-Acl -LiteralPath $path;$rules=$acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]);$ok=$true;
+   foreach($id in @('S-1-5-32-545','S-1-5-32-544','S-1-5-18')){
+    if(-not @($rules|Where-Object {$_.IdentityReference.Value -eq $id -and $_.AccessControlType -eq 'Allow' -and (($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -eq [Security.AccessControl.FileSystemRights]::FullControl) -and (($_.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0)}).Count){$ok=$false}
+   }
+   if(@($rules|Where-Object {$_.AccessControlType -eq 'Deny'}).Count){$ok=$false};$auditChecked++;if(-not $ok){$auditRestricted++}
+  }catch{$auditErrors++}
+  if($item -and $item.PSIsContainer -and (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0)){
+   try{foreach($child in Get-ChildItem -LiteralPath $path -Force -ErrorAction Stop){$pending.Push($child.FullName)}}catch{$auditErrors++}
+  }
+ }
 ") + @"
 }
+'Checked='+$auditChecked;'Restricted='+$auditRestricted;'Errors='+$auditErrors;'Skipped='+$auditSkipped;
 " + (apply ? "if($errors -gt 0){throw ('Часть папок или файлов не обработана полностью: '+$errors+'. '+[string]::Join([Environment]::NewLine,$issues))}" : "");
         }
     }
