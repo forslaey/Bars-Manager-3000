@@ -4,10 +4,29 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 namespace ServiceTool
 {
+    internal static class GridViewportLayout
+    {
+        internal static void UniformRows(DataGridView grid)
+        {
+            int height=0;
+            foreach(DataGridViewRow row in grid.Rows)height=Math.Max(height,row.GetPreferredHeight(row.Index,DataGridViewAutoSizeRowMode.AllCells,true));
+            foreach(DataGridViewRow row in grid.Rows)if(row.Height!=height)row.Height=height;
+        }
+        internal static int WholeRowsHeight(DataGridView grid,int limit)
+        {
+            int height=grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0;
+            int header=height;
+            foreach(DataGridViewRow row in grid.Rows){if(height+row.Height>limit)break;height+=row.Height;}
+            return height==header?Math.Max(1,limit):height;
+        }
+    }
+
     internal sealed class LibraryGridScrollBar : Control
     {
         private DataGridView grid;
         private bool dragging; private int dragOffset;
+        private bool correcting;
+        internal bool AlignToRows { get; set; }
         public ThemePalette Palette;
         public LibraryGridScrollBar()
         {
@@ -16,18 +35,46 @@ namespace ServiceTool
         }
         public void Bind(DataGridView target)
         {
-            grid = target; grid.Scroll += delegate { Invalidate(); }; grid.RowsAdded += delegate { Invalidate(); }; grid.RowsRemoved += delegate { Invalidate(); }; grid.SizeChanged += delegate { Invalidate(); };
+            grid = target; grid.Scroll += delegate { CorrectPosition(); Invalidate(); }; grid.RowsAdded += delegate { Invalidate(); }; grid.RowsRemoved += delegate { Invalidate(); }; grid.SizeChanged += delegate { CorrectPosition(); Invalidate(); };
             grid.MouseWheel += delegate(object sender, MouseEventArgs e) { MoveBy(-Math.Sign(e.Delta) * 3); var handled = e as HandledMouseEventArgs; if (handled != null) handled.Handled = true; };
         }
-        private int Maximum { get { return grid == null ? 0 : Math.Max(0, grid.RowCount - Math.Max(1, grid.DisplayedRowCount(false))); } }
-        private int First { get { return grid == null ? 0 : Math.Max(0, grid.FirstDisplayedScrollingRowIndex); } }
+        private int Maximum
+        {
+            get
+            {
+                if(grid==null||grid.RowCount==0)return 0;
+                int space=Math.Max(1,grid.ClientSize.Height-(grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0));
+                int first=grid.RowCount-1,used=grid.Rows[first].Height;
+                while(first>0&&used+grid.Rows[first-1].Height<=space){first--;used+=grid.Rows[first].Height;}
+                return first;
+            }
+        }
+        private void CorrectPosition()
+        {
+            if(correcting||grid==null||grid.RowCount==0)return;
+            int maximum=Maximum;
+            if(grid.FirstDisplayedScrollingRowIndex<=maximum)return;
+            correcting=true;try{grid.FirstDisplayedScrollingRowIndex=maximum;}finally{correcting=false;}
+        }
+        private int First { get { return grid == null ? 0 : Math.Min(Maximum,Math.Max(0, grid.FirstDisplayedScrollingRowIndex)); } }
+        private Rectangle Track
+        {
+            get
+            {
+                int top=AlignToRows&&grid!=null&&grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0;
+                int inset=Math.Min(6,Math.Max(0,(Height-top)/4));
+                return new Rectangle(0,top+inset,Width,Math.Max(1,Height-top-2*inset));
+            }
+        }
+        internal Rectangle ThumbBounds { get { return Thumb; } }
         private Rectangle Thumb
         {
             get
             {
-                int track = Math.Max(1, Height - 12), visible = grid == null ? 1 : Math.Max(1, grid.DisplayedRowCount(false));
+                Rectangle bounds=Track;
+                int track = bounds.Height, visible = grid == null ? 1 : Math.Max(1, grid.DisplayedRowCount(false));
                 int length = grid == null ? track : Math.Min(track, Math.Max(28, (int)((double)track * visible / Math.Max(1, grid.RowCount))));
-                int y = 6 + (Maximum == 0 ? 0 : (int)((double)(track - length) * First / Maximum));
+                int y = bounds.Top + (Maximum == 0 ? 0 : (int)((double)(track - length) * First / Maximum));
                 return new Rectangle(Width / 2 - 3, y, 6, length);
             }
         }
@@ -54,7 +101,7 @@ namespace ServiceTool
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e); if (!dragging || grid == null || grid.RowCount == 0) return;
-            int travel = Math.Max(1, Height - 12 - Thumb.Height), y = Math.Max(0, Math.Min(travel, e.Y - dragOffset - 6));
+            int travel = Math.Max(1, Track.Height - Thumb.Height), y = Math.Max(0, Math.Min(travel, e.Y - dragOffset - Track.Top));
             int next = Math.Max(0, Math.Min(Maximum, (int)Math.Round((double)y * Maximum / travel))); if (next != First) grid.FirstDisplayedScrollingRowIndex = next; Invalidate();
         }
         protected override void OnMouseUp(MouseEventArgs e) { dragging = false; Capture = false; base.OnMouseUp(e); Invalidate(); }

@@ -76,6 +76,10 @@ namespace ServiceTool
         { return new BrandButton { Text = text, Primary = primary, Palette = Colors, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 10, 0), Font = Font }; }
         protected Label Label(string text, bool muted)
         { return new Label { Text = text, Tag = muted ? "muted" : "", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty, AutoEllipsis = true }; }
+        protected Label ModuleHeading(string text)
+        { return new FlushLabel { Text=text,Font=new Font("Segoe UI",15,FontStyle.Bold),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true }; }
+        protected Label Caption(string text, bool muted)
+        { return new InputCaptionLabel { Text=text.TrimEnd(':')+":",Tag=muted?"muted":"",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true }; }
         public void SetTheme(bool dark, bool persist)
         {
             Colors = ThemePalette.Create(dark); BackColor = Colors.Canvas; ForeColor = Colors.Text;

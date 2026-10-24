@@ -103,7 +103,8 @@ namespace ServiceTool
                         if(form is LibraryManagerForm)
                         {
                             var actions=Children(form).OfType<Button>().Where(b=>new[]{"Открыть журнал","Перезагрузка","Компоненты"}.Contains(b.Text)).ToArray();
-                            Check(actions.Length==3&&actions.Select(b=>b.Size).Distinct().Count()==1,"All three footer actions have exactly equal dimensions");
+                            Check(actions.Length==3&&actions.Select(b=>b.Height).Distinct().Count()==1,"Footer actions have equal heights");
+                            Check(actions.Single(b=>b.Text=="Открыть журнал").Width>actions.Single(b=>b.Text=="Компоненты").Width,"Journal action remains wider for single-line text");
                         }
                         if(form is LibraryManagerForm && scale==1F)
                         {

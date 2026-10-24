@@ -31,7 +31,7 @@ namespace ServiceTool
                     {
                         var row=(TableLayoutPanel)eye.Parent;var box=(BrandTextBox)row.GetControlFromPosition(0,0);Check(eye.Left-box.Right>=8,"Eye has separate gap");
                     }
-                    var notice=All(dialog).OfType<Label>().Single(l=>l.Name=="passwordNotice");Check(notice.TextAlign==ContentAlignment.MiddleCenter&&notice.ForeColor==language.ForeColor,"Notice centered with matching theme warning color");
+                    var notice=All(dialog).OfType<Label>().Single(l=>l.Name=="passwordNotice");Check(notice.TextAlign==ContentAlignment.MiddleLeft&&notice.ForeColor==language.ForeColor,"Notice left aligned with matching theme warning color");
                     Check(Field<BrandButton>(dialog,"ok").Height<=60,"Normal dialog button height");Capture(dialog,"remote2324-"+id+"-"+dark);
                 }
                 foreach(float scale in new[]{1F,1.25F,1.5F,2F})

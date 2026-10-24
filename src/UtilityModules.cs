@@ -28,7 +28,7 @@ namespace ServiceTool
             Body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); Body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            var heading = Label(title, false); heading.Margin = new Padding(12, 8, 12, 4); heading.Font = new Font("Segoe UI", 15, FontStyle.Bold); Body.Controls.Add(heading, 0, 0);
+            var heading = ModuleHeading(title); heading.Margin = new Padding(12, 8, 12, 12); Body.Controls.Add(heading, 0, 0);
             var footer = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 8, 0, 0), Margin = Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -229,15 +229,15 @@ namespace ServiceTool
             preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,500));ClientSize=new Size(640,500);
             Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,12);
             Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
-            Body.GetControlFromPosition(0,0).Margin=new Padding(12,8,12,4);
+            Body.GetControlFromPosition(0,0).Margin=new Padding(12,8,12,12);
             var card=new Card {Dock=DockStyle.Fill,Padding=new Padding(16,16,16,8),Margin=new Padding(0,0,0,8)};
             var content=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=6,Margin=Padding.Empty};
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));
-            foreach(float height in new[]{26F,45F,8F,26F,45F,44F})content.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
-            var sourceCaption=Label("Будет взято из:",false);sourceCaption.TextAlign=ContentAlignment.BottomLeft;sourceCaption.Padding=new Padding(0,0,0,2);content.Controls.Add(sourceCaption,0,0);content.SetColumnSpan(sourceCaption,2);
+            foreach(float height in new[]{(float)PathFieldMetrics.CaptionHeight,(float)PathFieldMetrics.PickerHeight,12F,(float)PathFieldMetrics.CaptionHeight,(float)PathFieldMetrics.PickerHeight,44F})content.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+            var sourceCaption=Caption("Будет взято из:",false);content.Controls.Add(sourceCaption,0,0);content.SetColumnSpan(sourceCaption,2);
             sourceLabel=new BrandTextBox {Text=preview?@"C:\Библиотеки\_tools":"Выбери папку с утилитами",ReadOnly=true,AutoSize=false,Palette=Colors};
             chooseSource=Button("Выбрать папку…",false);chooseSource.Click+=delegate{Choose();};var sourceRow=new PathPickerRow(sourceLabel,chooseSource,168){Dock=DockStyle.Fill};content.Controls.Add(sourceRow,0,1);content.SetColumnSpan(sourceRow,2);
-            var targetCaption=Label("Путь распаковки:",false);targetCaption.TextAlign=ContentAlignment.BottomLeft;targetCaption.Padding=new Padding(0,0,0,2);content.Controls.Add(targetCaption,0,3);content.SetColumnSpan(targetCaption,2);
+            var targetCaption=Caption("Путь распаковки:",false);content.Controls.Add(targetCaption,0,3);content.SetColumnSpan(targetCaption,2);
             destination=new BrandTextBox {AutoSize=false,Palette=Colors,Text=ToolsDeployment.DefaultTarget};
             chooseTarget=Button("Выбрать путь…",false);chooseTarget.Click+=delegate{ChooseTarget();};var targetRow=new PathPickerRow(destination,chooseTarget,168){Dock=DockStyle.Fill};content.Controls.Add(targetRow,0,4);content.SetColumnSpan(targetRow,2);
             shortcuts.Text=PathFieldMetrics.ShortcutCaption;shortcuts.Checked=true;shortcuts.Dock=DockStyle.Fill;shortcuts.Margin=new Padding(0,16,0,0);shortcuts.Palette=Colors;content.Controls.Add(shortcuts,0,5);content.SetColumnSpan(shortcuts,2);

@@ -104,6 +104,9 @@ Invoke-TaskTests 'Ui2323Tests' 'ServiceTool.Ui2323Tests' ($taskUiSources + (Join
 Invoke-TaskTests 'FolderAuditTests' 'ServiceTool.FolderAuditTests' ($taskUiSources + (Join-Path $taskTests 'FolderAuditTests.cs'))
 
 Invoke-TaskTests 'Ui2324Tests' 'ServiceTool.Ui2324Tests' ($taskUiSources + (Join-Path $taskTests 'Ui2324Tests.cs'))
+Invoke-TaskTests 'Ui2328Tests' 'ServiceTool.Ui2328Tests' ($taskUiSources + (Join-Path $taskTests 'Ui2328Tests.cs'))
+Invoke-TaskTests 'Ui2329Tests' 'ServiceTool.Ui2329Tests' ($taskUiSources + (Join-Path $taskTests 'Ui2329Tests.cs'))
+Invoke-TaskTests 'Ui2330Tests' 'ServiceTool.Ui2330Tests' ($taskUiSources + (Join-Path $taskTests 'Ui2330Tests.cs'))
 
 Write-Output "Все проверки пройдены. Временные сборки: $taskBuild"
 Write-Output 'Реальные процедуры установки, удаления и управления службами не выполнялись.'

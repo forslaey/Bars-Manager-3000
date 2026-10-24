@@ -25,7 +25,7 @@ namespace ServiceTool
         private readonly bool preview;
         private readonly Func<string,SoftwarePackage> latestSource;
         private string source;
-        private bool busy,checking,closeAfter,applyingDefaults;
+        private bool busy,checking,closeAfter,applyingDefaults,fittingRows,fitRowsPending;
         private volatile bool cancelled;
         private LibrarySession session;
         internal bool MenuRequested {get;private set;}
@@ -35,33 +35,35 @@ namespace ServiceTool
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
             preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=Size.Empty}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{98F,0F,80F,84F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
-            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,4),Padding=new Padding(12,8,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,36));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,2));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            var title=Label("Программы для рабочего места пользователя",false);title.Font=new Font("Segoe UI",15,FontStyle.Bold);title.Margin=new Padding(0,0,12,0);heading.Controls.Add(title,0,0);
-            var folderGroup=new BufferedLayoutPanel {Dock=DockStyle.Right,Width=520,ColumnCount=1,RowCount=2,Margin=Padding.Empty};folderGroup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folderGroup.RowStyles.Add(new RowStyle(SizeType.Absolute,18));folderGroup.RowStyles.Add(new RowStyle(SizeType.Percent,100));folderGroup.Controls.Add(Label("Папка установщиков:",true),0,0);
+            foreach(float height in new[]{110F,0F,128F,84F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
+            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,4),Padding=new Padding(12,8,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,32));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,6));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var title=ModuleHeading("Программы для рабочего места пользователя");title.Margin=new Padding(0,0,12,0);heading.Controls.Add(title,0,0);
+            var folderGroup=new BufferedLayoutPanel {Dock=DockStyle.Right,Width=520,ColumnCount=1,RowCount=2,Margin=Padding.Empty};folderGroup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folderGroup.RowStyles.Add(new RowStyle(SizeType.Absolute,PathFieldMetrics.CaptionHeight));folderGroup.RowStyles.Add(new RowStyle(SizeType.Percent,100));folderGroup.Controls.Add(Caption("Папка установщиков:",true),0,0);
             sourceLabel=new BrandTextBox {Text="Папка не выбрана",ReadOnly=true,AutoSize=false,Palette=Colors};
             folderButton=Button("Выбрать папку...",false);folderButton.Click+=async delegate {if(!busy&&ChooseSource())await RefreshPackages();};
             var sourceRow=new PathPickerRow(sourceLabel,folderButton,176){Dock=DockStyle.Fill};folderGroup.Controls.Add(sourceRow,0,1);
             heading.Layout+=delegate{int width=Math.Min(heading.ClientSize.Width,sourceRow.PreferredRowWidth);if(folderGroup.Width!=width)folderGroup.Width=width;};
             heading.Controls.Add(folderGroup,0,2);body.Controls.Add(heading,0,0);
             var tableCard=new Panel {Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
-            ConfigureGrid();gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.Bind(grid);tableCard.Controls.Add(grid);tableCard.Controls.Add(gridScroll);
-            tableCard.Layout+=delegate{gridScroll.Visible=grid.RowCount>0&&grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(row=>row.Height)>tableCard.ClientSize.Height;};body.Controls.Add(tableCard,0,1);
+            ConfigureGrid();gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);tableCard.Controls.Add(grid);tableCard.Controls.Add(gridScroll);
+            // Reserve the scrollbar lane so scrolling cannot change column widths and row heights.
+            body.Controls.Add(tableCard,0,1);
             bool arrangingTable=false;
             body.Layout+=delegate {
                 if(arrangingTable||grid.Rows.Count==0)return;arrangingTable=true;
                 try {
                     int available=body.ClientSize.Height-(int)body.RowStyles[0].Height-(int)body.RowStyles[3].Height;
                     int desired=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(row=>row.Height);
-                    int optionMinimum=(int)Math.Ceiling(84*body.RowStyles[3].Height/84F);
-                    int tableHeight=Math.Max(1,Math.Min(desired,available-optionMinimum));
-                    body.RowStyles[1].SizeType=SizeType.Absolute;body.RowStyles[1].Height=tableHeight;
-                    body.RowStyles[2].SizeType=SizeType.Percent;body.RowStyles[2].Height=100;
+                    int optionMinimum=(int)Math.Ceiling(128*body.RowStyles[3].Height/84F);
+                    int limit=Math.Max(1,Math.Min(desired,available-optionMinimum));
+                    int tableHeight=GridViewportLayout.WholeRowsHeight(grid,limit);
+                    if(body.RowStyles[1].SizeType!=SizeType.Absolute||Math.Abs(body.RowStyles[1].Height-tableHeight)>0.5F){body.RowStyles[1].SizeType=SizeType.Absolute;body.RowStyles[1].Height=tableHeight;}
+                    if(body.RowStyles[2].SizeType!=SizeType.Percent){body.RowStyles[2].SizeType=SizeType.Percent;body.RowStyles[2].Height=100;}
                 }finally{arrangingTable=false;}
             };
-            grid.RowHeightChanged+=delegate{body.PerformLayout();};grid.ColumnWidthChanged+=delegate{body.PerformLayout();};
-            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Margin=new Padding(4,0,0,0),Padding=new Padding(0,6,0,6)};options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            options.RowStyles.Add(new RowStyle(SizeType.Percent,50));foreach(var item in new[]{defaults,chromeDefaults,remote}) {options.RowStyles.Add(new RowStyle(SizeType.Absolute,24));item.Dock=DockStyle.Fill;item.Margin=Padding.Empty;item.Palette=Colors;}
+            grid.RowHeightChanged+=delegate{body.PerformLayout();};grid.ColumnWidthChanged+=delegate{QueueFitRows();};
+            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Margin=new Padding(4,0,0,0),Padding=new Padding(0,10,0,10)};options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            options.RowStyles.Add(new RowStyle(SizeType.Percent,50));foreach(var item in new[]{defaults,chromeDefaults,remote}) {options.RowStyles.Add(new RowStyle(SizeType.Absolute,36));item.Dock=DockStyle.Fill;item.Margin=Padding.Empty;item.Palette=Colors;}
             defaults.Text="Применить ассоциации Notepad++ и 7-Zip для всех пользователей при входе";defaults.Checked=false;
             remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=false;
             chromeDefaults.Text="Сделать Chrome браузером по умолчанию для всех поддерживаемых файлов и ссылок";chromeDefaults.Checked=true;
@@ -79,14 +81,14 @@ namespace ServiceTool
             back=Button("В меню",false);ModuleNavigation.Configure(back);back.Click+=delegate{MenuRequested=true;Close();};footer.Controls.Add(back,1,0);
             // Navigation and the journal stay outside the scrolling work area.
             // Only unusually short screens or large text require scrolling it.
-            body.RowCount=4;while(body.RowStyles.Count>4)body.RowStyles.RemoveAt(body.RowStyles.Count-1);body.MinimumSize=new Size(0,520);
+            body.RowCount=4;while(body.RowStyles.Count>4)body.RowStyles.RemoveAt(body.RowStyles.Count-1);body.MinimumSize=new Size(0,440);
             var outer=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=Padding.Empty};outer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent,100));outer.RowStyles.Add(new RowStyle(SizeType.Absolute,78));outer.RowStyles.Add(new RowStyle(SizeType.Absolute,50));
-            outer.Controls.Add(new FillContentPanel(body){Margin=Padding.Empty},0,0);outer.Controls.Add(logCard,0,1);outer.Controls.Add(footer,0,2);Root.Controls.Add(outer,0,1);
+            outer.Controls.Add(new FillContentPanel(body){Margin=Padding.Empty,PreserveScrollOnFocus=true},0,0);outer.Controls.Add(logCard,0,1);outer.Controls.Add(footer,0,2);Root.Controls.Add(outer,0,1);
             try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){Log(ex.Message);}
             SetTheme(Colors.Dark,false);
             UpdateRows();
-            Shown+=async delegate {grid.PerformLayout();grid.AutoResizeRows(DataGridViewAutoSizeRowsMode.AllCells);if(preview)FillPreview();else await RefreshPackages();grid.PerformLayout();body.PerformLayout();};
+            Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else await RefreshPackages();grid.PerformLayout();body.PerformLayout();};
             FormClosing+=delegate(object sender,FormClosingEventArgs e)
             {
                 if(!busy)return;if(checking){cancelled=true;if(session!=null)session.Cancel();return;}e.Cancel=true;
@@ -100,7 +102,7 @@ namespace ServiceTool
             grid.Dock=DockStyle.Fill;grid.Margin=Padding.Empty;grid.BorderStyle=BorderStyle.None;
             grid.AllowUserToAddRows=grid.AllowUserToDeleteRows=grid.AllowUserToResizeRows=grid.AllowUserToResizeColumns=grid.AllowUserToOrderColumns=false;
             grid.ReadOnly=true;grid.TouchScrollingEnabled=true;grid.RowHeadersVisible=false;grid.MultiSelect=false;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;
-            grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.AllCells;
+            grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.None;
             grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=44;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             grid.ColumnHeadersDefaultCellStyle.Font=headerFont;grid.ColumnHeadersDefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;
             grid.DefaultCellStyle.Font=new Font("Segoe UI",9.5F);grid.DefaultCellStyle.Padding=new Padding(4);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
@@ -129,6 +131,20 @@ namespace ServiceTool
                 finally{e.Graphics.Restore(saved);}
                 e.Paint(e.CellBounds,DataGridViewPaintParts.Border|DataGridViewPaintParts.Focus);e.Handled=true;
             };
+        }
+        private void QueueFitRows()
+        {
+            if(fitRowsPending||!IsHandleCreated||IsDisposed)return;fitRowsPending=true;
+            BeginInvoke((MethodInvoker)delegate{fitRowsPending=false;if(!IsDisposed)FitRows();});
+        }
+        private void FitRows()
+        {
+            if(fittingRows||grid.RowCount==0)return;fittingRows=true;
+            try
+            {
+                GridViewportLayout.UniformRows(grid);
+            }
+            finally{fittingRows=false;}
         }
         private void ToggleSelection(int index)
         {
@@ -206,7 +222,7 @@ namespace ServiceTool
                 if(allowed)selectable.Add(id);else selection.Remove(id);row.Cells[0].Value=selection.Contains(id);
                 row.Cells[0].ToolTipText=allowed?"Щёлкни, чтобы выбрать или снять отметку":"Сначала проверь установленную программу и пакет";
             }
-            UpdateActions();
+            FitRows();UpdateActions();
         }
         private string[] ChosenInstalled(bool remoteOnly=false)
         {return SoftwareCatalog.Apps.Where(a=>selection.Contains(a.Id)&&(!remoteOnly||a.Remote)&&checks.ContainsKey(a.Id)&&checks[a.Id].State==LibraryState.Installed).Select(a=>a.Id).ToArray();}
@@ -360,7 +376,7 @@ namespace ServiceTool
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,64));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             heading.Controls.Add(new Label {Text="Постоянный пароль для "+SoftwareCatalog.Find(id).Name+"\r\nПодключение без подтверждения на этом компьютере",Dock=DockStyle.Fill,ForeColor=colors.Text,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,0);
             logo=BrandAssets.LoadSoftwareIcon(id);heading.Controls.Add(new PictureBox {Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Dock=DockStyle.Fill,Margin=new Padding(8,8,0,8)},1,0);layout.Controls.Add(heading,0,0);
-            layout.Controls.Add(new Label {Text="Пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty,TextAlign=ContentAlignment.BottomLeft,Padding=new Padding(0,0,0,2)},0,1);layout.Controls.Add(new Label {Text="Подтверди пароль",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty,TextAlign=ContentAlignment.BottomLeft,Padding=new Padding(0,0,0,2)},0,3);
+            layout.Controls.Add(new InputCaptionLabel {Text="Пароль:",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty,TextAlign=ContentAlignment.BottomLeft,Padding=new Padding(0,0,0,2)},0,1);layout.Controls.Add(new InputCaptionLabel {Text="Подтверди пароль:",Dock=DockStyle.Fill,ForeColor=colors.Text,Margin=Padding.Empty,TextAlign=ContentAlignment.BottomLeft,Padding=new Padding(0,0,0,2)},0,3);
             foreach(var box in new[]{input,confirmation}){box.Dock=DockStyle.Fill;box.UseSystemPasswordChar=true;box.MaxLength=128;box.Palette=colors;box.BackColor=colors.SurfaceAlt;box.ForeColor=colors.Text;box.Margin=new Padding(0,0,0,4);}
             layout.Controls.Add(PasswordRow(input,colors),0,2);layout.Controls.Add(PasswordRow(confirmation,colors),0,4);
             var languageRow=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
@@ -370,7 +386,7 @@ namespace ServiceTool
             remember.Text="Запомнить на этом компьютере для моей учётной записи";remember.Dock=DockStyle.Fill;remember.Palette=colors;remember.Margin=Padding.Empty;layout.Controls.Add(remember,0,8);
             standard.Text="Использовать стандартный пароль BARS";standard.Dock=DockStyle.Fill;standard.Palette=colors;standard.Margin=Padding.Empty;layout.Controls.Add(standard,0,7);
             standard.CheckedChanged+=delegate{if(standard.Checked){customPassword=input.Text;customConfirmation=confirmation.Text;input.Text=confirmation.Text="Dk3651340";}else{input.Text=customPassword;confirmation.Text=customConfirmation;}input.Enabled=confirmation.Enabled=!standard.Checked;input.UseSystemPasswordChar=confirmation.UseSystemPasswordChar=true;foreach(var eye in eyes){eye.Enabled=!standard.Checked;eye.Revealed=false;eye.AccessibleName="Показать пароль";eye.Invalidate();}};
-            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,Name="passwordNotice",TextAlign=ContentAlignment.MiddleCenter,ForeColor=colors.Dark?colors.Warning:Color.FromArgb(190,35,35),Font=new Font("Segoe UI",9),Margin=new Padding(0,12,0,4)},0,9);
+            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,Name="passwordNotice",TextAlign=ContentAlignment.MiddleLeft,ForeColor=colors.Dark?colors.Warning:Color.FromArgb(190,35,35),Font=new Font("Segoe UI",9),Margin=new Padding(0,12,0,4)},0,9);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var cancel=new BrandButton {Text="Отмена",Palette=colors,Dock=DockStyle.Fill,DialogResult=DialogResult.Cancel,Margin=new Padding(0,0,10,0)};actions.Controls.Add(cancel,0,0);
             ok=new BrandButton {Text="Продолжить",Palette=colors,Primary=true,Dock=DockStyle.Fill,Margin=Padding.Empty,Enabled=false};

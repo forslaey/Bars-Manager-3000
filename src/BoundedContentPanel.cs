@@ -9,6 +9,9 @@ namespace ServiceTool
     // reliably to WinForms AutoScroll. Size the service content explicitly.
     internal sealed class FillContentPanel : Panel
     {
+        internal bool PreserveScrollOnFocus { get; set; }
+        protected override Point ScrollToControl(Control activeControl)
+        { return PreserveScrollOnFocus ? AutoScrollPosition : base.ScrollToControl(activeControl); }
         private readonly Control content;
         private bool arranging,ready,pending,loadHooked;
         [DllImport("uxtheme.dll",CharSet=CharSet.Unicode)] private static extern int SetWindowTheme(IntPtr handle,string app,string identifiers);

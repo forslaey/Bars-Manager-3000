@@ -34,6 +34,7 @@ namespace ServiceTool
     {
         public bool Dark;
         public Color Canvas, Surface, SurfaceAlt, Text, Muted, Border;
+        public Color InputBorder { get { return Dark ? Border : Accent; } }
         public Color Accent, AccentText, Good, Warning, Danger;
         public Color Selection, SelectionText, DisabledSurface, DisabledText;
 
@@ -105,6 +106,18 @@ namespace ServiceTool
     internal sealed partial class ServiceGrid : DataGridView
     {
         public ServiceGrid() { DoubleBuffered = true; SetStyle(ControlStyles.ResizeRedraw, true); }
+    }
+
+    internal sealed class InputCaptionLabel : Label
+    {
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var bounds=new Rectangle(Padding.Left,Padding.Top,Math.Max(1,ClientSize.Width-Padding.Horizontal),Math.Max(1,ClientSize.Height-Padding.Vertical));
+            TextFormatFlags flags=TextFormatFlags.NoPadding|TextFormatFlags.NoPrefix|TextFormatFlags.SingleLine;
+            flags|=TextAlign==ContentAlignment.BottomLeft?TextFormatFlags.Bottom:TextFormatFlags.VerticalCenter;
+            if(AutoEllipsis)flags|=TextFormatFlags.EndEllipsis;
+            TextRenderer.DrawText(e.Graphics,Text,Font,bounds,ForeColor,flags);
+        }
     }
 
     internal sealed class FlushLabel : Label
@@ -465,7 +478,9 @@ namespace ServiceTool
     // Retain the native edit behavior, selection and password masking; paint only its border.
     internal sealed class BrandTextBox : TextBox
     {
-        public ThemePalette Palette;
+        private ThemePalette palette;
+        public ThemePalette Palette { get { return palette; } set { palette=value; Invalidate(); PaintBorder(); } }
+        public BrandTextBox() { BorderStyle=BorderStyle.FixedSingle; }
         [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetWindowDC(IntPtr handle);
         [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr handle, IntPtr dc);
         protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); PaintBorder(); }
@@ -474,21 +489,21 @@ namespace ServiceTool
         protected override void WndProc(ref Message message)
         {
             base.WndProc(ref message);
-            if (message.Msg == 0x000F || message.Msg == 0x0085 || message.Msg == 0x0317 || message.Msg == 0x0318) PaintBorder();
+            if (message.Msg == 0x000F || message.Msg == 0x0085 || message.Msg == 0x0317 || message.Msg == 0x0318) PaintBorder(message.Msg==0x0317 ? message.WParam : IntPtr.Zero);
         }
-        private void PaintBorder()
+        private void PaintBorder(IntPtr printDc = default(IntPtr))
         {
             if (!IsHandleCreated || IsDisposed || BorderStyle != BorderStyle.FixedSingle) return;
             ThemePalette p = Palette ?? ThemePalette.Create(false);
-            IntPtr dc = GetWindowDC(Handle);
+            IntPtr dc = printDc==IntPtr.Zero ? GetWindowDC(Handle) : printDc;
             if (dc == IntPtr.Zero) return;
             try
             {
                 using (Graphics graphics = Graphics.FromHdc(dc))
-                using (Pen edge = new Pen(Enabled && Focused ? p.Accent : p.Border))
+                using (Pen edge = new Pen(Enabled && Focused ? p.Accent : p.InputBorder))
                     graphics.DrawRectangle(edge, 0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
             }
-            finally { ReleaseDC(Handle, dc); }
+            finally { if(printDc==IntPtr.Zero)ReleaseDC(Handle, dc); }
         }
     }
 
@@ -653,6 +668,7 @@ namespace ServiceTool
     }
     internal static class PathFieldMetrics
     {
+        internal const int CaptionHeight=24, PickerHeight=36;
         internal const string ShortcutCaption="Создать ярлыки на рабочем столе";
         internal static System.Drawing.Size Measure(System.Windows.Forms.Control control)
         {

@@ -262,7 +262,7 @@ namespace ServiceTool
             Assert(Field<Button>(form, "chooseButton").Text == "Выбрать службу...", "File picker uses the requested service caption");
             FlushLabel fileTitle = Field<FlushLabel>(form, "fileTitle");
             Assert(fileTitle.Text == "Перетащи сюда .exe-файл службы BARS или выбери файл кнопкой.", "File drop zone uses the requested combined wording");
-            Assert(fileTitle.SingleLine && ((TableLayoutPanel)fileTitle.Parent).GetRow(fileTitle) == 3, "Combined instruction is single-line at the former lower caption position");
+            Assert(fileTitle.SingleLine && ((TableLayoutPanel)fileTitle.Parent).GetRow(fileTitle) == 2, "Combined instruction is single-line between equal vertical gaps");
             int helpCount = 0;
             foreach (Control control in AllControls(form))
             {

@@ -57,11 +57,11 @@ namespace ServiceTool
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
-            var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(12), Margin = new Padding(0, 0, 0, 12) };
+            var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(12,8,12,12), Margin = new Padding(0, 0, 0, 12) };
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
-            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
-            Label title = Label("Менеджер системных библиотек Windows", false); title.Font = new Font("Segoe UI", 15, FontStyle.Bold); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
+            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
+            Label title = ModuleHeading("Менеджер системных библиотек Windows"); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
             monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.None; monitor.Anchor = AnchorStyles.Right | AnchorStyles.Bottom; monitor.Checked = true; monitor.Margin = Padding.Empty; monitor.Height = 28;
             monitor.CheckedChanged += delegate { timer.Enabled = monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 2); statusLayout.SetRowSpan(monitor, 2);
             statusLayout.Layout += delegate
@@ -97,12 +97,12 @@ namespace ServiceTool
             journal.Dock = DockStyle.Fill; journal.Font = new Font("Consolas", 9); journalScroll.Dock = DockStyle.Right; journalScroll.Width = 14; journalScroll.Bind(journal);
             logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(logCard, 0, 2);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 2, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            restart = Button("Перезагрузка", false); restart.Margin = new Padding(0, 0, 10, 0); restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            restart = Button("Перезагрузка", false); ModuleNavigation.Configure(restart); restart.Margin = new Padding(0, 0, 10, 0); restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
             activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0); footer.SetColumnSpan(activity, 5);
-            report = Button("Открыть журнал", false); report.Click += delegate { OpenJournal(); }; footer.Controls.Add(report, 1, 1);
+            report = Button("Открыть журнал", false); ModuleNavigation.Configure(report); report.Width=180; report.Margin=new Padding(0,0,10,0); report.Click += delegate { OpenJournal(); }; footer.Controls.Add(report, 1, 1);
             BrandButton back = Button("В меню", false); ModuleNavigation.Configure(back); back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
-            windowsComponents = Button("Компоненты", false); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
+            windowsComponents = Button("Компоненты", false); ModuleNavigation.Configure(windowsComponents); windowsComponents.Margin=new Padding(0,0,10,0); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false); UpdateSource();
             timer.Tick += async delegate { if (!installing && !checking && Visible) await RefreshAsync(false); };

@@ -31,7 +31,18 @@ namespace ServiceTool
             var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Activity.AutoEllipsis=true;
             ConfigureGrid();
             var table=new Panel{Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
-            var slot=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.Bind(grid);slot.Controls.Add(grid);slot.Controls.Add(gridScroll);table.Controls.Add(slot);Body.Controls.Add(table,0,1);
+            var slot=new Panel{Dock=DockStyle.Top,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);slot.Controls.Add(grid);slot.Controls.Add(gridScroll);table.Controls.Add(slot);Body.Controls.Add(table,0,1);
+            bool pendingTable=false,arrangingTable=false;
+            Action arrangeTable=delegate {
+                if(arrangingTable||grid.RowCount==0)return;arrangingTable=true;
+                try{GridViewportLayout.UniformRows(grid);int height=GridViewportLayout.WholeRowsHeight(grid,table.ClientSize.Height);if(slot.Height!=height)slot.Height=height;}
+                finally{arrangingTable=false;}
+            };
+            Action queueTable=delegate {
+                if(pendingTable||!table.IsHandleCreated||table.IsDisposed)return;pendingTable=true;
+                table.BeginInvoke((MethodInvoker)delegate{pendingTable=false;if(!table.IsDisposed)arrangeTable();});
+            };
+            table.SizeChanged+=delegate{queueTable();};grid.ColumnWidthChanged+=delegate{queueTable();};grid.CellValueChanged+=delegate{queueTable();};Shown+=delegate{queueTable();};
             var actions=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=new Padding(0,10,0,6)};
             foreach(int weight in new[]{34,33,33})actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,weight));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             applyButton=Button("Применить профиль",true);applyButton.Click+=async delegate{await Apply(SelectedGroup,false);};
@@ -48,7 +59,7 @@ namespace ServiceTool
             grid.Dock=DockStyle.Fill;grid.Margin=Padding.Empty;grid.BorderStyle=BorderStyle.None;grid.ReadOnly=true;grid.RowHeadersVisible=false;
             grid.AllowUserToAddRows=grid.AllowUserToDeleteRows=grid.AllowUserToResizeRows=grid.AllowUserToResizeColumns=grid.AllowUserToOrderColumns=false;
             grid.MultiSelect=false;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;
-            grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.AllCells;grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=56;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.None;grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=56;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             grid.ColumnHeadersDefaultCellStyle.Font=headerFont;grid.ColumnHeadersDefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;
             grid.DefaultCellStyle.Padding=new Padding(8);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
             grid.CellBorderStyle=DataGridViewCellBorderStyle.Single;grid.ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.Single;grid.ScrollBars=ScrollBars.None;grid.TouchScrollingEnabled=true;

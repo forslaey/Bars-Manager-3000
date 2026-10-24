@@ -107,6 +107,7 @@ namespace ServiceTool
         private readonly GuideReaderScrollBar readerScroll=new GuideReaderScrollBar();
         private readonly GuideSectionScrollBar sectionScroll=new GuideSectionScrollBar();
         private readonly Label results = new Label();
+        private readonly Label searchCaption;
         private readonly BrandButton previous, next;
         private readonly List<Tuple<GuideSection, int>> hits = new List<Tuple<GuideSection, int>>();
         private int activeHit = -1;
@@ -125,7 +126,9 @@ namespace ServiceTool
             find.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55)); find.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45));
             for (int i = 0; i < 3; i++) find.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
             find.RowStyles.Add(new RowStyle(SizeType.Absolute,24));find.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            find.Controls.Add(Label("Поиск по всей инструкции", false), 0, 0);
+            searchCaption = Caption("Поиск по всей инструкции:", false);
+            searchCaption.Font = new Font(Font, FontStyle.Bold);
+            find.Controls.Add(searchCaption, 0, 0);
             search.Dock = DockStyle.None;search.Anchor=AnchorStyles.Left|AnchorStyles.Right; search.AutoSize = true; search.Margin = new Padding(0, 0, 10, 0); search.AccessibleName = "Поиск по всей инструкции";
             find.Controls.Add(search, 0, 1);search.Height=search.PreferredHeight;search.FontChanged+=delegate{search.Height=search.PreferredHeight;};
             previous = Button("Назад", false); next = Button("Далее", false); var clear = Button("Сбросить", false); clear.Margin = Padding.Empty;
@@ -227,6 +230,7 @@ namespace ServiceTool
 
         protected override void OnThemeChanged()
         {
+            if (searchCaption != null) searchCaption.ForeColor = Colors.Dark ? Color.Yellow : Color.Black;
             if (reader == null || sections == null) return;
             sectionScroll.Palette=Colors;sectionScroll.BackColor=Colors.Surface;readerScroll.Palette=Colors;readerScroll.BackColor=Colors.Surface;reader.BackColor = sections.BackColor = Colors.Surface; reader.ForeColor = sections.ForeColor = Colors.Text;
             if (reader.IsHandleCreated) ShowSection(false);

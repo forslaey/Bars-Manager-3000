@@ -297,9 +297,9 @@ namespace ServiceTool
             TableLayoutPanel fileLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = new Padding(0), Padding = new Padding(0) };
             fileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
-            fileLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+            fileLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+            fileLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
             fileCard.Controls.Add(fileLayout);
             fileTitle.Text = "Перетащи сюда .exe-файл службы BARS или выбери файл кнопкой.";
@@ -307,10 +307,11 @@ namespace ServiceTool
             fileTitle.Dock = DockStyle.Fill;
             fileTitle.AutoEllipsis = true;
             fileTitle.SingleLine = true;
+            fileTitle.TextAlign = ContentAlignment.MiddleLeft;
             fileTitle.Margin = new Padding(0);
             var moduleTitle=new FlushLabel {Text="Менеджер служб",Font=new Font("Segoe UI",15F,FontStyle.Bold),Dock=DockStyle.Fill,Margin=Padding.Empty,TextAlign=ContentAlignment.MiddleLeft};
             fileLayout.Controls.Add(moduleTitle,0,0);
-            fileLayout.Controls.Add(fileTitle, 0, 3);
+            fileLayout.Controls.Add(fileTitle, 0, 2);
             TableLayoutPanel fileInput = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 2, Margin = new Padding(0) };
             fileInput.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             fileInput.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 192));
@@ -535,7 +536,7 @@ namespace ServiceTool
             Label managementLabel = new FlushLabel { Text = "Действия для выбранной службы", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(12, 0, 0, 0) };
             management.Controls.Add(managementLabel, 0, 0);
             management.SetColumnSpan(managementLabel, 3);
-            Label startupLabel = new FlushLabel { Text = "Режим запуска", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(12, 0, 0, 0) };
+            Label startupLabel = new FlushLabel { Text = "Режим запуска:", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(8, 0, 0, 0) };
             management.Controls.Add(startupLabel, 3, 0);
             startButton = MakeButton("Запустить", false);
             stopButton = MakeButton("Остановить", false);
@@ -783,7 +784,7 @@ namespace ServiceTool
             {
                 background = palette.SurfaceAlt;
                 control.BackColor = background;
-                pathField.EdgeColor = palette.Border;
+                pathField.EdgeColor = palette.InputBorder;
                 pathField.FocusColor = palette.Accent;
                 pathField.Invalidate();
             }
