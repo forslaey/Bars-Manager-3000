@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 namespace ServiceTool
@@ -11,6 +11,15 @@ namespace ServiceTool
         internal static string Status(string group,IDictionary<string,string> values)
         {
             if(values.ContainsKey(group+".Error"))return "Проверка не выполнена\nПодробности в журнале";
+            if(group=="kiosk")
+            {
+                string support=Get(values,"kiosk.Support"),state=Get(values,"kiosk.Configured");
+                if(support=="Unavailable")return "Недоступно в этой версии Windows";
+                string status=state=="1"?"Ограничения записаны для всех пользователей":state=="0"?"Ограничения КСО не заданы полностью":"Не удалось проверить настройки КСО";
+                if(support=="Unconfirmed")status+="\nДействие в этой редакции не подтверждено";
+                else if(state=="1")status+="\nПроверь жесты после перезагрузки";
+                return status;
+            }
             if(group=="admin")return Capital(Enabled(Get(values,"admin.EnableLUA")));
             if(group=="firewall")return "Доменный: "+Enabled(Get(values,"firewall.Domain"))+"\nЧастный: "+Enabled(Get(values,"firewall.Private"))+"\nОбщедоступный: "+Enabled(Get(values,"firewall.Public"));
             if(group=="defender"){
@@ -38,6 +47,7 @@ namespace ServiceTool
         internal static string Error(string text)
         {
             text=text??"";
+            if(text.StartsWith("Режим КСО",StringComparison.Ordinal))return text;
             if(text.IndexOf("недоступ",StringComparison.OrdinalIgnoreCase)>=0||text.IndexOf("not recognized",StringComparison.OrdinalIgnoreCase)>=0)return "Эта функция недоступна в текущей конфигурации Windows.";
             if(text.IndexOf("denied",StringComparison.OrdinalIgnoreCase)>=0||text.IndexOf("доступ",StringComparison.OrdinalIgnoreCase)>=0)return "Windows не предоставила доступ к настройке. Проверь права администратора и ограничения организации.";
             if(text.IndexOf("Defender",StringComparison.OrdinalIgnoreCase)>=0)return "Защитник Windows не подтвердил изменение. Возможны ограничения политики или защита от изменений.";
@@ -46,6 +56,13 @@ namespace ServiceTool
         }
         internal static IEnumerable<string> Details(string group,IDictionary<string,string> values)
         {
+            if(group=="kiosk")
+            {
+                yield return "Настройки КСО применяются ко всему компьютеру, независимо от учётной записи.";
+                string backup=Get(values,"kiosk.BackupState");if(backup.Length>0)yield return "Копия прежних настроек: "+backup.ToLowerInvariant()+".";
+                if(Get(values,"kiosk.Support")=="Unconfirmed")yield return "Редакция Windows не входит в документированный список поддержки этих политик. Запись в реестр не подтверждает блокировку жестов.";
+                yield return "Политики организации могут изменить эти параметры. Баннеры уведомлений и сочетания клавиш этим режимом не отключаются.";
+            }
             if(group=="passwords"&&!values.ContainsKey("passwords.Error"))foreach(var p in InitialSystemSettings.PasswordPolicies)
             {
                 string v=Get(values,"passwords."+p.Name);if(v=="-1"&&p.Name=="MaximumPasswordAge")v="0";

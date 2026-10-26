@@ -125,7 +125,14 @@ function ReadPolicies($file){$values=@{};$section='';foreach($line in Get-Conten
         internal static LibraryInstallResult Run(string data,Action<string> progress)
         {
             var parts=(data??"").Split(':');if(parts.Length!=2)throw new InvalidDataException("Неверный запрос настроек");
-            if(parts[0]=="query"&&parts[1]=="all")return RunScript(QueryScript(),progress,true);
+            if(parts[1]=="kiosk")return KioskTouchSettings.Run(parts[0],progress);
+            if(parts[0]=="query"&&parts[1]=="all")
+            {
+                var result=RunScript(QueryScript(),progress,true);
+                try{result.Message+=Environment.NewLine+KioskTouchSettings.Run("query",null).Message;}
+                catch(Exception ex){result.Message+=Environment.NewLine+"kiosk.Error="+ex.Message.Replace("\r"," ").Replace("\n"," ");}
+                return result;
+            }
             return RunScript(Script(parts[0],parts[1]),progress);
         }
     }

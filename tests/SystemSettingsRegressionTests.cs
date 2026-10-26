@@ -26,7 +26,7 @@ namespace ServiceTool
                 foreach(bool dark in new[]{false,true})using(var form=new InitialSystemSettingsForm(true))
                 {
                     form.SetTheme(dark,false);form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.Show();Application.DoEvents();
-                    var grid=Field<ServiceGrid>(form,"grid");Check(grid.RowCount==6&&grid.TouchScrollingEnabled,"Six settings, native touch scrolling");
+                    var grid=Field<ServiceGrid>(form,"grid");Check(grid.RowCount==7&&grid.TouchScrollingEnabled,"Seven settings, native touch scrolling");
                     for(int pass=0;pass<8;pass++)
                     {
                         form.WindowState=FormWindowState.Maximized;Application.DoEvents();form.WindowState=FormWindowState.Normal;form.ClientSize=pass%2==0?new Size(1000,740):new Size(1200,900);Application.DoEvents();
