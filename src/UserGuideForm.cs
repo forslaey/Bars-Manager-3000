@@ -139,7 +139,7 @@ namespace ServiceTool
             var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 275)); content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            sections.Dock = DockStyle.Fill; sections.IntegralHeight = false; sections.BorderStyle = BorderStyle.FixedSingle; sections.Margin = Padding.Empty;
+            sections.Dock = DockStyle.Fill; sections.IntegralHeight = false; sections.BorderStyle = BorderStyle.None; sections.Margin = Padding.Empty;
             sections.Font = new Font("Segoe UI", 10F); sections.AccessibleName = "Разделы инструкции";
             sections.DrawItem += delegate(object sender, DrawItemEventArgs e)
             {

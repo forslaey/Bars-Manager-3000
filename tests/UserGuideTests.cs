@@ -61,6 +61,9 @@ namespace ServiceTool
                 {
                     guide.SetTheme(dark, false); Show(guide, scale);
                     var search = Field<BrandTextBox>(guide, "search"); var list = Field<ListBox>(guide, "sections"); var reader = Field<RichTextBox>(guide, "reader");
+                    Check(list.BorderStyle == BorderStyle.None, "Section menu has no native hover border");
+                    list.Focus(); Application.DoEvents();
+                    Check(list.BorderStyle == BorderStyle.None && list.TabStop, "Focus keeps border absent without disabling keyboard access");
                     Check(list.Items.Count == UserGuide.Sections.Length, "Empty search lists all sections");
                     Check(reader.ReadOnly && reader.WordWrap, "Guide is read-only and wraps text");
                     foreach (var button in All(guide).OfType<BrandButton>()) Check(button.Parent.ClientRectangle.Contains(button.Bounds), "Guide button fits at scale " + scale);
