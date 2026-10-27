@@ -126,10 +126,10 @@ namespace ServiceTool
             // Percentages of an odd pixel count round to different heights, so the three rows are
             // sized explicitly to identical values whenever the panel is resized.
             modules.SizeChanged += delegate { EqualRows(modules, 2); };
-            modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер служб", delegate { using (var form = new MainForm(null, false)) OpenModule(form); }), 0, 0);
-            modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер библиотек", delegate { using (var form = new LibraryManagerForm(false)) OpenModule(form); }), 1, 0);
-            modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nУстановка, удаление и удалённый доступ", "Установка программ", delegate { using (var form = new SoftwareManagerForm(false)) OpenModule(form); }), 0, 1);
-            modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { using (var form = new ToolsDeploymentForm(false)) OpenModule(form); }), 1, 1);
+            modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер служб", delegate { OpenModule(() => new MainForm(null, false)); }), 0, 0);
+            modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер библиотек", delegate { OpenModule(() => new LibraryManagerForm(false)); }), 1, 0);
+            modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nУстановка, удаление и удалённый доступ", "Установка программ", delegate { OpenModule(() => new SoftwareManagerForm(false)); }), 0, 1);
+            modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { OpenModule(() => new ToolsDeploymentForm(false)); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -137,7 +137,7 @@ namespace ServiceTool
             BrandButton guide = Button("Инструкция", false); guide.AccessibleName = "Открыть инструкцию";
             guide.Click += delegate { using (var dialog = new UserGuideForm()) { dialog.SetTheme(Colors.Dark, false); dialog.ShowDialog(this); } SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
             BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 2, 0);
-            body.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { using(var form=new InitialSystemSettingsForm()) OpenModule(form); }),0,2);
+            body.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { OpenModule(() => new InitialSystemSettingsForm()); }),0,2);
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1);
             LimitContent(new Size(1160, 860));
@@ -166,26 +166,15 @@ namespace ServiceTool
             BrandButton open = Button(action, true); open.Margin = new Padding(0, 0, 0, 0); open.Dock = DockStyle.None; open.Anchor = AnchorStyles.Bottom; open.Size = new Size(280, 50); open.Click += click;
             layout.Controls.Add(open, 0, 2); card.Controls.Add(layout); return card;
         }
-        private void OpenModule(Form form)
+        internal Func<Form> RequestedModule { get; private set; }
+
+        internal void OpenModule(Func<Form> factory)
         {
-            // Keep a visible owner while Windows activates the modal module. Hiding the
-            // launcher first leaves no foreground window and can activate another app.
-            if (form.StartPosition != FormStartPosition.Manual) form.StartPosition = FormStartPosition.CenterParent;
-            EventHandler activate = delegate { form.BringToFront(); form.Activate(); };
-            form.Shown += activate;
-            try { form.ShowDialog(this); }
-            finally
-            {
-                form.Shown -= activate;
-                if (!IsDisposed)
-                {
-                    var library = form as LibraryManagerForm; var services = form as MainForm;
-                    var utility = form as UtilityModuleForm; var software = form as SoftwareManagerForm;
-                    bool menu = library != null ? library.MenuRequested : software != null ? software.MenuRequested : utility != null ? utility.MenuRequested : services != null && services.MenuRequested;
-                    if (menu) { SetTheme(ThemePreference.LoadDark(), false); Show(); Activate(); }
-                    else Close();
-                }
-            }
+            if (RequestedModule != null || IsDisposed) return;
+            RequestedModule = factory;
+            Close();
+            // A cancelled close must not retain a stale navigation request.
+            if (!IsDisposed && Visible) RequestedModule = null;
         }
     }
 }

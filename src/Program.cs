@@ -61,12 +61,10 @@ namespace ServiceTool
                     return 0;
                 }
                 ApplicationStorage.MigrateLegacy();
-                if (args.Length == 1 && (args[0] == "--services" || File.Exists(args[0])))
-                {
-                    using (var services = new MainForm(args[0] == "--services" ? null : args[0], false))
-                    { Application.Run(services); if (services.MenuRequested) Application.Run(new ManagerHub()); }
-                }
-                else Application.Run(new ManagerHub());
+                Func<Form> initialWindow = args.Length == 1 && (args[0] == "--services" || File.Exists(args[0]))
+                    ? (Func<Form>)(() => new MainForm(args[0] == "--services" ? null : args[0], false))
+                    : (() => new ManagerHub());
+                using (var context = new ManagerApplicationContext(initialWindow)) Application.Run(context);
                 return 0;
             }
             catch (Exception ex)
