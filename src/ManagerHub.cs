@@ -128,7 +128,7 @@ namespace ServiceTool
             modules.SizeChanged += delegate { EqualRows(modules, 2); };
             modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер служб", delegate { using (var form = new MainForm(null, false)) OpenModule(form); }), 0, 0);
             modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер библиотек", delegate { using (var form = new LibraryManagerForm(false)) OpenModule(form); }), 1, 0);
-            modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nАссоциации файлов и удалённый доступ", "Установка программ", delegate { using (var form = new SoftwareManagerForm(false)) OpenModule(form); }), 0, 1);
+            modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nУстановка, удаление и удалённый доступ", "Установка программ", delegate { using (var form = new SoftwareManagerForm(false)) OpenModule(form); }), 0, 1);
             modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { using (var form = new ToolsDeploymentForm(false)) OpenModule(form); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };

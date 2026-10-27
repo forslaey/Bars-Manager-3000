@@ -33,18 +33,7 @@ namespace ServiceTool
             var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Activity.AutoEllipsis=true;
             ConfigureGrid();
             var table=new Panel{Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
-            var slot=new Panel{Dock=DockStyle.Top,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);slot.Controls.Add(grid);slot.Controls.Add(gridScroll);table.Controls.Add(slot);Body.Controls.Add(table,0,1);
-            bool pendingTable=false,arrangingTable=false;
-            Action arrangeTable=delegate {
-                if(arrangingTable||grid.RowCount==0)return;arrangingTable=true;
-                try{GridViewportLayout.UniformRows(grid);int height=GridViewportLayout.WholeRowsHeight(grid,table.ClientSize.Height);if(slot.Height!=height)slot.Height=height;}
-                finally{arrangingTable=false;}
-            };
-            Action queueTable=delegate {
-                if(pendingTable||!table.IsHandleCreated||table.IsDisposed)return;pendingTable=true;
-                table.BeginInvoke((MethodInvoker)delegate{pendingTable=false;if(!table.IsDisposed)arrangeTable();});
-            };
-            table.SizeChanged+=delegate{queueTable();};grid.ColumnWidthChanged+=delegate{queueTable();};grid.CellValueChanged+=delegate{queueTable();};Shown+=delegate{queueTable();};
+            var slot=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);slot.Controls.Add(grid);slot.Controls.Add(gridScroll);table.Controls.Add(slot);Body.Controls.Add(table,0,1);
             var actions=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=new Padding(0,10,0,6)};
             foreach(int weight in new[]{34,33,33})actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,weight));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             applyButton=Button("Применить профиль",true);applyButton.Click+=async delegate{await Apply(SelectedGroup,false);};
@@ -52,6 +41,9 @@ namespace ServiceTool
             refresh=Button("Проверить настройки",false);refresh.Margin=Padding.Empty;refresh.Click+=async delegate{await Check();};
             actions.Controls.Add(applyButton,0,0);actions.Controls.Add(standardButton,1,0);actions.Controls.Add(refresh,2,0);Body.Controls.Add(actions,0,2);
             var log=JournalPanel.Create(journal,"Журнал проверки и настройки",Colors);Body.Controls.Add(log,0,3);
+            Body.Controls.Remove(log);Body.Controls.Remove(footer);Root.Controls.Remove(Body);
+            Body.RowCount=3;while(Body.RowStyles.Count>3)Body.RowStyles.RemoveAt(Body.RowStyles.Count-1);
+            Root.Controls.Add(new CompactJournalLayout(Body,1,grid,log,footer,130,54),0,1);
             grid.SelectionChanged+=delegate{UpdateButtons();};grid.CurrentCellChanged+=delegate{UpdateButtons();};SetTheme(Colors.Dark,false);UpdateButtons();
             Shown+=async delegate{if(preview){foreach(DataGridViewRow row in grid.Rows)row.Cells[2].Value="Не проверено · демонстрация";}else await Check();};
         }

@@ -20,11 +20,8 @@ namespace ServiceTool
                     using(var form=new SoftwareManagerForm(true))
                     {
                         form.SetTheme(dark,false);
-                        var chrome=Field<BrandCheckBox>(form,"chromeDefaults");var defaults=Field<BrandCheckBox>(form,"defaults");var remote=Field<BrandCheckBox>(form,"remote");
-                        Check(chrome.Checked&&!defaults.Checked&&!remote.Checked,"Only Chrome initially checked");
-                        Check(((TableLayoutPanel)chrome.Parent).GetRow(chrome)==1,"Chrome option first");
                         Check(Field<BrandButton>(form,"refresh").Text=="Проверить версии в сети","Network check caption");
-                        Check(Field<BrandButton>(form,"associations").Text=="Применить ассоциации","Association caption");
+                        Check(Field<BrandButton>(form,"associations").Text=="Приложения по умолчанию","Association caption");
                         Check(Field<BrandButton>(form,"access").Text=="Настроить удалённый доступ","Remote access caption");
                     }
                     using(var form=new MainForm(null,true))

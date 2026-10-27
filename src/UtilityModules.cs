@@ -145,7 +145,7 @@ namespace ServiceTool
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             check = Button("Проверить компоненты", false); check.Click += async delegate { await Check(); }; actions.Controls.Add(check, 0, 0);
             action = Button("Установить выбранные", true); action.Margin = Padding.Empty; action.Enabled = false; action.Click += async delegate { await Apply(); }; actions.Controls.Add(action, 1, 0);
-            Body.Controls.Add(actions, 0, 2); SetTheme(Colors.Dark, false);
+            Body.Controls.Add(actions, 0, 2); LimitContent(new Size(760,590)); SetTheme(Colors.Dark, false);
             Shown += async delegate
             {
                 if (preview)

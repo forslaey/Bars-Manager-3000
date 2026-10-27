@@ -128,7 +128,7 @@ namespace ServiceTool
     }
     internal static class ManagerSystemActions
     {
-        internal static bool Known(string action) { return action == "initial-settings" || action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "tools-remove" || action == "system-restart" || action == "software-install" || action == "software-defaults" || action == "software-query" || action == "software-remove" || action == "software-access"; }
+        internal static bool Known(string action) { return action == "initial-settings" || action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "tools-remove" || action == "system-restart" || action == "software-install" || action == "software-query" || action == "software-remove" || action == "software-access"; }
         internal static LibraryInstallResult Execute(string action, string data, string path, Action<string> progress)
         {
             if (!Known(action)) throw new InvalidDataException("Неизвестное действие менеджера");
@@ -144,7 +144,6 @@ namespace ServiceTool
                     if (action == "software-access") return SoftwareMaintenance.ConfigureAccess(data,progress);
                     if (action == "software-query") return new LibraryInstallResult {ExitCode=0,State=LibraryState.Unknown,Message=SoftwareDetection.Query(data)};
                     if (action == "software-install") return SoftwareInstaller.Install(data,path,progress);
-                    if (action == "software-defaults") return SoftwareDefaults.Apply(data,progress);
                     if (action == "features-query") return WindowsComponents.Run(WindowsComponents.QueryScript(), progress);
                     if (action == "features-enable") return WindowsComponents.Run(WindowsComponents.EnableScript(data), progress);
                     if (action == "features-disable") return WindowsComponents.Run(WindowsComponents.DisableScript(data), progress);
