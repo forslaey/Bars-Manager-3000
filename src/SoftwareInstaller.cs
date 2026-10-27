@@ -40,12 +40,29 @@ namespace ServiceTool
     }
     internal static class SoftwareInstaller
     {
-        internal static ProcessStartInfo Command(string id, string file, string log, string existingDirectory=null)
+        internal static ProcessStartInfo Command(string id, string file, string log, string existingDirectory = null)
         {
-            string directory=existingDirectory ?? Path.Combine(Environment.GetFolderPath(id=="anydesk" ? Environment.SpecialFolder.ProgramFilesX86 : Environment.SpecialFolder.ProgramFiles),SoftwareCatalog.Find(id).Folder);
-            var start=new ProcessStartInfo { UseShellExecute=false, CreateNoWindow=true, WorkingDirectory=Path.GetDirectoryName(file) };
-            if (id=="rudesktop" || id=="chrome") { start.FileName=Path.Combine(Environment.SystemDirectory,"msiexec.exe"); start.Arguments="/i "+LibraryPlan.Quote(file)+" /qn /norestart REBOOT=ReallySuppress /L*v "+LibraryPlan.Quote(log); }
-            else { start.FileName=file; start.Arguments=id=="anydesk" ? "--install "+LibraryPlan.Quote(directory)+" --silent --start-with-win --create-desktop-icon --update-manually" : "/S"; }
+            string directory = existingDirectory ?? Path.Combine(
+                Environment.GetFolderPath(id == "anydesk"
+                    ? Environment.SpecialFolder.ProgramFilesX86 : Environment.SpecialFolder.ProgramFiles),
+                SoftwareCatalog.Find(id).Folder);
+            var start = new ProcessStartInfo {
+                UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(file)
+            };
+            if (id == "rudesktop" || id == "chrome")
+            {
+                start.FileName = Path.Combine(Environment.SystemDirectory, "msiexec.exe");
+                start.Arguments = "/i " + LibraryPlan.Quote(file) +
+                    " /qn /norestart REBOOT=ReallySuppress /L*v " + LibraryPlan.Quote(log);
+            }
+            else
+            {
+                start.FileName = file;
+                start.Arguments = id == "anydesk"
+                    ? "--install " + LibraryPlan.Quote(directory) +
+                        " --silent --start-with-win --create-desktop-icon --update-manually"
+                    : "/S";
+            }
             return start;
         }
         private static bool AnyDeskPrinter()
@@ -92,9 +109,10 @@ namespace ServiceTool
                         code=LibraryProcess.Run(Command(package.Id,verified,log,before.State==LibraryState.Installed ? Path.GetDirectoryName(before.Executable) : null),progress);
                     }
                 }
-                SoftwareCheck after=SoftwareDetection.Check(package.Id,request.AllowAnyDesk32);
-                if (!LibraryPlan.Success(code) || after.State!=LibraryState.Installed || SoftwareCatalog.Compare(after.Version,package.Version)<0)
-                    return new LibraryInstallResult {ExitCode=code,State=LibraryState.Unknown,Message=LibraryPlan.NeedsReboot(code) ? "Нужна перезагрузка; результат нужно проверить после неё" : "Установка не подтверждена. Код "+code+". "+after.Detail,LogPath=File.Exists(log)?log:""};
+                SoftwareCheck after;
+                var incomplete = CheckInstallOutcome(code, package, log,
+                    () => SoftwareDetection.Check(package.Id, request.AllowAnyDesk32), out after);
+                if (incomplete != null) return incomplete;
                 string note = "";
                 // The vendor client has no command-line switch for the printer: AnyDesk installs the
                 // AnyDesk Printer only when that box is ticked in the installer UI, which silent
@@ -112,6 +130,32 @@ namespace ServiceTool
             }
             finally { try {if(File.Exists(verified)) File.Delete(verified);Directory.Delete(stage,false);} catch(IOException){} catch(UnauthorizedAccessException){} }
         }
+        // Return before any post-install action if the installer failed, needs a reboot,
+        // or its result cannot be confirmed. A reboot is never treated as readiness.
+        internal static LibraryInstallResult CheckInstallOutcome(int code, SoftwarePackage package,
+            string log, Func<SoftwareCheck> detect, out SoftwareCheck after)
+        {
+            after = null;
+            string logPath = File.Exists(log) ? log : "";
+            if (LibraryPlan.NeedsReboot(code))
+                return new LibraryInstallResult {
+                    ExitCode = code, State = LibraryState.Unknown,
+                    Message = "Нужна перезагрузка; результат нужно проверить после неё", LogPath = logPath
+                };
+            if (!LibraryPlan.Success(code))
+                return new LibraryInstallResult {
+                    ExitCode = code, State = LibraryState.Unknown,
+                    Message = "Установка не подтверждена. Код " + code + ". ", LogPath = logPath
+                };
+            after = detect();
+            if (after.State != LibraryState.Installed || SoftwareCatalog.Compare(after.Version, package.Version) < 0)
+                return new LibraryInstallResult {
+                    ExitCode = code, State = LibraryState.Unknown,
+                    Message = "Установка не подтверждена. Код " + code + ". " + after.Detail, LogPath = logPath
+                };
+            return null;
+        }
+
         internal static void ConfigureRemote(string id,string password,Action<string,string> execute)
         {
             if(id!="anydesk" && id!="rudesktop") throw new InvalidDataException("Неизвестный клиент удалённого доступа");

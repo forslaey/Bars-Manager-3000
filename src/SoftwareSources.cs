@@ -151,10 +151,41 @@ namespace ServiceTool
                     SoftwareTrust.Verify(package,true);
                     ToolsDeployment.SafePath(final); if (File.Exists(final)) File.Replace(staged,final,null); else File.Move(staged,final); package.File=final;
                 }
-                finally { if (File.Exists(staged)) File.Delete(staged); Directory.Delete(validation,false); }
+                finally { CleanupDownload(staged, validation, progress); }
                 return package;
             }
-            finally { if (File.Exists(temporary)) File.Delete(temporary); }
+            finally { CleanupDownload(temporary, null, progress); }
+        }
+
+        // Cleanup is best-effort and must never replace a download/validation exception.
+        // Only remove the exact temporary file and an empty private directory, never a tree.
+        internal static void CleanupDownload(string file, string directory, Action<string> progress)
+        {
+            CleanupTemporary(() => {
+                ToolsDeployment.SafePath(file);
+                if (File.Exists(file)) File.Delete(file);
+            }, file, progress);
+            if (directory != null)
+                CleanupTemporary(() => {
+                    ToolsDeployment.SafePath(directory);
+                    if (Directory.Exists(directory)) Directory.Delete(directory, false);
+                }, directory, progress);
+        }
+
+        private static void CleanupTemporary(Action cleanup, string path, Action<string> progress)
+        {
+            try { cleanup(); }
+            catch (IOException ex) { ReportCleanupFailure(path, ex, progress); }
+            catch (UnauthorizedAccessException ex) { ReportCleanupFailure(path, ex, progress); }
+            catch (System.Security.SecurityException ex) { ReportCleanupFailure(path, ex, progress); }
+        }
+
+        private static void ReportCleanupFailure(string path, Exception error, Action<string> progress)
+        {
+            // A disposed UI/logger must not hide the original error either.
+            if (progress == null) return;
+            try { progress("Не удалось убрать временный объект: " + path + ". " + error.Message); }
+            catch (Exception) { }
         }
         internal static SoftwarePackage Best(IEnumerable<SoftwarePackage> packages, string id)
         { SoftwarePackage best=null; foreach (var package in packages.Where(p=>p.Id==id)) if (best==null || SoftwareCatalog.Compare(package.Version,best.Version)>0) best=package; return best; }

@@ -40,6 +40,7 @@ namespace ServiceTool
                 Reject(() => WindowsComponents.Resolve(""), "Reject empty feature installation");
                 Check(WindowsComponents.EnableScript("iis").Contains("-All -NoRestart") && !WindowsComponents.QueryScript().Contains("Enable-"), "Query read-only and servicing prohibits reboot");
                 Check(WindowsComponents.DisableScript("telnet,tftp").Contains("Disable-WindowsOptionalFeature") && WindowsComponents.DisableScript("telnet").Contains("-NoRestart") && WindowsComponents.DisableScript("telnet").Contains("'TelnetClient'") && !WindowsComponents.DisableScript("telnet").Contains("TFTP"), "Removal uses the same exact profile without reboot");
+                Check(!WindowsComponents.DisableScript("telnet").Contains(" -All"), "Disable cmdlet must not receive unsupported All parameter");
                 Reject(() => WindowsComponents.DisableScript("telnet;Remove-Item C:\\"), "Removal rejects command injection");
                 Check(ManagerSystemActions.Known("features-disable"), "Removal is an explicit whitelisted action");
                 Check(WindowsComponents.GroupOrder[0].Contains("fiLinn") && WindowsComponents.InGroup(WindowsComponents.GroupOrder[0]).Length == 2, "Telnet/TFTP group listed before IIS");

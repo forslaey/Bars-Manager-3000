@@ -55,6 +55,8 @@ $taskUiSources += Join-Path $taskSource 'BarsFolderPermissions.cs'
 $taskUiSources += @('KioskTouchSettings.cs','PasswordEyeButton.cs','InitialSystemSettings.cs','InitialSystemSettingsForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
 $taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','UserGuideForm.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs','SoftwareCatalog.cs','SoftwareSources.cs','SoftwareDetection.cs','SoftwareInstaller.cs','CompactJournalLayout.cs','SoftwareManagerForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
 $taskUiSources += @('BrandMessageBox.cs','JournalPanel.cs','SystemSettingsPresentation.cs','GuideReader.cs','ModuleNavigation.cs') | ForEach-Object { Join-Path $taskSource $_ }
+Invoke-TaskTests 'ReviewRegressionTests' 'ServiceTool.ReviewRegressionTests' ($taskUiSources + (Join-Path $taskTests 'ReviewRegressionTests.cs'))
+& (Join-Path $taskTests 'WindowsFeatureCommands.Tests.ps1') -AssemblyPath (Join-Path $taskPackage $taskPackageName)
 Invoke-TaskTests 'UtilityModuleTests' 'ServiceTool.UtilityModuleTests' ($taskUiSources + (Join-Path $taskTests 'UtilityModuleTests.cs'))
 if ($UtilitySmoke) { Invoke-TaskTests 'UtilitySmokeTests' 'ServiceTool.UtilitySmokeTests' ($taskUiSources + (Join-Path $taskTests 'UtilitySmokeTests.cs')) }
 Invoke-TaskTests 'SoftwareTests' 'ServiceTool.SoftwareTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareTests.cs'))

@@ -53,12 +53,12 @@ namespace ServiceTool
             return "$ErrorActionPreference='Stop'; $r=Enable-WindowsOptionalFeature -Online -FeatureName " + FeatureList(ids) +
                 " -All -NoRestart; if(@($r | Where-Object { $_.RestartNeeded -eq $true }).Count -gt 0){'" + RestartMarker + "'}";
         }
-        // Removal is the exact inverse of the same profile; -All removes parent/child pairs together
-        // and -NoRestart keeps Windows servicing under the operator's control.
+        // Disable-WindowsOptionalFeature has no -All parameter; use the exact profile.
+        // -NoRestart keeps Windows servicing under the operator's control.
         internal static string DisableScript(string ids)
         {
             return "$ErrorActionPreference='Stop'; $r=Disable-WindowsOptionalFeature -Online -FeatureName " + FeatureList(ids) +
-                " -All -NoRestart; if(@($r | Where-Object { $_.RestartNeeded -eq $true }).Count -gt 0){'" + RestartMarker + "'}";
+                " -NoRestart; if(@($r | Where-Object { $_.RestartNeeded -eq $true }).Count -gt 0){'" + RestartMarker + "'}";
         }
         // Groups are described for the UI; the underlying profile array keeps stable indices.
         internal static readonly string[] GroupOrder = { "Компоненты для fiLinn, piglet", "Компоненты для модуля «Отчёты для арендаторов»" };
