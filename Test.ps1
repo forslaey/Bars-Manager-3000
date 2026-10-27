@@ -56,6 +56,7 @@ $taskUiSources += @('KioskTouchSettings.cs','PasswordEyeButton.cs','InitialSyste
 $taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','UserGuideForm.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs','SoftwareCatalog.cs','SoftwareSources.cs','SoftwareDetection.cs','SoftwareInstaller.cs','CompactJournalLayout.cs','SoftwareManagerForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
 $taskUiSources += @('BrandMessageBox.cs','JournalPanel.cs','SystemSettingsPresentation.cs','GuideReader.cs','ModuleNavigation.cs') | ForEach-Object { Join-Path $taskSource $_ }
 $taskUiSources += Join-Path $taskSource 'ManagerApplicationContext.cs'
+$taskUiSources += Join-Path $taskSource 'WindowPlacement.cs'
 Invoke-TaskTests 'NavigationTests' 'ServiceTool.NavigationTests' ($taskUiSources + (Join-Path $taskTests 'NavigationTests.cs'))
 Invoke-TaskTests 'ReviewRegressionTests' 'ServiceTool.ReviewRegressionTests' ($taskUiSources + (Join-Path $taskTests 'ReviewRegressionTests.cs'))
 & (Join-Path $taskTests 'WindowsFeatureCommands.Tests.ps1') -AssemblyPath (Join-Path $taskPackage $taskPackageName)
@@ -117,3 +118,5 @@ Invoke-TaskTests 'KioskTouchTests' 'ServiceTool.KioskTouchTests' ($taskUiSources
 Invoke-TaskTests 'Ui2332Tests' 'ServiceTool.Ui2332Tests' ($taskUiSources + (Join-Path $taskTests 'Ui2332Tests.cs'))
 Write-Output "Все проверки пройдены. Временные сборки: $taskBuild"
 Write-Output 'Реальные процедуры установки, удаления и управления службами не выполнялись.'
+
+Invoke-TaskTests 'WindowSessionTests' 'ServiceTool.WindowSessionTests' ($taskUiSources + (Join-Path $taskTests 'WindowSessionTests.cs'))

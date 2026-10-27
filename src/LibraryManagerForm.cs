@@ -40,6 +40,7 @@ namespace ServiceTool
         private Func<bool, DialogResult> confirmCancellation = null;
         internal const string CancelWarning = "Отменить очередь и завершить процессы текущего установщика?\r\n\r\nСначала отправим запрос закрытия; через 2 секунды завершим оставшиеся процессы этой очереди. Принудительное прерывание может оставить компонент установленным частично. Полный откат не гарантирован; после отмены нужна проверка.\r\n\r\nСистемную службу Windows Installer и посторонние установки не завершаем. Windows может продолжить завершение своей операции или откат.";
         internal bool MenuRequested { get; private set; }
+        internal override void ResumeSession() { MenuRequested=false; base.ResumeSession(); }
         internal bool IsInstalling { get { return installing; } }
         internal string SourceDirectory { get { return source; } }
         public LibraryManagerForm(bool previewMode) : base("Bars Component Manager 3000", new Size(1120, 800))
@@ -57,13 +58,13 @@ namespace ServiceTool
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
-            var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(12,8,12,12), Margin = new Padding(0, 0, 0, 12) };
+            var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(ModuleHeadingStyle.Left,ModuleHeadingStyle.Top,12,12), Margin = new Padding(0, 0, 0, 12) };
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
             statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
             Label title = ModuleHeading("Менеджер системных библиотек Windows"); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
             monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.None; monitor.Anchor = AnchorStyles.Right | AnchorStyles.Bottom; monitor.Checked = true; monitor.Margin = Padding.Empty; monitor.Height = 28;
-            monitor.CheckedChanged += delegate { timer.Enabled = monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 2); statusLayout.SetRowSpan(monitor, 2);
+            monitor.CheckedChanged += delegate { timer.Enabled = Visible && monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 2); statusLayout.SetRowSpan(monitor, 2);
             statusLayout.Layout += delegate
             {
                 using (Graphics graphics = monitor.CreateGraphics())
@@ -105,12 +106,13 @@ namespace ServiceTool
             windowsComponents = Button("Компоненты", false); ModuleNavigation.Configure(windowsComponents); windowsComponents.Margin=new Padding(0,0,10,0); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false); UpdateSource();
+            VisibleChanged += delegate { timer.Enabled = Visible && monitor.Checked && !preview && !installing && !checking; };
             timer.Tick += async delegate { if (!installing && !checking && Visible) await RefreshAsync(false); };
             Shown += async delegate
             {
                 if (preview) { FillPreview(); return; }
                 if (!String.IsNullOrEmpty(sourceError)) Log(sourceError);
-                await RefreshAsync(true); if (!IsDisposed && !Disposing) timer.Enabled = monitor.Checked;
+                await RefreshAsync(true); if (!IsDisposed && !Disposing) timer.Enabled = Visible && monitor.Checked;
             };
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
@@ -155,12 +157,8 @@ namespace ServiceTool
             bool wasRunning=timer.Enabled; timer.Stop();
             try
             {
-                using(var form=new WindowsFeaturesForm(preview, true))
-                {
-                    form.SetTheme(Colors.Dark,false); form.StartPosition=FormStartPosition.CenterParent;
-                    form.ShowDialog(this);
-                    RememberWindowsRestart(form.RestartRequired);
-                }
+                var form=ModuleNavigation.ShowDialog(this, () => new WindowsFeaturesForm(preview, true));
+                RememberWindowsRestart(form.RestartRequired);
                 SetTheme(ThemePreference.LoadDark(),false);
             }
             finally { if(!IsDisposed && !Disposing) { UpdateRestartAvailability(); timer.Enabled=wasRunning && monitor.Checked && !preview; } }
@@ -467,7 +465,7 @@ namespace ServiceTool
                 activeSession = null; installing = false;
                 if (!IsDisposed)
                 {
-                    stop.Enabled = false; refresh.Enabled = install.Enabled = true; timer.Enabled = monitor.Checked && !closeAfterCancel;
+                    stop.Enabled = false; refresh.Enabled = install.Enabled = true; timer.Enabled = Visible && monitor.Checked && !closeAfterCancel;
                     activity.Text = cancelRequested ? "Отменено. Проверь состояние компонентов перед повторной установкой." : "Очередь завершена или приостановлена. Подробности в журнале.";
                     RenderRows(); windowsComponents.Enabled = true; UpdateRestartAvailability();
                     if (closeAfterCancel) BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) Close(); });

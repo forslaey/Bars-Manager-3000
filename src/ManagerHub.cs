@@ -65,8 +65,11 @@ namespace ServiceTool
                 MinimumSize=new Size(Math.Min(MinimumSize.Width,area.Width),Math.Min(MinimumSize.Height,area.Height));
                 if(WindowState==FormWindowState.Normal)Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));
             }
+            WindowPlacement.Constrain(this);
             base.OnLoad(e);
         }
+        internal virtual void ResumeSession() { SetTheme(ThemePreference.LoadDark(), false); }
+        protected override void OnShown(EventArgs e) { WindowPlacement.Constrain(this); base.OnShown(e); }
         protected void LimitContent(Size maximum)
         {
             Controls.Remove(Root);
@@ -77,7 +80,7 @@ namespace ServiceTool
         protected Label Label(string text, bool muted)
         { return new Label { Text = text, Tag = muted ? "muted" : "", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty, AutoEllipsis = true }; }
         protected Label ModuleHeading(string text)
-        { return new FlushLabel { Text=text,Font=new Font("Segoe UI",15,FontStyle.Bold),Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true }; }
+        { return ModuleHeadingStyle.Create(text); }
         protected Label Caption(string text, bool muted)
         { return new InputCaptionLabel { Text=text.TrimEnd(':')+":",Tag=muted?"muted":"",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true }; }
         public void SetTheme(bool dark, bool persist)
@@ -135,7 +138,7 @@ namespace ServiceTool
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Controls.Add(Label("Версия " + typeof(ManagerHub).Assembly.GetName().Version.ToString(3), true), 0, 0);
             BrandButton guide = Button("Инструкция", false); guide.AccessibleName = "Открыть инструкцию";
-            guide.Click += delegate { using (var dialog = new UserGuideForm()) { dialog.SetTheme(Colors.Dark, false); dialog.ShowDialog(this); } SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
+            guide.Click += delegate { ModuleNavigation.ShowDialog(this, () => new UserGuideForm()); SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
             BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 2, 0);
             body.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { OpenModule(() => new InitialSystemSettingsForm()); }),0,2);
             body.Controls.Add(footer, 0, 3);
@@ -167,10 +170,16 @@ namespace ServiceTool
             layout.Controls.Add(open, 0, 2); card.Controls.Add(layout); return card;
         }
         internal Func<Form> RequestedModule { get; private set; }
+        internal Type RequestedModuleType { get; private set; }
 
-        internal void OpenModule(Func<Form> factory)
+        internal void OpenModule<T>(Func<T> factory) where T : Form
+        {
+            OpenModule(typeof(T), () => factory());
+        }
+        internal void OpenModule(Type type, Func<Form> factory)
         {
             if (RequestedModule != null || IsDisposed) return;
+            RequestedModuleType = type;
             RequestedModule = factory;
             Close();
             // A cancelled close must not retain a stale navigation request.

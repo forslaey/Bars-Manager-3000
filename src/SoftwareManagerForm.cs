@@ -29,14 +29,15 @@ namespace ServiceTool
         private volatile bool cancelled;
         private LibrarySession session;
         internal bool MenuRequested {get;private set;}
+        internal override void ResumeSession() { MenuRequested=false; closeAfter=false; base.ResumeSession(); }
         internal SoftwareManagerForm(bool previewMode) : this(previewMode,SoftwareSources.Latest) {}
         internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,780))
         {
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
             preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=Size.Empty}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{110F,0F,56F,84F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
-            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,4),Padding=new Padding(12,8,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,32));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,6));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            foreach(float height in new[]{122F,0F,56F,84F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
+            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,12),Padding=new Padding(ModuleHeadingStyle.Left,ModuleHeadingStyle.Top,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,32));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,6));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var title=ModuleHeading("Программы для рабочего места пользователя");title.Margin=new Padding(0,0,12,0);heading.Controls.Add(title,0,0);
             var folderGroup=new BufferedLayoutPanel {Dock=DockStyle.Right,Width=520,ColumnCount=1,RowCount=2,Margin=Padding.Empty};folderGroup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folderGroup.RowStyles.Add(new RowStyle(SizeType.Absolute,PathFieldMetrics.CaptionHeight));folderGroup.RowStyles.Add(new RowStyle(SizeType.Percent,100));folderGroup.Controls.Add(Caption("Папка установщиков:",true),0,0);
             sourceLabel=new BrandTextBox {Text="Папка не выбрана",ReadOnly=true,AutoSize=false,Palette=Colors};
@@ -46,7 +47,8 @@ namespace ServiceTool
             heading.Controls.Add(folderGroup,0,2);body.Controls.Add(heading,0,0);
             var tableCard=new Panel {Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
             ConfigureGrid();gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);tableCard.Controls.Add(grid);tableCard.Controls.Add(gridScroll);
-            // Reserve the scrollbar lane so scrolling cannot change column widths and row heights.
+            // Measure against the narrow lane first, then reclaim it only when all rows fit.
+            tableCard.SizeChanged+=delegate{QueueFitRows();};
             body.Controls.Add(tableCard,0,1);
             grid.ColumnWidthChanged+=delegate{QueueFitRows();};
             var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=1,Margin=new Padding(4,0,0,0),Padding=new Padding(0,10,0,10)};
@@ -117,7 +119,7 @@ namespace ServiceTool
         }
         private void QueueFitRows()
         {
-            if(fitRowsPending||!IsHandleCreated||IsDisposed)return;fitRowsPending=true;
+            if(fittingRows||fitRowsPending||!IsHandleCreated||IsDisposed)return;fitRowsPending=true;
             BeginInvoke((MethodInvoker)delegate{fitRowsPending=false;if(!IsDisposed)FitRows();});
         }
         private void FitRows()
@@ -125,7 +127,16 @@ namespace ServiceTool
             if(fittingRows||grid.RowCount==0)return;fittingRows=true;
             try
             {
+                // Use the smaller width for measurement in either state. This is
+                // deterministic even if hiding the lane unwraps a long cell.
+                bool wasVisible=gridScroll.Visible;
+                gridScroll.Visible=true;
+                grid.Parent.PerformLayout();
                 GridViewportLayout.UniformRows(grid);
+                int total=grid.ColumnHeadersHeight;
+                foreach(DataGridViewRow row in grid.Rows)total+=row.Height;
+                gridScroll.Visible=total>grid.ClientSize.Height;
+                if(wasVisible!=gridScroll.Visible)grid.Parent.PerformLayout();
             }
             finally{fittingRows=false;}
         }

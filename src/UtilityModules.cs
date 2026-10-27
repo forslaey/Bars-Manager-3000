@@ -18,6 +18,7 @@ namespace ServiceTool
         protected LibrarySession Session;
         protected volatile bool CancelRequested = false;
         internal bool MenuRequested { get; private set; }
+        internal override void ResumeSession() { MenuRequested=false; base.ResumeSession(); }
         // Small utility modules carry no product description; only the launcher keeps About.
         protected UtilityModuleForm(string title, Size size) : base(title, size)
         {
@@ -28,7 +29,7 @@ namespace ServiceTool
             Body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); Body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            var heading = ModuleHeading(title); heading.Margin = new Padding(12, 8, 12, 12); Body.Controls.Add(heading, 0, 0);
+            var heading = ModuleHeading(title); heading.Margin = new Padding(ModuleHeadingStyle.Left, ModuleHeadingStyle.Top, 12, 12); Body.Controls.Add(heading, 0, 0);
             var footer = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 8, 0, 0), Margin = Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));

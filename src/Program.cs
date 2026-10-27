@@ -123,6 +123,8 @@ namespace ServiceTool
     internal sealed class MainForm : Form
     {
         internal bool MenuRequested { get; private set; }
+        internal void SuspendSession() { closing=false; timer.Stop(); }
+        internal void ResumeSession() { MenuRequested=false; closing=false; SetTheme(ThemePreference.LoadDark(),false); UpdateRefreshTimer(); }
         [DllImport("user32.dll", CharSet = CharSet.Auto)] private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
         private readonly Color ink = Color.FromArgb(26, 39, 60);
         private readonly Color muted = Color.FromArgb(91, 107, 128);
@@ -291,7 +293,7 @@ namespace ServiceTool
             layout.Controls.Add(header, 0, 0);
 
             Card fileCard = new Card { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10) };
-            fileCard.Padding = new Padding(12, 8, 12, 10);
+            fileCard.Padding = new Padding(ModuleHeadingStyle.Left, ModuleHeadingStyle.Top, 12, 10);
             TableLayoutPanel fileLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = new Padding(0), Padding = new Padding(0) };
             fileLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             fileLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
@@ -307,7 +309,7 @@ namespace ServiceTool
             fileTitle.SingleLine = true;
             fileTitle.TextAlign = ContentAlignment.MiddleLeft;
             fileTitle.Margin = new Padding(0);
-            var moduleTitle=new FlushLabel {Text="Менеджер служб",Font=new Font("Segoe UI",15F,FontStyle.Bold),Dock=DockStyle.Fill,Margin=Padding.Empty,TextAlign=ContentAlignment.MiddleLeft};
+            var moduleTitle=ModuleHeadingStyle.Create("Менеджер служб");
             fileLayout.Controls.Add(moduleTitle,0,0);
             fileLayout.Controls.Add(fileTitle, 0, 2);
             TableLayoutPanel fileInput = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 2, Margin = new Padding(0) };
@@ -636,6 +638,7 @@ namespace ServiceTool
                 else await RefreshStatusAsync(false);
                 UpdateRefreshTimer();
             };
+            VisibleChanged += delegate { UpdateRefreshTimer(); };
             FormClosing += OnFormClosing;
             FormClosed += delegate { closing = true; timer.Dispose(); toolTips.Dispose(); };
             AppendLog("Готово. Общий список служб BARS загрузится автоматически. Для новой службы выбери .exe службы BARS.");
@@ -656,17 +659,19 @@ namespace ServiceTool
             Rectangle area=Screen.FromControl(this).WorkingArea;
             MinimumSize=new Size(Math.Min(MinimumSize.Width,area.Width),Math.Min(MinimumSize.Height,area.Height));
             if(WindowState==FormWindowState.Normal)Size=new Size(Math.Min(Width,area.Width),Math.Min(Height,area.Height));
+            WindowPlacement.Constrain(this);
             base.OnLoad(e);
         }
         protected override void OnShown(EventArgs e)
         {
+            WindowPlacement.Constrain(this);
             LayoutBrandImage(brandImage.Parent);
             base.OnShown(e);
         }
 
         private void UpdateRefreshTimer()
         {
-            if (!closing && !operationRunning && !preview && autoRefreshToggle.Checked) timer.Start();
+            if (Visible && !closing && !operationRunning && !preview && autoRefreshToggle.Checked) timer.Start();
             else timer.Stop();
         }
 

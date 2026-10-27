@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
@@ -41,16 +41,23 @@ namespace ServiceTool
                 {
                     bool exited = false;
                     context.ThreadExit += delegate { exited = true; };
+                    Form retained = null;
+                    Type moduleType = null;
+                    using (var probe=factory()) moduleType=probe.GetType();
+                    Size retainedSize=Size.Empty;
                     for (int cycle = 0; cycle < 3; cycle++)
                     {
                         var oldHub = (ManagerHub)context.CurrentWindow;
                         Form module = null;
-                        oldHub.OpenModule(() => {
+                        oldHub.OpenModule(moduleType, () => {
                             Check(oldHub.IsDisposed && !oldHub.IsHandleCreated, "Launcher destroyed before module construction");
                             module = factory();
                             return module;
                         });
                         Pump();
+                        module=context.CurrentWindow;
+                        if(cycle==0) { retained=module; retainedSize=new Size(module.Width-20,module.Height-20); module.Size=retainedSize; retainedSize=module.Size; }
+                        else { Check(Object.ReferenceEquals(module,retained), "Same module reused"); Check(module.Size==retainedSize,"Normal bounds retained"); }
                         Check(Object.ReferenceEquals(context.CurrentWindow, module), "Module is current window");
                         Check(module.Visible && module.Enabled && !module.Modal && module.Owner == null, "Independent usable module");
                         Check(!Application.OpenForms.OfType<ManagerHub>().Any(), "No launcher retained while module is open");
@@ -59,12 +66,13 @@ namespace ServiceTool
                         module.WindowState = FormWindowState.Normal; Pump();
                         Children(module).OfType<Button>().Single(b => b.Text == "В меню").PerformClick();
                         Pump();
-                        Check(module.IsDisposed, "Module disposed on return");
+                        Check(!module.IsDisposed && !module.Visible, "Module hidden and retained on return");
                         Check(context.CurrentWindow is ManagerHub && context.CurrentWindow.Visible, "Fresh launcher opens on menu request");
                         Check(!Object.ReferenceEquals(oldHub, context.CurrentWindow) && !exited, "Return does not terminate message loop");
                     }
                     context.CurrentWindow.Close(); Pump();
                     Check(exited && context.CurrentWindow == null, "Launcher close exits context");
+                    Check(retained.IsDisposed,"Exit disposes cached module");
                 }
                 foreach (var factory in factories)
                 using (var context = new ManagerApplicationContext(factory, () => Hub()))
