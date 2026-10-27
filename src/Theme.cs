@@ -120,16 +120,59 @@ namespace ServiceTool
         }
     }
 
+    // Measure the visible glyph edge, not a Label's logical box or GDI overhang.
+    // Cached by text prefix, font and DPI; no per-paint bitmap allocation after warm-up.
+    internal static class TextInkMetrics
+    {
+        private static readonly System.Collections.Generic.Dictionary<string,int> cache=new System.Collections.Generic.Dictionary<string,int>();
+        internal static int Left(string text,Font font,Graphics target,bool noPadding)
+        {
+            if(String.IsNullOrEmpty(text))return 0;
+            string sample=text.Substring(0,Math.Min(12,text.Length));
+            string key=sample+"|"+font.Name+"|"+font.SizeInPoints.ToString(System.Globalization.CultureInfo.InvariantCulture)+"|"+font.Style+"|"+target.DpiX+"|"+target.DpiY+"|"+noPadding;
+            int result;if(cache.TryGetValue(key,out result))return result;
+            int height=Math.Max(32,(int)Math.Ceiling(font.GetHeight(target))*3);
+            using(var bitmap=new Bitmap(Math.Max(256,height*8),height))
+            {
+                bitmap.SetResolution(target.DpiX,target.DpiY);
+                using(var graphics=Graphics.FromImage(bitmap))
+                {
+                    graphics.Clear(Color.White);
+                    TextFormatFlags flags=TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix;
+                    if(noPadding)flags|=TextFormatFlags.NoPadding;
+                    TextRenderer.DrawText(graphics,sample,font,new Rectangle(8,0,bitmap.Width-16,height),Color.Black,flags);
+                }
+                result=0;bool found=false;
+                for(int x=0;x<bitmap.Width&&!found;x++)for(int y=0;y<height;y++)
+                {Color c=bitmap.GetPixel(x,y);if(c.R<224||c.G<224||c.B<224){result=x-8;found=true;break;}}
+            }
+            cache[key]=result;return result;
+        }
+    }
+
     internal sealed class FlushLabel : Label
     {
         public bool SingleLine { get; set; }
+        internal Func<Graphics,int> InkLeft { get; set; }
+        internal bool WrapLines { get; set; }
         protected override void OnPaint(PaintEventArgs e)
         {
             TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix |
                 (SingleLine ? TextFormatFlags.SingleLine : TextFormatFlags.WordBreak);
-            if (TextAlign == ContentAlignment.MiddleLeft) flags |= TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine;
+            if (TextAlign == ContentAlignment.MiddleLeft && !WrapLines) flags |= TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine;
             if (AutoEllipsis) flags |= TextFormatFlags.EndEllipsis;
-            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ForeColor, flags);
+            Rectangle bounds=ClientRectangle;
+            if(InkLeft!=null&&!String.IsNullOrEmpty(Text))
+            {
+                int shift=InkLeft(e.Graphics)-TextInkMetrics.Left(Text,Font,e.Graphics,true);
+                bounds.X+=shift;bounds.Width-=shift;
+            }
+            if(WrapLines)
+            {
+                int height=TextRenderer.MeasureText(e.Graphics,Text,Font,new Size(Math.Max(1,bounds.Width),Int32.MaxValue),flags).Height;
+                bounds.Y+=Math.Max(0,(bounds.Height-height)/2);
+            }
+            TextRenderer.DrawText(e.Graphics, Text, Font, bounds, ForeColor, flags);
         }
     }
 
@@ -632,6 +675,7 @@ namespace ServiceTool
         private System.Drawing.Size pickerSize;
         private int pickerDrop=4;
         private bool arranging;
+        internal int PreferredRowHeight {get{return pickerSize.Height;}}
         internal int PreferredRowWidth {get{return PathFieldMetrics.Measure(field).Width+pickerSize.Width+(int)System.Math.Round(12F*pickerSize.Width/buttonWidth);}}
         internal PathPickerRow(BrandTextBox path,BrandButton button,int width)
         {

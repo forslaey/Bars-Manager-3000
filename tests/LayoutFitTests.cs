@@ -83,8 +83,8 @@ namespace ServiceTool
                             var field=Children(form).OfType<BrandTextBox>().Single();var picker=Children(form).OfType<Button>().Single(b=>b.Text=="Выбрать папку...");
                             Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Left,picker.Bottom-2)).Y-field.Parent.PointToScreen(new Point(field.Left,field.Bottom-1)).Y-4*metricsScale)<=1,"Software picker has same small downward offset as utilities");
                             Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Right,0)).X-grid.Parent.Parent.PointToScreen(new Point(grid.Parent.Right,0)).X)<=1,"Folder block anchored to right edge of working area");
-                            var folder=field.Parent.Parent;var heading=(TableLayoutPanel)folder.Parent;var title=heading.GetControlFromPosition(0,0);
-                            Check(folder.Top-title.Bottom>=Math.Max(1,2*metricsScale-2),"Clear gap after module title");
+                            var heading=(TableLayoutPanel)field.Parent.Parent;var title=heading.GetControlFromPosition(0,1);var caption=heading.GetControlFromPosition(1,1);
+                            Check(title.Top==caption.Top&&title.Height==caption.Height,"Title and folder caption share one row");
                             var choices=Children(form).OfType<BrandCheckBox>().ToArray();var first=choices.OrderBy(c=>c.Top).First();var last=choices.OrderBy(c=>c.Top).Last();var install=Children(form).OfType<Button>().Single(b=>b.Text=="Установить");
                             int topGap=first.Parent.PointToScreen(first.Location).Y-grid.Parent.Parent.PointToScreen(new Point(grid.Parent.Left,grid.Parent.Bottom)).Y;
                             int bottomGap=install.Parent.PointToScreen(install.Location).Y-last.Parent.PointToScreen(new Point(last.Left,last.Bottom)).Y;

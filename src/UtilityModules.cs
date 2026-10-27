@@ -29,7 +29,7 @@ namespace ServiceTool
             Body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); Body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 58)); Body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            var heading = ModuleHeading(title); heading.Margin = new Padding(ModuleHeadingStyle.Left, ModuleHeadingStyle.Top, 12, 12); Body.Controls.Add(heading, 0, 0);
+            var heading = ModuleHeading(title); heading.Margin = new Padding(0, ModuleHeadingStyle.Top, 0, 12); Body.Controls.Add(heading, 0, 0);
             var footer = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 8, 0, 0), Margin = Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -230,7 +230,7 @@ namespace ServiceTool
             preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,500));ClientSize=new Size(640,500);
             Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,12);
             Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
-            Body.GetControlFromPosition(0,0).Margin=new Padding(12,8,12,12);
+            Body.GetControlFromPosition(0,0).Margin=new Padding(0,8,0,12);
             var card=new Card {Dock=DockStyle.Fill,Padding=new Padding(16,16,16,8),Margin=new Padding(0,0,0,8)};
             var content=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=6,Margin=Padding.Empty};
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));

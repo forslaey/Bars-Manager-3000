@@ -80,7 +80,7 @@ namespace ServiceTool
         protected Label Label(string text, bool muted)
         { return new Label { Text = text, Tag = muted ? "muted" : "", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty, AutoEllipsis = true }; }
         protected Label ModuleHeading(string text)
-        { return ModuleHeadingStyle.Create(text); }
+        { return ModuleHeadingStyle.Create(text,true); }
         protected Label Caption(string text, bool muted)
         { return new InputCaptionLabel { Text=text.TrimEnd(':')+":",Tag=muted?"muted":"",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true }; }
         public void SetTheme(bool dark, bool persist)

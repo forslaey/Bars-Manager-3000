@@ -45,7 +45,7 @@ namespace ServiceTool
                         {
                             var title=Children(form).OfType<Label>().Single(l=>l.Text==names[i]);
                             var bounds=new Rectangle(root.PointToClient(title.PointToScreen(Point.Empty)),title.Size);
-                            if(expected==null)expected=bounds;else Check(bounds.X==expected.Value.X&&bounds.Width==expected.Value.Width,"Common horizontal title alignment with compact module heights: "+form.GetType().Name+" "+bounds+" expected "+expected);
+                            if(i<2) { if(expected==null)expected=bounds;else Check(bounds.X==expected.Value.X,"Card heading uses same content inset: "+form.GetType().Name); } else Check(bounds.X==root.Padding.Left,"Flat heading starts at outer working edge: "+form.GetType().Name);
                             Check(title.Font.SizeInPoints==15&&title.Font.Bold,"Common heading font");
                         }
                         if(form is SoftwareManagerForm)

@@ -5,8 +5,8 @@ namespace ServiceTool
     internal static class ModuleHeadingStyle
     {
         internal const int Left=12, Top=8;
-        internal static Label Create(string text)
-        { return new FlushLabel {Text=text,Font=new Font("Segoe UI",15F,FontStyle.Bold),Dock=DockStyle.Fill,Margin=Padding.Empty,TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true}; }
+        internal static Label Create(string text,bool alignToEdge=false)
+        { return new FlushLabel {InkLeft=alignToEdge?(System.Func<Graphics,int>)(g=>0):null,Text=text,Font=new Font("Segoe UI",15F,FontStyle.Bold),Dock=DockStyle.Fill,Margin=Padding.Empty,TextAlign=ContentAlignment.MiddleLeft,AutoEllipsis=true}; }
     }
     internal static class ModuleNavigation
     {

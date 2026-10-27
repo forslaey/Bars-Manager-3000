@@ -37,14 +37,26 @@ namespace ServiceTool
             preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=Size.Empty}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(float height in new[]{122F,0F,56F,84F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
-            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=new Padding(0,0,0,12),Padding=new Padding(ModuleHeadingStyle.Left,ModuleHeadingStyle.Top,0,0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,32));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,6));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            var title=ModuleHeading("Программы для рабочего места пользователя");title.Margin=new Padding(0,0,12,0);heading.Controls.Add(title,0,0);
-            var folderGroup=new BufferedLayoutPanel {Dock=DockStyle.Right,Width=520,ColumnCount=1,RowCount=2,Margin=Padding.Empty};folderGroup.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folderGroup.RowStyles.Add(new RowStyle(SizeType.Absolute,PathFieldMetrics.CaptionHeight));folderGroup.RowStyles.Add(new RowStyle(SizeType.Percent,100));folderGroup.Controls.Add(Caption("Папка установщиков:",true),0,0);
+            var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=3,Margin=new Padding(0,0,0,12),Padding=new Padding(0,8,0,0)};
+            heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,520));
+            heading.RowStyles.Add(new RowStyle(SizeType.Absolute,30));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,32));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var title=ModuleHeading("Программы для рабочего места пользователя");((FlushLabel)title).WrapLines=true;title.AutoEllipsis=false;title.Margin=new Padding(0,0,12,0);heading.Controls.Add(title,0,1);
+            var folderCaption=Caption("Папка установщиков:",true);heading.Controls.Add(folderCaption,1,1);
             sourceLabel=new BrandTextBox {Text="Папка не выбрана",ReadOnly=true,AutoSize=false,Palette=Colors};
             folderButton=Button("Выбрать папку...",false);folderButton.Click+=async delegate {if(!busy&&ChooseSource())await RefreshPackages();};
-            var sourceRow=new PathPickerRow(sourceLabel,folderButton,176){Dock=DockStyle.Fill};folderGroup.Controls.Add(sourceRow,0,1);
-            heading.Layout+=delegate{int width=Math.Min(heading.ClientSize.Width,sourceRow.PreferredRowWidth);if(folderGroup.Width!=width)folderGroup.Width=width;};
-            heading.Controls.Add(folderGroup,0,2);body.Controls.Add(heading,0,0);
+            var sourceRow=new PathPickerRow(sourceLabel,folderButton,176){Dock=DockStyle.Fill};heading.Controls.Add(sourceRow,1,2);
+            heading.Layout+=delegate
+            {
+                int width=Math.Min(heading.ClientSize.Width,sourceRow.PreferredRowWidth);
+                if(heading.ColumnStyles[1].Width!=width)heading.ColumnStyles[1].Width=width;
+                float scale=sourceRow.PreferredRowHeight/40F;
+                int available=Math.Max(1,heading.ClientSize.Width-width-title.Margin.Horizontal);
+                int measured=TextRenderer.MeasureText(title.Text,title.Font,new Size(available,Int32.MaxValue),TextFormatFlags.NoPadding|TextFormatFlags.NoPrefix|TextFormatFlags.WordBreak).Height;
+                float shared=Math.Max(32*scale,measured),blank=Math.Max(0,62*scale-shared);
+                if(Math.Abs(heading.RowStyles[0].Height-blank)>.1F)heading.RowStyles[0].Height=blank;
+                if(Math.Abs(heading.RowStyles[1].Height-shared)>.1F)heading.RowStyles[1].Height=shared;
+            };
+            body.Controls.Add(heading,0,0);
             var tableCard=new Panel {Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
             ConfigureGrid();gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);tableCard.Controls.Add(grid);tableCard.Controls.Add(gridScroll);
             // Measure against the narrow lane first, then reclaim it only when all rows fit.

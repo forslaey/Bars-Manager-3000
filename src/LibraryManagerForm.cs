@@ -76,8 +76,8 @@ namespace ServiceTool
                     if (monitor.Width != width) monitor.Width = width;
                 }
             };
-            summary = Label("Проверяем установленные компоненты…", true); statusLayout.Controls.Add(summary, 0, 2);
-            sourceLabel = Label("", true); sourceLabel.Font = new Font("Segoe UI", 9); statusLayout.Controls.Add(sourceLabel, 0, 3); status.Controls.Add(statusLayout);
+            summary = Label("Проверяем установленные компоненты…", true); ((FlushLabel)title).InkLeft=g=>TextInkMetrics.Left(summary.Text,summary.Font,g,false); statusLayout.Controls.Add(summary, 0, 2);
+            sourceLabel = new FlushLabel {Text="",Tag="muted",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true,InkLeft=g=>TextInkMetrics.Left(summary.Text,summary.Font,g,false)}; sourceLabel.Font = new Font("Segoe UI", 9); statusLayout.Controls.Add(sourceLabel, 0, 3); status.Controls.Add(statusLayout);
             body.Controls.Add(status, 0, 0);
             var tableCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 12), Margin = new Padding(0, 0, 0, 12) };
             var tableLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };

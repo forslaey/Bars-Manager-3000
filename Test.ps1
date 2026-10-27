@@ -120,3 +120,5 @@ Write-Output "Все проверки пройдены. Временные сб�
 Write-Output 'Реальные процедуры установки, удаления и управления службами не выполнялись.'
 
 Invoke-TaskTests 'WindowSessionTests' 'ServiceTool.WindowSessionTests' ($taskUiSources + (Join-Path $taskTests 'WindowSessionTests.cs'))
+
+Invoke-TaskTests 'InkAlignmentTests' 'ServiceTool.InkAlignmentTests' ($taskUiSources + (Join-Path $taskTests 'InkAlignmentTests.cs'))

@@ -310,6 +310,8 @@ namespace ServiceTool
             fileTitle.TextAlign = ContentAlignment.MiddleLeft;
             fileTitle.Margin = new Padding(0);
             var moduleTitle=ModuleHeadingStyle.Create("Менеджер служб");
+            fileTitle.InkLeft=g=>TextInkMetrics.Left(moduleTitle.Text,moduleTitle.Font,g,true);
+            ((FlushLabel)statusTitle).InkLeft=g=>TextInkMetrics.Left(moduleTitle.Text,moduleTitle.Font,g,true);
             fileLayout.Controls.Add(moduleTitle,0,0);
             fileLayout.Controls.Add(fileTitle, 0, 2);
             TableLayoutPanel fileInput = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 1, ColumnCount = 2, Margin = new Padding(0) };
@@ -353,9 +355,9 @@ namespace ServiceTool
             Card registered = new Card { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 10), Padding = new Padding(12) };
             TableLayoutPanel serviceLayout = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty, ColumnCount = 1, RowCount = 5 };
             serviceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
-            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             registered.Controls.Add(serviceLayout);
@@ -405,7 +407,7 @@ namespace ServiceTool
                     autoRefreshToggle.Bounds=new Rectangle(Math.Max(0,refreshSlot.ClientSize.Width-width),Math.Max(0,refreshSlot.ClientSize.Height-height),width,height);
                 }
             };
-            serviceLayout.Controls.Add(statusLayout, 0, 0);
+            serviceLayout.Controls.Add(statusLayout, 0, 2);
 
             Panel actions = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty, Padding = new Padding(0, 7, 0, 7) };
             TableLayoutPanel actionButtons = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), ColumnCount = 5, RowCount = 1 };
@@ -445,7 +447,7 @@ namespace ServiceTool
             servicesButton.SizeChanged += alignRefresh;
             actionButtons.Layout += delegate { alignRefresh(null, EventArgs.Empty); };
             actions.Controls.Add(actionButtons);
-            serviceLayout.Controls.Add(actions, 0, 2);
+            serviceLayout.Controls.Add(actions, 0, 0);
             hint.Dock = DockStyle.Fill;
             hint.Tag = "muted";
             hint.ForeColor = muted;
