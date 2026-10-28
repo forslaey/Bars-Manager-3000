@@ -12,8 +12,10 @@ namespace ServiceTool
     internal sealed class BundleReceipts
     {
         readonly string root;
+        readonly Action<string> checkpoint;
         static readonly object gate=new object();
-        internal BundleReceipts(string root){this.root=root;}
+        internal BundleReceipts(string root):this(root,null){}
+        internal BundleReceipts(string root,Action<string> checkpoint){this.root=root;this.checkpoint=checkpoint;}
         string Receipt(BundleRemoteFile file)
         {
             string key;
@@ -49,9 +51,15 @@ namespace ServiceTool
             lock(gate)
             {
                 string path=Receipt(file);Directory.CreateDirectory(Path.GetDirectoryName(path));
-                string temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";
-                var doc=new XmlDocument();var node=doc.CreateElement("file");node.SetAttribute("path",file.Path);node.SetAttribute("sha256",file.Sha256);doc.AppendChild(node);doc.Save(temp);
-                if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);
+                string temp=Path.Combine(Path.GetDirectoryName(path),"receipt-"+Guid.NewGuid().ToString("N")+".tmp");
+                var doc=new XmlDocument();var node=doc.CreateElement("file");node.SetAttribute("path",file.Path);node.SetAttribute("sha256",file.Sha256);doc.AppendChild(node);try
+                {
+                    if(checkpoint!=null)checkpoint("before-receipt-write");doc.Save(temp);
+                    if(checkpoint!=null)checkpoint("before-receipt-publish");
+                    string previous=File.Exists(path)?YandexBundleSource.Hash(path,CancellationToken.None):null;
+                    BundlePublication.Publish(temp,path,previous,CancellationToken.None,null);
+                }
+                finally{if(File.Exists(temp))File.Delete(temp);}
             }
         }
     }

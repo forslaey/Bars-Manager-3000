@@ -113,18 +113,12 @@ namespace ServiceTool
             // a locally edited file or an unexpected newly created file.
             destination=YandexBundleSource.LocalPath(root,file.Path);
             Directory.CreateDirectory(Path.GetDirectoryName(destination));
-            BundleMaintenance.ValidateAgainstLocal(root,part,file,token);
-            if(originalHash!=null)BundlePackageIdentity.ValidateUpgrade(destination,part,file.Path);
-            if(stage!=null)stage("Публикация");
-            if(File.Exists(destination))
+            lock(BundlePublication.Gate)
             {
-                if(originalHash==null||!String.Equals(YandexBundleSource.Hash(destination,token),originalHash,StringComparison.OrdinalIgnoreCase))throw new IOException("Локальный файл изменился; новая копия не опубликована");
-                File.Replace(part,destination,null);
-            }
-            else
-            {
-                if(originalHash!=null)throw new IOException("Локальный файл исчез во время загрузки; требуется сверка");
-                File.Move(part,destination);
+                BundleMaintenance.ValidateAgainstLocal(root,part,file,token);
+                if(originalHash!=null)BundlePackageIdentity.ValidateUpgrade(destination,part,file.Path);
+                if(stage!=null)stage("Публикация");
+                BundlePublication.Publish(part,destination,originalHash,token,null);
             }
             progress(file.Size);
         }

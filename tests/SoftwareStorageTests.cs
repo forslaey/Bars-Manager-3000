@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -14,9 +14,17 @@ namespace ServiceTool
         private static void Check(bool ok,string message){if(!ok)throw new Exception(message);count++;}
         private static void Reject(Action action,string message){bool failed=false;try{action();}catch(InvalidDataException){failed=true;}catch(IOException){failed=true;}catch(OperationCanceledException){failed=true;}Check(failed,message);}
         private static string Area(string name){string value=Path.Combine(root,name);Directory.CreateDirectory(value);return value;}
-        private static SoftwarePackage Package(string area){string file=Path.Combine(area,Path.GetFileName(fixture));File.Copy(fixture,file);return SoftwareCatalog.Describe("notepad",file,"Temporary signed fixture");}
+        private static SoftwarePackage Package(string area){string file=Path.Combine(area,Path.GetFileName(fixture));File.Copy(fixture,file);return Describe("notepad",file,"Inert generated fixture");}
         private static string Old(string folder){Directory.CreateDirectory(folder);string old=Path.Combine(folder,"npp.1.0.Installer.x64.exe");File.Copy(fixture,old);return old;}
         private sealed class NoHttp:IWebRequestCreate{public WebRequest Create(Uri uri){throw new WebException("Test download unavailable");}}
+        private static SoftwarePackage Describe(string id,string file,string source)
+        {
+            var match=System.Text.RegularExpressions.Regex.Match(Path.GetFileName(file),@"^npp\.(\d+(?:\.\d+){1,3})\.Installer\.x64\.exe$");
+            if(!match.Success||new FileInfo(file).Length!=65536)throw new InvalidDataException("Invalid inert fixture");
+            return new SoftwarePackage {Id=id,File=file,Version=match.Groups[1].Value,Architecture="x64",Sha256=SoftwareCatalog.Hash(file),Source=source};
+        }
+        private static SoftwarePackage Publish(SoftwarePackage p,string folder,Action<string> log,Func<bool> cancelled)
+        {return SoftwarePackageStorage.PublishVerified(p,folder,log,cancelled,x=>{SoftwareCatalog.Validate(x,true);if(SoftwareCatalog.Hash(x.File)!=x.Sha256)throw new InvalidDataException("Fixture hash mismatch");},Describe);}
         public static int Main(string[] args)
         {
             root=Path.Combine(Path.GetTempPath(),"bars-storage-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
@@ -30,7 +38,7 @@ namespace ServiceTool
                     SoftwareTrust.Verify(saved,false);Check(Directory.GetDirectories(Path.Combine(library,"_soft")).Length==0,"Successful live download leaves no staging directories");
                     Console.WriteLine("PASS live save-to-_soft: "+saved.Version+" SHA256="+saved.Sha256+"; no installer executed.");return 0;
                 }
-                fixture=Directory.GetFiles(@"C:\Библиотеки\_soft","npp.*.Installer.x64.exe").First();
+                fixture=Path.Combine(Area("fixture"),"npp.8.9.8.1.Installer.x64.exe");File.WriteAllBytes(fixture,new byte[65536]);
                 string libraries=Area("Библиотеки");string soft=Path.Combine(libraries,"_soft");
                 Check(SoftwarePackageStorage.Folder(libraries)==soft,"Library selection appends _soft even when missing");
                 Check(SoftwarePackageStorage.Folder(soft+"\\")==soft,"Existing _soft path not nested again");
@@ -45,7 +53,7 @@ namespace ServiceTool
                 var package=Package(Area("fresh"));string old=Old(soft);
                 string unrelated=Path.Combine(soft,"keep.txt");File.WriteAllText(unrelated,"Keep user file");
                 string corrupt=Path.Combine(soft,"npp.invalid.Installer.x64.exe");File.WriteAllText(corrupt,"Unrecognized file must remain");
-                var savedPackage=SoftwarePackageStorage.Publish(package,libraries,messages.Add,()=>false);
+                var savedPackage=Publish(package,libraries,messages.Add,()=>false);
                 Check(savedPackage.File==Path.Combine(soft,Path.GetFileName(fixture))&&File.Exists(savedPackage.File),"Verified new package published flat into _soft");
                 Check(!File.Exists(old),"Older recognized installer permanently removed after publication");
                 Check(File.Exists(unrelated)&&File.Exists(corrupt),"Unrelated and unrecognized files preserved");
@@ -55,23 +63,23 @@ namespace ServiceTool
                 string original=Path.Combine(rollbackSoft,Path.GetFileName(fixture));File.Copy(fixture,original);
                 var lockedPackage=Package(Area("locked-source"));string previousHash=SoftwareCatalog.Hash(original);
                 using(var held=new FileStream(lockedPackage.File,FileMode.Open,FileAccess.Read,FileShare.Read))
-                    Reject(()=>SoftwarePackageStorage.Publish(lockedPackage,rollback,messages.Add,()=>false),"Failed new-file rename triggers rollback");
+                    Reject(()=>Publish(lockedPackage,rollback,messages.Add,()=>false),"Failed new-file rename triggers rollback");
                 Check(File.Exists(original)&&SoftwareCatalog.Hash(original)==previousHash,"Same-name previous installer restored on failure");
                 Check(File.Exists(lockedPackage.File),"Failed publication retains staged file for caller cleanup");
-                var replacement=Package(Area("same-name"));string replacementStage=Path.GetDirectoryName(replacement.File);SoftwarePackageStorage.Publish(replacement,rollback,messages.Add,()=>false);
+                var replacement=Package(Area("same-name"));string replacementStage=Path.GetDirectoryName(replacement.File);Publish(replacement,rollback,messages.Add,()=>false);
                 Check(File.Exists(original)&&!Directory.GetFiles(replacementStage,"*.previous").Any(),"Same-name replacement committed");
 
                 string failed=Area("bad-hash");string failedOld=Old(Path.Combine(failed,"_soft"));var bad=Package(Area("bad-source"));bad.Sha256=new string('0',64);
-                Reject(()=>SoftwarePackageStorage.Publish(bad,failed,messages.Add,()=>false),"Hash failure rejected before replacing old installer");Check(File.Exists(failedOld),"Hash failure preserves previous installer");
+                Reject(()=>Publish(bad,failed,messages.Add,()=>false),"Hash failure rejected before replacing old installer");Check(File.Exists(failedOld),"Hash failure preserves previous installer");
                 var cancelled=Package(Area("cancelled-source"));int probes=0;
-                Reject(()=>SoftwarePackageStorage.Publish(cancelled,failed,messages.Add,()=>++probes>=2),"Cancellation at commit boundary rejected");Check(File.Exists(failedOld)&&File.Exists(cancelled.File),"Cancellation preserves old and staged files");
+                Reject(()=>Publish(cancelled,failed,messages.Add,()=>++probes>=2),"Cancellation at commit boundary rejected");Check(File.Exists(failedOld)&&File.Exists(cancelled.File),"Cancellation preserves old and staged files");
 
                 string newer=Area("newer");string newerSoft=Path.Combine(newer,"_soft");Directory.CreateDirectory(newerSoft);
                 string higher=Path.Combine(newerSoft,"npp.99.0.Installer.x64.exe");File.Copy(fixture,higher);var lower=Package(Area("lower-source"));
-                Reject(()=>SoftwarePackageStorage.Publish(lower,newer,messages.Add,()=>false),"Newer local installer never replaced with older download");Check(File.Exists(higher),"Newer installer retained");
+                Reject(()=>Publish(lower,newer,messages.Add,()=>false),"Newer local installer never replaced with older download");Check(File.Exists(higher),"Newer installer retained");
 
                 string busy=Area("locked-old");string busyOld=Old(Path.Combine(busy,"_soft"));var fresh=Package(Area("busy-source"));
-                using(var held=new FileStream(busyOld,FileMode.Open,FileAccess.Read,FileShare.Read))SoftwarePackageStorage.Publish(fresh,busy,messages.Add,()=>false);
+                using(var held=new FileStream(busyOld,FileMode.Open,FileAccess.Read,FileShare.Read))Publish(fresh,busy,messages.Add,()=>false);
                 Check(File.Exists(fresh.File)&&File.Exists(busyOld),"Busy old file does not destroy verified new installer");
                 Check(messages.Any(m=>m.Contains("прежний удалить не удалось")),"Incomplete old-file cleanup reported");
 

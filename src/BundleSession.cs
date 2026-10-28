@@ -25,7 +25,7 @@ namespace ServiceTool
             string path=PathIn(root,"queue.xml");Directory.CreateDirectory(Path.GetDirectoryName(path));string temp=PathIn(root,"queue-"+Guid.NewGuid().ToString("N")+".tmp");
             var doc=new XmlDocument();var node=doc.CreateElement("queue");node.SetAttribute("source",YandexBundleSource.PublicLink);doc.AppendChild(node);
             foreach(var file in files){var item=doc.CreateElement("file");item.SetAttribute("path",file.Path);item.SetAttribute("sha256",file.Sha256);node.AppendChild(item);}
-            try{doc.Save(temp);if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}finally{if(File.Exists(temp))File.Delete(temp);}
+            try{doc.Save(temp);string previous=File.Exists(path)?YandexBundleSource.Hash(path,System.Threading.CancellationToken.None):null;BundlePublication.Publish(temp,path,previous,System.Threading.CancellationToken.None,null);}finally{if(File.Exists(temp))File.Delete(temp);}
         }
         internal static HashSet<string> Load(string root)
         {

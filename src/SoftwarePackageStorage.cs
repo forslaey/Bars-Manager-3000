@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -49,9 +49,13 @@ namespace ServiceTool
         }
         internal static SoftwarePackage Publish(SoftwarePackage package,string selected,Action<string> progress,Func<bool> cancelled)
         {
+            return PublishVerified(package,selected,progress,cancelled,p=>{SoftwareCatalog.Validate(p,true);SoftwareTrust.Verify(p,true);},SoftwareCatalog.Describe);
+        }
+        internal static SoftwarePackage PublishVerified(SoftwarePackage package,string selected,Action<string> progress,Func<bool> cancelled,Action<SoftwarePackage> verify,Func<string,string,string,SoftwarePackage> describe)
+        {
             LibraryCancellation.Check(cancelled);string folder=Folder(selected);ToolsDeployment.SafePath(folder);
-            SoftwareCatalog.Validate(package,true);SoftwareTrust.Verify(package,true);
-            var actual=SoftwareCatalog.Describe(package.Id,package.File,package.Source);
+            verify(package);
+            var actual=describe(package.Id,package.File,package.Source);
             if(actual.Architecture!=package.Architecture||SoftwareCatalog.Compare(actual.Version,package.Version)!=0||!String.Equals(actual.Sha256,package.Sha256,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Установщик изменился до сохранения");
             if(SoftwareCatalog.PackageId(package.File)!=package.Id)throw new InvalidDataException("Неверное имя установщика");
             Directory.CreateDirectory(folder);ToolsDeployment.SafePath(folder);
@@ -61,7 +65,7 @@ namespace ServiceTool
             {
                 if(SoftwareCatalog.PackageId(file)!=package.Id)continue;
                 SoftwarePackage old;
-                try{old=SoftwareCatalog.Describe(package.Id,file,"Локальный _soft");}
+                try{old=describe(package.Id,file,"Локальный _soft");}
                 catch(InvalidDataException ex){if(String.Equals(file,final,StringComparison.OrdinalIgnoreCase))throw;progress("Прежний файл не распознан и сохранён: "+file+". "+ex.Message);continue;}
                 catch(IOException ex){if(String.Equals(file,final,StringComparison.OrdinalIgnoreCase))throw;progress("Прежний файл не распознан и сохранён: "+file+". "+ex.Message);continue;}
                 catch(UnauthorizedAccessException ex){if(String.Equals(file,final,StringComparison.OrdinalIgnoreCase))throw;progress("Прежний файл недоступен и сохранён: "+file+". "+ex.Message);continue;}

@@ -130,11 +130,10 @@ namespace ServiceTool
                         while(true){Entry entry;lock(sync){if(queue.Count==0||token.IsCancellationRequested||worker>=workerLimit)return;entry=queue.Dequeue();entry.State="Скачивание";}
                             try{
                                 string destination=YandexBundleSource.LocalPath(scannedRoot,entry.File.Path);
-                                bool published=File.Exists(destination)&&YandexBundleSource.Hash(destination,token)==entry.File.Sha256;
+                                bool published=BundlePublication.Matches(scannedRoot,entry.File,token);
                                 if(!published)new BundleTransfer(new YandexBundleSource()).Download(entry.File,scannedRoot,entry.OriginalHash,bytes=>{lock(sync)entry.Bytes=bytes;},token,bytes=>Interlocked.Add(ref receivedBytes,bytes),state=>{lock(sync){entry.State=state;if(state=="Ожидание повтора"&&autoReduce)workerLimit=Math.Max(1,workerLimit-1);}BundleSession.Log(scannedRoot,entry.File.Path+": "+state);});
-                                string warning=null;
-                                try{new BundleReceipts(scannedRoot).Record(entry.File);}catch(IOException ex){warning=ex.Message;}catch(UnauthorizedAccessException ex){warning=ex.Message;}
-                                lock(sync){entry.Done=true;entry.Bytes=entry.File.Size;entry.Selected=false;entry.State=warning==null?"Готово":"Файл сохранён; квитанция не записана: "+warning;}
+                                string warning=BundlePublication.Record(scannedRoot,entry.File,null);
+                                lock(sync){entry.Done=true;entry.Bytes=entry.File.Size;entry.Selected=false;entry.State=warning==null?"Готово":warning;}
                             }
                             catch(Exception ex){BundleSession.Log(scannedRoot,entry.File.Path+": "+(token.IsCancellationRequested?"Прервано":ex.Message));lock(sync)entry.State=token.IsCancellationRequested?"Приостановлено / прервано":"Ошибка: "+ex.Message;if(token.IsCancellationRequested)return;}
                         }

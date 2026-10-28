@@ -21,14 +21,11 @@ namespace ServiceTool
             {
                 if(!Path.GetFileName(path).Equals(Path.GetFileName(relative),StringComparison.OrdinalIgnoreCase))
                 {alias=Path.Combine(Path.GetDirectoryName(path),"identity-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(alias);metadata=Path.Combine(alias,Path.GetFileName(relative));File.Copy(path,metadata,false);}
-                if(relative.StartsWith("/_soft/",StringComparison.OrdinalIgnoreCase))
+                string id=SoftwareCatalog.PackageId(relative);
+                if(!String.IsNullOrEmpty(id))
                 {
-                    string id=SoftwareCatalog.PackageId(relative);
-                    if(!String.IsNullOrEmpty(id))
-                    {
                         var p=SoftwareCatalog.Describe(id,metadata,"Комплект");
                         return new BundlePackageIdentity {Key="software|"+id+"|"+p.Architecture,Version=p.Version};
-                    }
                 }
                 var library=LibraryDiscovery.Describe(metadata,relative);
                 if(library!=null&&(library.Kind==LibraryKind.Access||library.Kind==LibraryKind.Framework||library.Kind==LibraryKind.Inno||library.Kind==LibraryKind.VcBundle))
@@ -60,13 +57,33 @@ namespace ServiceTool
     {internal string Path,Hash;}
     internal static class BundleMaintenance
     {
+        internal static System.Collections.Generic.IEnumerable<string> PackageFiles(string root,CancellationToken token)
+        {
+            string full=Path.GetFullPath(root);YandexBundleSource.LocalPath(full,"/containment-check");
+            if(!Directory.Exists(full))yield break;
+            var pending=new System.Collections.Generic.Stack<string>();pending.Push(full);int count=0;
+            while(pending.Count>0)
+            {
+                token.ThrowIfCancellationRequested();string dir=pending.Pop();
+                foreach(string child in Directory.GetDirectories(dir))
+                {
+                    string name=Path.GetFileName(child);
+                    if(name.Equals(".bars-download",StringComparison.OrdinalIgnoreCase)||name.Equals("_tools",StringComparison.OrdinalIgnoreCase)||name.Equals("Журнал установки библиотек",StringComparison.OrdinalIgnoreCase)||(File.GetAttributes(child)&FileAttributes.ReparsePoint)!=0)continue;
+                    pending.Push(child);
+                }
+                foreach(string path in Directory.GetFiles(dir))
+                {
+                    token.ThrowIfCancellationRequested();if(++count>20000)throw new IOException("Превышен предел локального каталога");
+                    if((File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0)continue;
+                    string ext=Path.GetExtension(path);if(ext.Equals(".exe",StringComparison.OrdinalIgnoreCase)||ext.Equals(".msi",StringComparison.OrdinalIgnoreCase))yield return path;
+                }
+            }
+        }
         internal static void ValidateAgainstLocal(string root,string staged,BundleRemoteFile file,CancellationToken token)
         {
             if(file.Group=="Утилиты")return;
             var incoming=BundlePackageIdentity.Read(staged,file.Path);if(incoming==null)return;
-            string directory=Path.GetDirectoryName(YandexBundleSource.LocalPath(root,file.Path));if(!Directory.Exists(directory))return;
-            // Compare only installable siblings; no execution and no traversal of utility trees.
-            foreach(string local in Directory.GetFiles(directory))
+            foreach(string local in PackageFiles(root,token))
             {
                 token.ThrowIfCancellationRequested();if((File.GetAttributes(local)&FileAttributes.ReparsePoint)!=0)continue;
                 string relative="/"+local.Substring(Path.GetFullPath(root).TrimEnd('\\','/').Length).TrimStart('\\','/').Replace('\\','/');
@@ -86,22 +103,15 @@ namespace ServiceTool
                 System.Collections.Generic.List<BundlePackageIdentity> list;if(!known.TryGetValue(identity.Key,out list))known[identity.Key]=list=new System.Collections.Generic.List<BundlePackageIdentity>();list.Add(identity);
             }
             var result=new System.Collections.Generic.List<BundleOldFile>();
-            var pending=new System.Collections.Generic.Stack<string>();pending.Push(Path.GetFullPath(root));
-            var paths=new System.Collections.Generic.HashSet<string>(current.Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
-            while(pending.Count>0)
+            foreach(string path in PackageFiles(root,token))
             {
-                token.ThrowIfCancellationRequested();string dir=pending.Pop();
-                foreach(string child in Directory.GetDirectories(dir))if(!Path.GetFileName(child).Equals(".bars-download",StringComparison.OrdinalIgnoreCase)&&!Path.GetFileName(child).Equals("_tools",StringComparison.OrdinalIgnoreCase)&&(File.GetAttributes(child)&FileAttributes.ReparsePoint)==0)pending.Push(child);
-                foreach(string path in Directory.GetFiles(dir))
-                {
                     string relative="/"+path.Substring(Path.GetFullPath(root).TrimEnd('\\','/').Length).TrimStart('\\','/').Replace('\\','/');
-                    if(paths.Contains(relative)||(File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0)continue;
+                    if(current.Any(f=>String.Equals(f.Path,relative,StringComparison.OrdinalIgnoreCase))||(File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0)continue;
                     string ext=Path.GetExtension(path);if(!ext.Equals(".exe",StringComparison.OrdinalIgnoreCase)&&!ext.Equals(".msi",StringComparison.OrdinalIgnoreCase))continue;
                     string hash=YandexBundleSource.Hash(path,token);var remote=new BundleRemoteFile {Path=relative,Sha256=hash};
                     if(!new BundleReceipts(root).CanReplace(remote,hash))continue;
                     var identity=BundlePackageIdentity.Read(path,relative);System.Collections.Generic.List<BundlePackageIdentity> replacements;
                     if(identity!=null&&known.TryGetValue(identity.Key,out replacements)&&replacements.Any(p=>LibraryVersions.SameChannel(identity.Version,p.Version)&&LibraryVersions.Compare(p.Version,identity.Version)>0))result.Add(new BundleOldFile {Path=relative,Hash=hash});
-                }
             }
             return result;
         }
