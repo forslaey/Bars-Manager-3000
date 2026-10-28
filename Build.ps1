@@ -26,7 +26,7 @@ try {
     }
     if ($Sign) { foreach ($taskArchitecture in @('x86','x64')) { & (Join-Path $PSScriptRoot 'tools\Sign-File.ps1') -FilePath (Join-Path $taskBuild "Installer.$taskArchitecture.exe") -CertificateThumbprint $CertificateThumbprint -TimestampServer $TimestampServer } }
     $taskSources = @(Get-ChildItem -LiteralPath $taskSource -File -Filter '*.cs' | ForEach-Object FullName)
-    $taskResources = @("/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png")
+    $taskResources = @("/resource:$(Join-Path $taskAssets 'BundleManifest.json'),BARS.BundleManifest.json", "/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png")
     foreach ($taskArchitecture in @('x86','x64')) { $taskResources += "/resource:$(Join-Path $taskBuild "Installer.$taskArchitecture.exe"),BARS.Helper.$taskArchitecture" }
     $taskStaged = Join-Path $taskBuild 'Bars Manager 3000.exe'
     & $taskCompiler @taskCommon @taskResources '/platform:anycpu' "/out:$taskStaged" @taskSources

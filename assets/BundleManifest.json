@@ -1,0 +1,937 @@
+﻿[
+    {
+        "Path":  "/!ПОЯСНЕНИЕ.txt",
+        "Size":  996,
+        "Sha256":  "d7a9367040e2b48bc55979c58a64674c40fa7bc03a6356817fb123b41c5d1a5d"
+    },
+    {
+        "Path":  "/0.Microsoft Visual C++ 2005-2022 Redistributable 14.52.37025.0.exe",
+        "Size":  108212471,
+        "Sha256":  "4e7483652c94aa470b4d943975e2d75f4d3457d8eccc502f0135edcf66a81220"
+    },
+    {
+        "Path":  "/1.NDP481-DevPack-ENU.exe",
+        "Size":  103548920,
+        "Sha256":  "fd9ae4b63cbc8f7637249c4b29d25281b1f70fbe6d650109dcbf2bdf596cf994"
+    },
+    {
+        "Path":  "/10.DevExpress_v8.2.exe",
+        "Size":  17500627,
+        "Sha256":  "987684ae74e8d1d726e402e69e54fbabc01e635b4c0576c3c72c181270bfcf18"
+    },
+    {
+        "Path":  "/11.DevExpress_v13.2.7.exe",
+        "Size":  80041272,
+        "Sha256":  "3ee4cb5c220c9d072060136176304c0d1fd502d2d240afefbd13029dcf249abb"
+    },
+    {
+        "Path":  "/12.DevExpress_v15.1.4.exe",
+        "Size":  72350168,
+        "Sha256":  "943ce91dd615964f5af573a76e23ca392b058c334edbe36062e879692441a5eb"
+    },
+    {
+        "Path":  "/13.DevExpress_v22.1.4.exe",
+        "Size":  161266311,
+        "Sha256":  "39601933051d895e4f0cd349e1463918915cdbd973862d7231f9b72c48b30af5"
+    },
+    {
+        "Path":  "/14.sqlncli_x64.msi",
+        "Size":  8108544,
+        "Sha256":  "cc3c4f0239e87affe4b14a9dcefdd3a10c4f74b2eb8098d9966e36c7651e4599"
+    },
+    {
+        "Path":  "/15.msxml6_x64.msi",
+        "Size":  2610688,
+        "Sha256":  "7806740c262fda66432c4981d6086e5b7220ce4e329e8fe6100fcf72a1fb1cf5"
+    },
+    {
+        "Path":  "/16.msxml6_x86.msi",
+        "Size":  1462272,
+        "Sha256":  "893c49066ef1c5987e8f683634776d13c7a8d4fd5a6356c6823e4a108cca3ce0"
+    },
+    {
+        "Path":  "/17.accessdatabaseengine_X64.exe",
+        "Size":  83400344,
+        "Sha256":  "04e96c9f1a1f7d251a88aececf1dc10ff65950392787427c00814a43308003de"
+    },
+    {
+        "Path":  "/18.VFPOLEDBSetup.msi",
+        "Size":  1292288,
+        "Sha256":  "741a707a3b2535d166cbe4e29c4b267f614f23514e04782b79f8e7b8c822c736"
+    },
+    {
+        "Path":  "/2.SQLSysClrTypes_2014_x64.msi",
+        "Size":  4288512,
+        "Sha256":  "14e13d88a76a2c05f90ed3f53a2c3c7cbc5593d3109e8bacdb45c12ab557a07f"
+    },
+    {
+        "Path":  "/3.SQLSysClrTypes_2014.msi",
+        "Size":  3125248,
+        "Sha256":  "d99d572baae44cc5b79a1759761e1d1f0491382f64cfb547d2efbe56cd01cc84"
+    },
+    {
+        "Path":  "/4.SQLSysClrTypes.msi",
+        "Size":  1513984,
+        "Sha256":  "e9c0fbff2e627582254dabcf3bb5384057a269a7e71da4c87bdb5905670aea78"
+    },
+    {
+        "Path":  "/5.SQLSysClrTypes_x64.msi",
+        "Size":  1917952,
+        "Sha256":  "c54a2807ee849016e75dc759fb086e7011ea8f0be62990fd6c26e29387a969ba"
+    },
+    {
+        "Path":  "/6.SharedManagementObjects.msi",
+        "Size":  10953728,
+        "Sha256":  "4b1ec03bc5cc69481b9da6b2db41ae6d3adeacffe854cc209d125e83a739f937"
+    },
+    {
+        "Path":  "/7.SharedManagementObjects_2014.msi",
+        "Size":  6631424,
+        "Sha256":  "654e7a016340a262f63f143984dcef42c85c06aa92671bcac22508f7c5b7ba41"
+    },
+    {
+        "Path":  "/8.SharedManagementObjects_2014_x64.msi",
+        "Size":  7753728,
+        "Sha256":  "a44de01f0554962c2d9e80c947ff3918fadd2e5f4b9c5d1afa523d6e84a37332"
+    },
+    {
+        "Path":  "/9.SharedManagementObjectsx64.msi",
+        "Size":  16428032,
+        "Sha256":  "dccec315e3c345a7efb5951f3e9b27512b4e91d73ec48c7196633b7449115b7c"
+    },
+    {
+        "Path":  "/Microsoft .NET/Исправлятор .NET Famework.exe",
+        "Size":  1260536,
+        "Sha256":  "4b8f1a54b8caa28594d39c4628f6ad28eaf4a26d538bab2f1eab79e61199b142"
+    },
+    {
+        "Path":  "/Microsoft .NET/Удалятор .NET Framework.exe",
+        "Size":  298496,
+        "Sha256":  "f585a897cf5e03f2908adeedb1b7fe0cededa1a249430e18cdc396845723428d"
+    },
+    {
+        "Path":  "/_soft/7z2604-x64.exe",
+        "Size":  1664082,
+        "Sha256":  "d54bf805f9f3704d1e8db2fa3498ae7ef2df0312b40b558e7c71c734430a665d"
+    },
+    {
+        "Path":  "/_soft/AnyDesk.exe",
+        "Size":  8553912,
+        "Sha256":  "2a85e3bc09a2c8b6707cd56ec464be42705a5849f1a8a5b38c66b56b2c07b124"
+    },
+    {
+        "Path":  "/_soft/googlechromestandaloneenterprise64.msi",
+        "Size":  170979328,
+        "Sha256":  "a31bd8a4746069a128bf3beefdaa246c792af5f15bbf06af0259abc895c9609b"
+    },
+    {
+        "Path":  "/_soft/npp.8.9.8.1.Installer.x64.exe",
+        "Size":  6963432,
+        "Sha256":  "26f3bcced788fadbac4e7e577b430ea2ce6060cf3bcad993ef4612ecd7d743da"
+    },
+    {
+        "Path":  "/_soft/rudesktop-3.0.1563-x64.msi",
+        "Size":  31744000,
+        "Sha256":  "f02e1b8d1a1b446e599d0edcfec64ca005dea0ca8e6b9e4d9c8bc367fc7b6aad"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 10/aspnetcore-runtime-10.0.14-win-x64.exe",
+        "Size":  11271088,
+        "Sha256":  "b7ff2dc29209ac243eaea0b7614e26d33136e3d8a1aba97ba211e0e39e209849"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 10/aspnetcore-runtime-10.0.14-win-x86.exe",
+        "Size":  10758240,
+        "Sha256":  "7b3992c33f7fe9610b1a1a848b970fffdc084be0eaf39542ae93936b2740b7e7"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 10/dotnet-runtime-10.0.14-win-x64.exe",
+        "Size":  30653360,
+        "Sha256":  "53a67d2d68a74a892010191d70080a5b359f41ed7d0bb2f92f120c9f0e4e199d"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 10/dotnet-runtime-10.0.14-win-x86.exe",
+        "Size":  28367088,
+        "Sha256":  "00f84fc2ddcbae10f41266c869a0ab73e4ff63e61fa204a2ac6117c185b275c8"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 11/aspnetcore-runtime-11.0.0-rc.3.26522.148-win-x64.exe",
+        "Size":  11377088,
+        "Sha256":  "fde7738d49fac711648802e35e40149e03e4c55c80a1e52f80077c0275f2915f"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 11/aspnetcore-runtime-11.0.0-rc.3.26522.148-win-x86.exe",
+        "Size":  10774432,
+        "Sha256":  "9e1073bf9518b1893af004639091ea30cc809b814554275f718a000366ab587c"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 11/dotnet-runtime-11.0.0-rc.3.26522.148-win-x64.exe",
+        "Size":  32906216,
+        "Sha256":  "057975959d62e97d07266ef346484c8b32bf7f73858f7526da6594544b053960"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 11/dotnet-runtime-11.0.0-rc.3.26522.148-win-x86.exe",
+        "Size":  30421376,
+        "Sha256":  "598598cdd72e69798944d1fa25cbb3d34883b683df76a08033f37166571d175e"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 6/aspnetcore-runtime-6.0.36-win-x64.exe",
+        "Size":  9033496,
+        "Sha256":  "06dbd26509079497c363b28060874d75d19c3797b83020f3c53f37faa755a61d"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 6/aspnetcore-runtime-6.0.36-win-x86.exe",
+        "Size":  8258744,
+        "Sha256":  "af72a5b08fb14e95c1d05d2542d3de79d50e31e06cac181b2a1df3f87bc1f515"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 6/dotnet-runtime-6.0.36-win-x64.exe",
+        "Size":  28101408,
+        "Sha256":  "6bdad7bc4c41fe93d4ae7b0312b1d017cfe369d28e7e2e421f5b675f9feefe84"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 6/dotnet-runtime-6.0.36-win-x86.exe",
+        "Size":  25601736,
+        "Sha256":  "3b3cb4636251a582158f4b6b340f20b3861e6793eb9a3e64bda29cbf32da3604"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 7/aspnetcore-runtime-7.0.20-win-x64.exe",
+        "Size":  9703408,
+        "Sha256":  "ab9a6bfed06369dbe22328f54c69ce0660629ea6fc31bc554ed8b585edb16a67"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 7/aspnetcore-runtime-7.0.20-win-x86.exe",
+        "Size":  8924480,
+        "Sha256":  "c4fa407e4e8324edd900b6a39ab7964a45b77bd5a22d4cdba945f1a17c595ab8"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 7/dotnet-runtime-7.0.20-win-x64.exe",
+        "Size":  28392424,
+        "Sha256":  "10f48feee0f7fb4c2ed61ecef5e58699743afc9531f8a293680a99fc2d0a78a5"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 7/dotnet-runtime-7.0.20-win-x86.exe",
+        "Size":  26026368,
+        "Sha256":  "9bf79c94ab014b555167e61f3ce653fdf54c70bda6d6c74ab9f6f44652947a89"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 8/aspnetcore-runtime-8.0.33-win-x64.exe",
+        "Size":  10480944,
+        "Sha256":  "19448b01f8bd96a5df33e4a9b267707b2defd85e44a50f8851596af1b9a6ecea"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 8/aspnetcore-runtime-8.0.33-win-x86.exe",
+        "Size":  9729376,
+        "Sha256":  "893d059b3cd096429a3656b190c0da11079c07c1d60ac3f45eb99405fb38da58"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 8/dotnet-runtime-8.0.33-win-x64.exe",
+        "Size":  28613992,
+        "Sha256":  "00ae8b7bab1e8de69162aebbcc518789ccdcad1bd98aff4f08556812604867ea"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 8/dotnet-runtime-8.0.33-win-x86.exe",
+        "Size":  26354040,
+        "Sha256":  "dfbf5dca6a6c37a1ee316e37227f2aaa6e0be3a42305534636ad8e2c6c980294"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 9/aspnetcore-runtime-9.0.22-win-x64.exe",
+        "Size":  10594576,
+        "Sha256":  "db9ff4e204299d46a168726000679c3e7df9fe4fb07f11929d658ce2749cb3fd"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 9/aspnetcore-runtime-9.0.22-win-x86.exe",
+        "Size":  9815360,
+        "Sha256":  "914bdc3640f508a3113c2bee9bca062033bfa91035022caf17b7ccc9f5a465ac"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 9/dotnet-runtime-9.0.22-win-x64.exe",
+        "Size":  29785008,
+        "Sha256":  "c0327daf307c18f23515735bae8a1c2ee3881b317f6dd1aaae867b852b8235a6"
+    },
+    {
+        "Path":  "/Microsoft .NET/.NET 9/dotnet-runtime-9.0.22-win-x86.exe",
+        "Size":  27172840,
+        "Sha256":  "e38ca2cfc29915d2845dbce54fbc04f40133f0a451c3c1115d9a333415d0983c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/7100A_Conf.exe",
+        "Size":  73728,
+        "Sha256":  "f8e6dcfbf1e2d034364e04715f23b43a1b7fb92dfdb05b02f2e2edb48b009268"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/DK-QStart.exe",
+        "Size":  41472,
+        "Sha256":  "164496166f711c34a6c55d30337c4e493b72a33858cee3ed03b0b75a4d83b062"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/IPSearch_Troubles.txt",
+        "Size":  265,
+        "Sha256":  "342685293d03143fb1fe739781d519f942328dfb31f29fae796e9d7d2ebb5801"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/IpSearch.exe",
+        "Size":  54784,
+        "Sha256":  "d057300d0495757128c0024b13df1223459c04b09a832f3c6982bc366e2f39d2"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/PicTerminal.exe",
+        "Size":  523264,
+        "Sha256":  "6dfb0fe8e6e8cfe4bbd9d8cc03a969384ef7df8b2d31380155e97a371a1aa94a"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/SY400.exe",
+        "Size":  636416,
+        "Sha256":  "e6b23ad82f42740d1ba4f9f324a8d6783f3dba7f15cdf133bc9d2e2bb2f6af7f"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/SY400.ini",
+        "Size":  21,
+        "Sha256":  "6174d62bccea3a2a77e1be18af4c8b0c0d279ce15fa649133a3e57a2ca2bd46b"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/history.txt",
+        "Size":  2692,
+        "Sha256":  "dde8ba78dcbf8a4f4e0a62192d5270b54b4be30e3a6f10facd7f153b2da333cd"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/kitty.exe",
+        "Size":  784896,
+        "Sha256":  "b3a0a5812ccc7f7a9962c0519d464bd8d45f4042b4838583b3686500db614f53"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/kitty.ini",
+        "Size":  51,
+        "Sha256":  "d43024c656949fce55dcde29857e37a2ac71b1da86df371f40188d0485e62d9d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/plink.exe",
+        "Size":  1043072,
+        "Sha256":  "e5621ffe4879f0ec39ed40f688db9399c2d43054d41ef14472fa335c4693b915"
+    },
+    {
+        "Path":  "/_tools/WinSCP v6.6.2/WinSCP.com",
+        "Size":  555744,
+        "Sha256":  "9867c3e879436419fa3f62af3a18756930b947b3495d11086efb0e5c55399858"
+    },
+    {
+        "Path":  "/_tools/WinSCP v6.6.2/WinSCP.exe",
+        "Size":  26227296,
+        "Sha256":  "43498cc12376e7634e78c68b88fc55551982e5e6cf8651c91b905a39905051db"
+    },
+    {
+        "Path":  "/_tools/WinSCP v6.6.2/WinSCP.ru",
+        "Size":  1476096,
+        "Sha256":  "ae9a5643f9faf7cf6815a2dfab73cf47139f9b5164303b9dde306febe6d9a473"
+    },
+    {
+        "Path":  "/_tools/WinSCP v6.6.2/readme.txt",
+        "Size":  476,
+        "Sha256":  "694886943eba4470b8310703a3a27e6a2f064fac22f1a3afd1d29eb2331505e9"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/COMsProc.exe",
+        "Size":  16896,
+        "Sha256":  "fcba2c71ff8b4816911753bb3063828867a0301834bd23bba4da40ff1f527804"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/COMscript_basicPatcher_FUL_1_6.cst",
+        "Size":  9776,
+        "Sha256":  "ec96b960a0c126dfdccefe8e67f47dd9a58098441682886232ebad5b4fdaa99d"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/EUPL-EN.pdf",
+        "Size":  34312,
+        "Sha256":  "cd5d9e2a925d8daa92d083fd8c1cea48df1bcfffd857f4f93e2148fddc5001ec"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/History.txt",
+        "Size":  1433,
+        "Sha256":  "f636e298e24650c85c9991ab529114e6ee67624000c31b41996736094d1c7609"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/ToDoList.txt",
+        "Size":  318,
+        "Sha256":  "2f03688f389d79f743bfc689eff231889a63376b4c12e7a77c577899b90bf897"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/c3po v1.6 для DK-CL0618.pdf",
+        "Size":  71389,
+        "Sha256":  "3668023adc6b1d2bb5b90ea91ff8bb1ace2629a815768a7ef9fc180e8dec11c1"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/cspPanel.exe",
+        "Size":  27136,
+        "Sha256":  "7b2b493d14196e975577d502b8bc7b223064af64d8b206c3383fb8cb3c0e34dc"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tftpd32.chm",
+        "Size":  337074,
+        "Sha256":  "9d8fdcfef8e576e96d3c5486fdb240efc07ffffbb3a5f08f42c0d4ee0e77f37d"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tftpd32.exe",
+        "Size":  216064,
+        "Sha256":  "de3636c98e3d7f2d0ecfbe3ac50f29ece5b03262a1dff52bf7e8903972f97b3c"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tftpd32.ini",
+        "Size":  693,
+        "Sha256":  "b2a3944ba6b7f9819346fe23b5663e64ee43c93918e86fc93780b712dd9c7f40"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/ПервичнаяПрошивкаКардлановФилином_02.html",
+        "Size":  35320,
+        "Sha256":  "36d5516588dc29c20c77235139295fc14c0228aa407c92d17a4a7308b0cd0318"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/BeginStarter.txt",
+        "Size":  100,
+        "Sha256":  "5b77040bd37a0b1c7698dfc28cab7e8939cdab3274366fb7c5f0ca4fc4782f71"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/KKServ_Full.txt",
+        "Size":  2296,
+        "Sha256":  "02cdf9913a86344870f13ce4bb89f32ae1e26182004febda3bc6896e55ad1f84"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/LxCon.exe",
+        "Size":  820224,
+        "Sha256":  "d0bd69353a74cff13c40dafecf469d63f13472b4e16540f661990ab823291126"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/LxCon.ini",
+        "Size":  20,
+        "Sha256":  "18ef765c85c986d690f9a6c5876c5dfaf0e1569925e1d225c4fb9cfe317b3e0d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/Patcher",
+        "Size":  1511,
+        "Sha256":  "8a5ef12ce5a55671bf5eeb7b6e0a000d784329ff6f2508c98429fd44388b9a5e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/config-CL0618.tar",
+        "Size":  4608,
+        "Sha256":  "209b5f4dd93790dfcc8243d72b2801491bff038bab9852e3312fa6e3dd960f2c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/history.txt",
+        "Size":  1460,
+        "Sha256":  "e422f87f1dd8f9af34342951915b39ac04558bf8e4519cb25173e7802ac3bba9"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/plink.exe",
+        "Size":  1043072,
+        "Sha256":  "e5621ffe4879f0ec39ed40f688db9399c2d43054d41ef14472fa335c4693b915"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/starter.sh",
+        "Size":  541,
+        "Sha256":  "210f51983bb0b735d342e1446e5a0c3bc53a33ce424af94a3891555e5e9100a1"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon12/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon12/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon12/BeginStarter.txt",
+        "Size":  98,
+        "Sha256":  "49b80273ad4cc4d9bb003fd9931eac172281cfaf2d3632ffcf4e24db71d5422d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon12/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon12/LxCon.exe",
+        "Size":  750592,
+        "Sha256":  "ce3ffc3533960b132178c272034733d1bda4334f4effc3370bec4120ce05b2aa"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon12/plink.exe",
+        "Size":  545880,
+        "Sha256":  "5a21a83dfb5822301896a696f3a1a3e8207bf541e11cd1f2bbb7bc666251d8c7"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/BeginStarter.txt",
+        "Size":  98,
+        "Sha256":  "49b80273ad4cc4d9bb003fd9931eac172281cfaf2d3632ffcf4e24db71d5422d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/LxCon.exe",
+        "Size":  755712,
+        "Sha256":  "1d89af509361d3b0bd457d643c9c70d4237381e1035cc85b484347d7a3eede22"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/plink.exe",
+        "Size":  545880,
+        "Sha256":  "5a21a83dfb5822301896a696f3a1a3e8207bf541e11cd1f2bbb7bc666251d8c7"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/BeginStarter.txt",
+        "Size":  98,
+        "Sha256":  "49b80273ad4cc4d9bb003fd9931eac172281cfaf2d3632ffcf4e24db71d5422d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/LxCon.exe",
+        "Size":  758784,
+        "Sha256":  "34c8e21c9e657ada353f950cde70a69949b0e708c64eef3c33a3b6769e1b57eb"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/plink.exe",
+        "Size":  545880,
+        "Sha256":  "5a21a83dfb5822301896a696f3a1a3e8207bf541e11cd1f2bbb7bc666251d8c7"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/BeginStarter.txt",
+        "Size":  98,
+        "Sha256":  "49b80273ad4cc4d9bb003fd9931eac172281cfaf2d3632ffcf4e24db71d5422d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/LxCon.exe",
+        "Size":  763392,
+        "Sha256":  "ca7c283fd52f8080d778f3084fb16e050825e833600903ef524d2bff0d7c87c2"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/LxCon.ini",
+        "Size":  20,
+        "Sha256":  "18ef765c85c986d690f9a6c5876c5dfaf0e1569925e1d225c4fb9cfe317b3e0d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/Patcher",
+        "Size":  1511,
+        "Sha256":  "8a5ef12ce5a55671bf5eeb7b6e0a000d784329ff6f2508c98429fd44388b9a5e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/history.txt",
+        "Size":  1366,
+        "Sha256":  "80c5353e3f5ef5b5b5a2ca80c0abf01a454f92eb38a49d12b57ae2b46157b00e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/plink.exe",
+        "Size":  545880,
+        "Sha256":  "5a21a83dfb5822301896a696f3a1a3e8207bf541e11cd1f2bbb7bc666251d8c7"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/BeginStarter.txt",
+        "Size":  98,
+        "Sha256":  "49b80273ad4cc4d9bb003fd9931eac172281cfaf2d3632ffcf4e24db71d5422d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/LxCon.exe",
+        "Size":  765952,
+        "Sha256":  "e170c534f8184bd2ac918605c7a12f100d2e86b61eb13155c5e66e1e34d5103b"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/LxCon.ini",
+        "Size":  20,
+        "Sha256":  "18ef765c85c986d690f9a6c5876c5dfaf0e1569925e1d225c4fb9cfe317b3e0d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/Patcher",
+        "Size":  1511,
+        "Sha256":  "8a5ef12ce5a55671bf5eeb7b6e0a000d784329ff6f2508c98429fd44388b9a5e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/history.txt",
+        "Size":  1366,
+        "Sha256":  "80c5353e3f5ef5b5b5a2ca80c0abf01a454f92eb38a49d12b57ae2b46157b00e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/plink.exe",
+        "Size":  545880,
+        "Sha256":  "5a21a83dfb5822301896a696f3a1a3e8207bf541e11cd1f2bbb7bc666251d8c7"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/starter.sh",
+        "Size":  538,
+        "Sha256":  "e5763c4af147892c7f38f7aa4a9eb1e5b5629570da005ea760cb9468b8b8504c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/BeginStarter.txt",
+        "Size":  100,
+        "Sha256":  "5b77040bd37a0b1c7698dfc28cab7e8939cdab3274366fb7c5f0ca4fc4782f71"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/KKServ_Full.txt",
+        "Size":  2296,
+        "Sha256":  "02cdf9913a86344870f13ce4bb89f32ae1e26182004febda3bc6896e55ad1f84"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/LxCon.exe",
+        "Size":  803328,
+        "Sha256":  "bc1d46136667c1f600dd4f0d4a5d46ed01186a5aa05e4de723d9a33866993087"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/LxCon.ini",
+        "Size":  20,
+        "Sha256":  "18ef765c85c986d690f9a6c5876c5dfaf0e1569925e1d225c4fb9cfe317b3e0d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/Patcher",
+        "Size":  1511,
+        "Sha256":  "8a5ef12ce5a55671bf5eeb7b6e0a000d784329ff6f2508c98429fd44388b9a5e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/history.txt",
+        "Size":  1460,
+        "Sha256":  "e422f87f1dd8f9af34342951915b39ac04558bf8e4519cb25173e7802ac3bba9"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/kkserv.ini",
+        "Size":  259,
+        "Sha256":  "ee7b58cc69282b6e746b4b83d5ff05956a817df1b6855919a9680186af088aab"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/plink.exe",
+        "Size":  545880,
+        "Sha256":  "5a21a83dfb5822301896a696f3a1a3e8207bf541e11cd1f2bbb7bc666251d8c7"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/starter.sh",
+        "Size":  582,
+        "Sha256":  "843959d0ba5b9a7d21c7a1aed637ef35ab8cd54c725b9c887b527518a4abee9a"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/7z.dll",
+        "Size":  1073664,
+        "Sha256":  "f5b9ecd9190c020bce284cfc3c9a529146477ecde59c4c8487991b76178db6b0"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/7z.exe",
+        "Size":  265216,
+        "Sha256":  "27a05f5c210da07e1edb7c0e6eb995b26b0164e8bff38478ed12036d463b2b19"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/BeginStarter.txt",
+        "Size":  100,
+        "Sha256":  "5b77040bd37a0b1c7698dfc28cab7e8939cdab3274366fb7c5f0ca4fc4782f71"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/EndStarter.txt",
+        "Size":  65,
+        "Sha256":  "c0d8c30ccdb55373a21e77f7eac68c670284bd1978eb49b1d351621b377173d5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/KKServ_Full.txt",
+        "Size":  2296,
+        "Sha256":  "02cdf9913a86344870f13ce4bb89f32ae1e26182004febda3bc6896e55ad1f84"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/LxCon.exe",
+        "Size":  810496,
+        "Sha256":  "36c205adc49576d37256c4bf671b4ae99671ccbe11cfaf6d7d9eda831909d64d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/LxCon.ini",
+        "Size":  20,
+        "Sha256":  "18ef765c85c986d690f9a6c5876c5dfaf0e1569925e1d225c4fb9cfe317b3e0d"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/Patcher",
+        "Size":  1511,
+        "Sha256":  "8a5ef12ce5a55671bf5eeb7b6e0a000d784329ff6f2508c98429fd44388b9a5e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/history.txt",
+        "Size":  1460,
+        "Sha256":  "e422f87f1dd8f9af34342951915b39ac04558bf8e4519cb25173e7802ac3bba9"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/plink.exe",
+        "Size":  545880,
+        "Sha256":  "5a21a83dfb5822301896a696f3a1a3e8207bf541e11cd1f2bbb7bc666251d8c7"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxTerminal/LxCon-.exe",
+        "Size":  648192,
+        "Sha256":  "8f1da909716034591636b5f1345f8a399b0cfe76bfb81339cd3b463e8a9663a1"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxTerminal/LxCon.exe",
+        "Size":  656384,
+        "Sha256":  "1f816ea6be794d912588ae8450c7b83b53285553f9a893e9e19f9982a2aa023a"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/FUL_C3PO_V1_4-CL0618.tar",
+        "Size":  20480,
+        "Sha256":  "8396825cdbfc36af92484d9920f0f288f8c8e811e4df7a4b3836dc7ddb5597b1"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/FUL_C3PO_V1_6-CL0618.tar",
+        "Size":  20480,
+        "Sha256":  "267ac59b1913ad9b2b44756a26163e00e0e6e810c5557933a804f1f91796779a"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/UPD_C3PO_SCRIPT_V_1_600001-CL0618.tar",
+        "Size":  61440,
+        "Sha256":  "2aa3491650113c5e0fa552a77f7688612ba6d00d13de7f82900beaa688af4915"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/UPD_C3PO_V_1_600001-CL0618.tar",
+        "Size":  533504,
+        "Sha256":  "24dbe74b1cd848497f5a4a243533d0ca3ace9bff29fdba5e4ea21c57d7f5ba65"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/UPD_QtLib_4_clib-CL0618.tar",
+        "Size":  15206400,
+        "Sha256":  "d41ca3dc16c7029d0a24a430ee1ed24be97df5edcc2c736121c367e098d7734a"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/UPD_c3poVoice_v1_4-CL0618.tar",
+        "Size":  512000,
+        "Sha256":  "7d09e5bd406bc5752ea00da97a052e9d5cf514b65d6ce58a23c353de7c8f8c7f"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/UPD_c3po_Base+-CL0618.tar",
+        "Size":  2447360,
+        "Sha256":  "18cb0ea9ad393bb0c50d409629aa15ab90ab32f91116799ce5a57ea074ad0cec"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/UPD_c3po_v1_3_media_800x480-CL0618.tar",
+        "Size":  2631680,
+        "Sha256":  "5cd9c1e8951a42c72abdd6538328d9a6bed095ca8af6b339efe627f76607c987"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/show_logo-DK-CL_ssh",
+        "Size":  775447,
+        "Sha256":  "6a70d882d2c1745ac30cce8e92024fde447972fddab8603e35f6e65de36f501d"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/show_logo-DK-CL_ssh_wifi2",
+        "Size":  775453,
+        "Sha256":  "7bb2b26f697009e97354a08358106eb89e1faa967ec77bb7b473a73b4d699579"
+    },
+    {
+        "Path":  "/_tools/fiLinn_V0.3/tFiles/typea.ko",
+        "Size":  165091,
+        "Sha256":  "a24f2dac711c7909bcad4daefffb4b1162f13a7360f75c31c1c863161847c9f8"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/UPD_config/UPD_config.sh",
+        "Size":  568,
+        "Sha256":  "b20d49f367bf8d521521506201155defb16f287e38fb75052e64dd72282dab9f"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon13/UPD_format/UPD_format.sh",
+        "Size":  181,
+        "Sha256":  "01e5febe9e6ff4ba055b6998f76acbb6a462c38094c356e0be1077c523b2bda4"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/Download/format-tft",
+        "Size":  187,
+        "Sha256":  "affa0b81c15c9052ef0041d40bf154bc7cdd24391100b22525d1b14596649850"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/UPD_config/opt/UPD/UPD_config.sh",
+        "Size":  938,
+        "Sha256":  "cf3f434fe2274da10a9b95d32b8f604cf74cf11bf76f486546073a4b08fb4f2c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/UPD_config/opt/UPD/kkserv.ini",
+        "Size":  261,
+        "Sha256":  "fdeb39e04d0ff113796c13036dae61de5534f000cd9e5af31213d6effca73b5e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/UPD_config/opt/UPD/routetable.bin",
+        "Size":  20,
+        "Sha256":  "b7a2e8b604d3ea8649b0d89ab14206a5a756333fb3a03328ae5c964fde5a6ed5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/UPD_config/opt/UPD/starter.sh",
+        "Size":  724,
+        "Sha256":  "3e03092b1d4c39b11fd46e7ccdff6aa9ce8be85322f6901a00c299686a49c96a"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon110/UPD_format/opt/UPD/UPD_format.sh",
+        "Size":  170,
+        "Sha256":  "cbc48d53412aa0cfc6bcc5986b2054ca673f39b0fcedc2f202ed30195b3fee8c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/UPD_config/opt/UPD/UPD_config.sh",
+        "Size":  664,
+        "Sha256":  "9a67d77e63d636043fc593ad36278eec8925acb0db4863158e525233039ecab4"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon15/UPD_format/opt/UPD/UPD_format.sh",
+        "Size":  181,
+        "Sha256":  "01e5febe9e6ff4ba055b6998f76acbb6a462c38094c356e0be1077c523b2bda4"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/UPD_config/opt/UPD/UPD_config.sh",
+        "Size":  708,
+        "Sha256":  "e947a5aa5771b99d23466f21880c25706357381c70b2d1bb52c9327073dee2fb"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon16/UPD_format/opt/UPD/UPD_format.sh",
+        "Size":  170,
+        "Sha256":  "cbc48d53412aa0cfc6bcc5986b2054ca673f39b0fcedc2f202ed30195b3fee8c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/UPD_config/opt/UPD/UPD_config.sh",
+        "Size":  772,
+        "Sha256":  "373c58543e8cd820ea36790d9ebaa2d025b56e23e87266120eeb1a695de1c946"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/UPD_config/opt/UPD/routetable.bin",
+        "Size":  16,
+        "Sha256":  "8e0e590350790f9fb250f226875934e0cb2246564619ccd8ebf932f37765de86"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/UPD_config/opt/UPD/starter.sh",
+        "Size":  540,
+        "Sha256":  "e5557c92c1220ae5dbceb48cddc01806f787dfcbfc7db6eeeff87fed3811169f"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon17/UPD_format/opt/UPD/UPD_format.sh",
+        "Size":  170,
+        "Sha256":  "cbc48d53412aa0cfc6bcc5986b2054ca673f39b0fcedc2f202ed30195b3fee8c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/UPD_config/opt/UPD/UPD_config.sh",
+        "Size":  857,
+        "Sha256":  "27cddab10e8c2aadf4814d43b9b1897bde48c8c865705f31741f42f059643d0f"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/UPD_config/opt/UPD/kkserv.ini",
+        "Size":  259,
+        "Sha256":  "ee7b58cc69282b6e746b4b83d5ff05956a817df1b6855919a9680186af088aab"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/UPD_config/opt/UPD/routetable.bin",
+        "Size":  24,
+        "Sha256":  "5cf353f85d429e4348d674331032f430cd530d58b1a30606243fde43f20a7169"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/UPD_config/opt/UPD/starter.sh",
+        "Size":  585,
+        "Sha256":  "50f90dd65d64fde217c83d79feae69ffbce961309d3e600355fee9a954484806"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon18/UPD_format/opt/UPD/UPD_format.sh",
+        "Size":  170,
+        "Sha256":  "cbc48d53412aa0cfc6bcc5986b2054ca673f39b0fcedc2f202ed30195b3fee8c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/UPD_config/opt/UPD/UPD_config.sh",
+        "Size":  938,
+        "Sha256":  "cf3f434fe2274da10a9b95d32b8f604cf74cf11bf76f486546073a4b08fb4f2c"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/UPD_config/opt/UPD/kkserv.ini",
+        "Size":  261,
+        "Sha256":  "fdeb39e04d0ff113796c13036dae61de5534f000cd9e5af31213d6effca73b5e"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/UPD_config/opt/UPD/routetable.bin",
+        "Size":  20,
+        "Sha256":  "b7a2e8b604d3ea8649b0d89ab14206a5a756333fb3a03328ae5c964fde5a6ed5"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/UPD_config/opt/UPD/starter.sh",
+        "Size":  724,
+        "Sha256":  "3e03092b1d4c39b11fd46e7ccdff6aa9ce8be85322f6901a00c299686a49c96a"
+    },
+    {
+        "Path":  "/_tools/Piglet_V0.12/LxCon19/UPD_format/opt/UPD/UPD_format.sh",
+        "Size":  170,
+        "Sha256":  "cbc48d53412aa0cfc6bcc5986b2054ca673f39b0fcedc2f202ed30195b3fee8c"
+    }
+]

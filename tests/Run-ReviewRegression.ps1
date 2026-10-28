@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([string]$BuildDirectory,[string[]]$TestNames=@('ReviewRegressionTests','UtilityModuleTests','SoftwareTests','SoftwareMaintenanceTests','SoftwareConfirmationTests','SoftwareStorageTests','Ui2332Tests','LayoutFitTests','UserGuideTests','KioskTouchTests'))
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
@@ -11,7 +11,7 @@ if(-not(Test-Path -LiteralPath $binary)){throw 'Build the current version into b
 & (Join-Path $PSScriptRoot 'WindowsFeatureCommands.Tests.ps1') -AssemblyPath $binary
 $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($binary))
 $resources=@()
-foreach($name in $assembly.GetManifestResourceNames()){
+foreach($name in $assembly.GetManifestResourceNames() | Where-Object {$_ -ne 'BARS.BundleManifest.json'} ){
     $path=Join-Path $BuildDirectory $name
     $input=$assembly.GetManifestResourceStream($name);$output=[IO.File]::Create($path)
     try{$input.CopyTo($output)}finally{$input.Dispose();$output.Dispose()}
@@ -22,6 +22,7 @@ if(-not(Test-Path -LiteralPath $compiler)){$compiler=Join-Path $env:WINDIR 'Micr
 $references=& (Join-Path $root 'tools\Prepare-References.ps1')
 $args=@('/nologo','/target:exe','/platform:anycpu','/utf8output','/codepage:65001','/noconfig','/nostdlib+',('/win32manifest:'+(Join-Path $root 'src\app.manifest')))
 foreach($dll in @('mscorlib','System','System.Core','System.Xml','System.Drawing','System.Windows.Forms','System.IO.Compression','System.IO.Compression.FileSystem','System.Configuration.Install','System.ServiceProcess','System.Security','System.Web.Extensions')){$args+='/reference:'+(Join-Path $references ($dll+'.dll'))}
+if(Test-Path (Join-Path $root 'assets\BundleManifest.json')){$resources+=('/resource:'+(Join-Path $root 'assets\BundleManifest.json')+',BARS.BundleManifest.json')}
 $sources=@(Get-ChildItem (Join-Path $root 'src') -Filter *.cs -File | ForEach-Object FullName)
 foreach($name in $TestNames){
     if($name -notmatch '\A[A-Za-z0-9]+Tests\z'){throw 'Invalid test name'}

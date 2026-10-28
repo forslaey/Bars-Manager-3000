@@ -19,7 +19,8 @@ namespace ServiceTool
         readonly BrandTextBox folder=new BrandTextBox();
         readonly Label summary;
         readonly BundleProgressBar total=new BundleProgressBar {Dock=DockStyle.Fill};
-        readonly BrandButton scan,start,pause,back,choose,stop;
+        readonly BrandButton scan,start,pause,back,choose,stop,results;
+        readonly BundleCloudSource cloudSource=new BundleCloudSource();
         readonly BrandCheckBox libraries=new BrandCheckBox {Text="Библиотеки и .NET",Checked=true},tools=new BrandCheckBox {Text="Утилиты BARS",Checked=true};
         List<Entry> batch;
         long previousBytes,networkBytes,receivedBytes;
@@ -41,23 +42,23 @@ namespace ServiceTool
         }
         internal bool MenuRequested {get;private set;}
         internal override void ResumeSession(){MenuRequested=false;base.ResumeSession();}
-        internal BundleDownloadForm(string libraryRoot=null):base("Загрузка комплекта",new Size(800,610))
+        internal BundleDownloadForm(string libraryRoot=null):base("Загрузка комплекта",new Size(650,500))
         {
-            MinimumSize=new Size(760,570);Root.RowStyles[0].Height=76;
+            MinimumSize=SizeFromClientSize(new Size(650,500));ClientSize=new Size(650,500);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;Root.RowStyles[0].Height=60;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=7,Margin=Padding.Empty};body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{42F,50F,46F,0F,40F,30F,50F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
+            foreach(float height in new[]{34F,42F,68F,0F,44F,30F,100F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
             body.Controls.Add(ModuleHeading("Загрузка комплекта"),0,0);
             var path=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,150));path.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            path.Controls.Add(Caption("Папка комплекта",false),0,0);folder.ReadOnly=true;folder.Text=libraryRoot??BundlePreferences.Load();folder.Dock=DockStyle.Fill;folder.Margin=new Padding(0,9,10,9);path.Controls.Add(folder,1,0);
+            path.Controls.Add(Caption("Папка комплекта",false),0,0);folder.ReadOnly=true;folder.Text=libraryRoot??BundlePreferences.Load();folder.Dock=DockStyle.Fill;folder.Margin=new Padding(0,7,10,7);path.Controls.Add(folder,1,0);
             choose=Button("Выбрать папку",false);ModuleNavigation.Configure(choose);choose.Anchor=AnchorStyles.Right;choose.Click+=delegate{using(var dialog=new FolderBrowserDialog {SelectedPath=folder.Text})if(dialog.ShowDialog(this)==DialogResult.OK){folder.Text=dialog.SelectedPath;entries.Clear();scannedRoot=null;UpdateState();}};path.Controls.Add(choose,2,0);body.Controls.Add(path,0,1);
-            var groups=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};groups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));groups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));groups.RowStyles.Add(new RowStyle(SizeType.Percent,100));int column=0;foreach(var option in new[]{libraries,tools}){option.Dock=DockStyle.Fill;option.Palette=Colors;option.CheckedChanged+=delegate{if(!busy){foreach(var entry in entries)entry.Selected=entry.Allowed&&!entry.Done&&GroupSelected(entry.File.Group);UpdateState();}};groups.Controls.Add(option,column++,0);}body.Controls.Add(groups,0,2);
+            var groups=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};groups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));groups.RowStyles.Add(new RowStyle(SizeType.Percent,50));groups.RowStyles.Add(new RowStyle(SizeType.Percent,50));int row=0;foreach(var option in new[]{libraries,tools}){option.Dock=DockStyle.Fill;option.Margin=Padding.Empty;option.Palette=Colors;option.CheckedChanged+=delegate{if(!busy){foreach(var entry in entries)entry.Selected=entry.Allowed&&!entry.Done&&GroupSelected(entry.File.Group);UpdateState();}};groups.Controls.Add(option,0,row++);}body.Controls.Add(groups,0,2);
             body.Controls.Add(JournalPanel.Create(journal,"Журнал загрузки комплекта",Colors),0,3);
             summary=Label("Проверка сверяет файлы; установка в Windows не выполняется.",true);body.Controls.Add(summary,0,4);total.Margin=new Padding(0,2,0,8);body.Controls.Add(total,0,5);
-            var actions=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=5,RowCount=1,Margin=Padding.Empty};for(int i=0;i<5;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,20));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            scan=Button("Проверить",false);start=Button("Скачать",true);pause=Button("Пауза",false);stop=Button("Отменить",false);back=Button("В меню",false);
+            var actions=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=Padding.Empty};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
+            scan=Button("Проверить",false);start=Button("Скачать",true);pause=Button("Пауза",false);stop=Button("Отменить",false);back=Button("В меню",false);results=Button("Результаты",false);results.Click+=delegate{ShowResults();};
             scan.Click+=async delegate{await Scan();};start.Click+=async delegate{await Download();};pause.Click+=delegate{if(!downloading)return;if(paused){paused=false;pause.Text="Пауза";}else{paused=true;pause.Enabled=false;pause.Text="Пауза…";if(cancellation!=null)cancellation.Cancel();}};
             stop.Click+=delegate{if(busy&&BrandMessageBox.Show(this,"Остановить загрузку? Готовые файлы и данные для продолжения сохранятся.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)==DialogResult.Yes){cancelRequested=true;paused=false;if(cancellation!=null)cancellation.Cancel();}};
-            back.Click+=delegate{MenuRequested=true;Close();};int index=0;foreach(var button in new[]{scan,start,pause,stop,back}){ModuleNavigation.Configure(button);button.Dock=DockStyle.Fill;button.Margin=new Padding(0,5,index==4?0:10,5);actions.Controls.Add(button,index++,0);}body.Controls.Add(actions,0,6);Root.Controls.Add(body,0,1);
+            back.Click+=delegate{MenuRequested=true;Close();};int index=0;foreach(var button in new[]{scan,start,results,pause,stop,back}){ModuleNavigation.Configure(button);button.Dock=DockStyle.Fill;button.Margin=new Padding(0,5,index%3==2?0:10,5);actions.Controls.Add(button,index%3,index/3);index++;}body.Controls.Add(actions,0,6);Root.Controls.Add(body,0,1);
             timer.Tick+=delegate{RefreshProgress();};VisibleChanged+=delegate{timer.Enabled=Visible;};
             FormClosing+=delegate(object sender,FormClosingEventArgs e){if(busy){e.Cancel=true;if(BrandMessageBox.Show(this,"Остановить загрузку и закрыть окно? Готовые файлы сохранятся.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)==DialogResult.Yes){closeAfter=true;cancelRequested=true;paused=false;if(cancellation!=null)cancellation.Cancel();}}};
             SetTheme(Colors.Dark,false);UpdateState();
@@ -65,15 +66,21 @@ namespace ServiceTool
         bool GroupSelected(string group){return group=="Программы"?false:group=="Утилиты"?tools.Checked:libraries.Checked;}
         static string SizeText(long bytes){return (bytes/1048576.0).ToString("0.0")+" МиБ";}
         void Log(string text){if(IsDisposed)return;if(InvokeRequired){try{BeginInvoke((MethodInvoker)delegate{Log(text);});}catch(InvalidOperationException){}return;}journal.AppendText(DateTime.Now.ToString("HH:mm:ss")+"  "+text+Environment.NewLine);}
-        void UpdateState(){scan.Enabled=choose.Enabled=!busy;start.Enabled=!busy&&entries.Any(e=>e.Selected&&e.Allowed&&!e.Done);pause.Enabled=downloading;stop.Enabled=busy;back.Enabled=!busy;libraries.Enabled=tools.Enabled=!busy;}
-        async Task Scan()
+        void UpdateState(){results.Enabled=!busy&&scannedRoot!=null;scan.Enabled=choose.Enabled=!busy;start.Enabled=!busy&&entries.Any(e=>e.Selected&&e.Allowed&&!e.Done);pause.Enabled=downloading;stop.Enabled=busy;back.Enabled=!busy;libraries.Enabled=tools.Enabled=!busy;}
+        void ShowResults()
         {
-            if(busy)return;busy=true;cancelRequested=false;paused=false;batch=null;cancellation=new CancellationTokenSource();UpdateState();string root=Path.GetFullPath(folder.Text);Log("Проверяем выбранные разделы: читаем каталог облака и сверяем локальные файлы.");summary.Text="Читаем каталоги Яндекс Диска и проверяем локальные файлы…";
+            var source=entries.Where(e=>!e.Done).ToArray();var rows=source.Select(e=>new BundleDifferenceItem {Path=e.File.Path.TrimStart('/'),State=e.State,Allowed=e.Allowed,Selected=e.Selected}).ToArray();
+            using(var dialog=new BundleDifferencesForm(rows))dialog.ShowDialog(this);
+            for(int i=0;i<rows.Length;i++)source[i].Selected=rows[i].Selected;UpdateState();
+        }
+        async Task Scan(BundleCloud? forcedCloud=null)
+        {
+            if(busy)return;bool suggestAlternative=false;BundleCloud cloud;if(forcedCloud.HasValue)cloud=forcedCloud.Value;else using(var picker=new BundleCloudDialog(true)){if(picker.ShowDialog(this)!=DialogResult.OK)return;cloud=picker.Cloud;}busy=true;cancelRequested=false;paused=false;batch=null;cancellation=new CancellationTokenSource();UpdateState();string root=Path.GetFullPath(folder.Text);Log("Проверяем выбранные разделы: читаем каталог облака и сверяем локальные файлы.");summary.Text="Читаем выбранное облако и проверяем локальные файлы…";
             try
             {
                 var token=cancellation.Token;
                 var result=await Task.Run(()=>{
-                    var files=new YandexBundleSource().Scan(token);var list=new List<Entry>();
+                    var files=cloudSource.Scan(cloud,token,Log);var list=new List<Entry>();
                     foreach(var file in files.Where(f=>GroupSelected(f.Group))){token.ThrowIfCancellationRequested();string local=YandexBundleSource.LocalPath(root,file.Path);var entry=new Entry {File=file};
                         if(!File.Exists(local)){entry.Allowed=entry.Selected=true;entry.State="Отсутствует — скачать";}
                         else{entry.OriginalHash=YandexBundleSource.Hash(local,token);entry.Done=entry.OriginalHash==file.Sha256;entry.Allowed=!entry.Done&&new BundleReceipts(root).CanReplace(file,entry.OriginalHash);entry.Selected=entry.Allowed;entry.State=entry.Done?"Обновление не требуется":entry.Allowed?"Изменён в источнике — обновить":"Отличается — сохранить локальный файл";}
@@ -88,22 +95,24 @@ namespace ServiceTool
                 foreach(var entry in entries.Where(e=>!e.Done))Log(entry.File.Path.TrimStart('/')+": "+entry.State);
                 var differences=entries.Where(e=>!e.Done).Select(e=>new[]{e.File.Path.TrimStart('/'),e.State}).ToArray();
                 Log("Проверка завершена. Требуют внимания: "+differences.Length+"; актуальных файлов: "+entries.Count(e=>e.Done)+".");
-                if(differences.Length>0)using(var dialog=new BundleDifferencesForm(differences))dialog.ShowDialog(this);
+                ShowResults();
                 summary.Text="Проверено: "+entries.Count+" файлов. Недостающие и ранее загруженные неизменённые установщики выбраны; остальные локальные файлы защищены.";
                 RootAccepted=true;BundlePreferences.Save(root);
             }
-            catch(Exception ex){summary.Text=cancellation.IsCancellationRequested?"Проверка отменена":"Не удалось проверить: "+ex.Message;Log(summary.Text);}
+            catch(Exception ex){summary.Text=cancellation.IsCancellationRequested?"Проверка отменена":"Не удалось проверить: "+ex.Message;Log(summary.Text);suggestAlternative=!cancellation.IsCancellationRequested;}
             finally{busy=false;cancellation.Dispose();cancellation=null;UpdateState();if(closeAfter)Close();}
+            if(suggestAlternative&&!closeAfter&&BrandMessageBox.Show(this,"Не удалось проверить выбранное облако. Попробовать альтернативное?","Проверка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)await Scan(cloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google);
         }
-        async Task Download()
+        async Task Download(BundleCloud? forcedCloud=null)
         {
-            if(busy||scannedRoot==null)return;
+            if(busy||scannedRoot==null)return;BundleCloud downloadCloud;if(forcedCloud.HasValue)downloadCloud=forcedCloud.Value;else using(var picker=new BundleCloudDialog(false)){if(picker.ShowDialog(this)!=DialogResult.OK)return;downloadCloud=picker.Cloud;}
             var selected=entries.Where(e=>e.Selected&&e.Allowed&&!e.Done).ToList();if(selected.Count==0)return;
             if(BrandMessageBox.Show(this,"Скачать "+selected.Count+" файлов ("+SizeText(selected.Sum(e=>e.File.Size))+")?\r\nУстановщики не будут запущены.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
             busy=true;downloading=true;cancelRequested=false;paused=false;batch=selected;previousBytes=0;receivedBytes=0;networkBytes=0;sampled=DateTime.UtcNow;started=DateTime.UtcNow;UpdateState();
             try
             {
                 int workers=3;workerLimit=workers;
+                if(!cloudSource.Ready(downloadCloud))await Task.Run(()=>cloudSource.Scan(downloadCloud,CancellationToken.None,Log));
                 Directory.CreateDirectory(scannedRoot);
                 BundleSession.Save(scannedRoot,selected.Select(e=>e.File));BundleSession.Log(scannedRoot,"Начало очереди: "+selected.Count+" файлов");
                 string probe=YandexBundleSource.LocalPath(scannedRoot,"/.bars-download/write-"+Guid.NewGuid().ToString("N")+".tmp");
@@ -121,7 +130,8 @@ namespace ServiceTool
                             try{
                                 string destination=YandexBundleSource.LocalPath(scannedRoot,entry.File.Path);
                                 bool published=BundlePublication.Matches(scannedRoot,entry.File,token);
-                                if(!published)new BundleTransfer(new YandexBundleSource()).Download(entry.File,scannedRoot,entry.OriginalHash,bytes=>{lock(sync)entry.Bytes=bytes;},token,bytes=>Interlocked.Add(ref receivedBytes,bytes),state=>{lock(sync){entry.State=state;if(state=="Ожидание повтора")workerLimit=Math.Max(1,workerLimit-1);}BundleSession.Log(scannedRoot,entry.File.Path+": "+state);});
+                                if(!cloudSource.Contains(downloadCloud,entry.File))throw new IOException("Выбранное облако не содержит подтверждённую копию файла");
+                                if(!published)cloudSource.Transfer(downloadCloud).Download(entry.File,scannedRoot,entry.OriginalHash,bytes=>{lock(sync)entry.Bytes=bytes;},token,bytes=>Interlocked.Add(ref receivedBytes,bytes),state=>{lock(sync){entry.State=state;if(state=="Ожидание повтора")workerLimit=Math.Max(1,workerLimit-1);}BundleSession.Log(scannedRoot,entry.File.Path+": "+state);});
                                 string warning=BundlePublication.Record(scannedRoot,entry.File,null);
                                 lock(sync){entry.Done=true;entry.Bytes=entry.File.Size;entry.Selected=false;entry.State=warning==null?"Готово":warning;}Log("Сохранён файл: "+entry.File.Path.TrimStart('/')+(warning==null?"":". "+warning));
                             }
@@ -136,6 +146,7 @@ namespace ServiceTool
             }
             catch(Exception ex){summary.Text="Загрузка не завершена: "+ex.Message;Log(summary.Text);}
             finally{busy=false;downloading=false;paused=false;pause.Text="Пауза";if(cancellation!=null){cancellation.Dispose();cancellation=null;}UpdateState();if(closeAfter)Close();}
+            if(!cancelRequested&&!closeAfter&&selected.Any(e=>!e.Done)&&BrandMessageBox.Show(this,"Часть файлов не удалось получить из выбранного облака. Попробовать другое облако? Будут загружены только файлы с тем же размером и SHA-256.","Резервное облако",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)await Download(downloadCloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google);
         }
         void RefreshProgress()
         {

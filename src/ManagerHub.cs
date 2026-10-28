@@ -113,7 +113,7 @@ namespace ServiceTool
     {
         public ManagerHub() : base("BARS Manager 3000", new Size(900, 770))
         {
-            FormBorderStyle=FormBorderStyle.FixedSingle; MinimumSize = new Size(860, 740); ClientSize = new Size(900, 770);
+            FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false; MinimumSize = new Size(860, 740); ClientSize = new Size(900, 770);
             Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 84;
             var launcherHeader=(TableLayoutPanel)Root.GetControlFromPosition(0,0);launcherHeader.Padding=new Padding(0,18,0,0);
             Root.AutoScroll=true;
@@ -135,7 +135,7 @@ namespace ServiceTool
             modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { OpenModule(() => new ToolsDeploymentForm(false)); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
             var footer=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=new Padding(5,0,5,0),Padding=new Padding(0,8,0,0)};
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,160));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,160));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,150));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,190));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,190));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var bundle=Button("Скачать комплект",false);bundle.Click+=delegate{OpenModule(()=>new BundleDownloadForm());};footer.Controls.Add(bundle,0,0);
             var guide=Button("Инструкция",false);guide.AccessibleName="Открыть инструкцию";guide.Click+=delegate{ModuleNavigation.ShowDialog(this,()=>new UserGuideForm());SetTheme(ThemePreference.LoadDark(),false);};footer.Controls.Add(guide,2,0);
             var about=Button("О программе",false);about.Margin=Padding.Empty;about.Click+=delegate{using(var dialog=new AboutDialog(Colors,Icon))dialog.ShowDialog(this);};footer.Controls.Add(about,3,0);
