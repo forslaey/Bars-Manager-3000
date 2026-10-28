@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -11,6 +11,7 @@ namespace ServiceTool
     public static class ServiceManagement
     {
         public const int RollbackFailed = 1003; // ERROR_CAN_NOT_COMPLETE; startup rollback needs manual verification.
+        [DllImport("advapi32.dll",SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] private static extern bool DeleteService(IntPtr service);
         private const int InvalidParameter = 87;
         private const int Timeout = 1460;
         private const int WaitMilliseconds = 30000;
@@ -137,7 +138,7 @@ namespace ServiceTool
                 if (ch < 32 || ch == '/' || ch == '\\')
                     throw new ArgumentException("Некорректное системное имя службы.", "serviceName");
             StrictUtf8.GetByteCount(serviceName);
-            if ((action == "start" || action == "stop") && mode == "none") return;
+            if ((action == "start" || action == "stop" || action == "delete") && mode == "none") return;
             if (action == "startup" && (mode == "auto" || mode == "auto-delayed" || mode == "manual" || mode == "disabled")) return;
             throw new ArgumentException("Недопустимое действие или режим запуска службы.");
         }
@@ -152,7 +153,7 @@ namespace ServiceTool
             try
             {
                 uint access = action == "startup" ? 0x0001u | 0x0002u :
-                    0x0004u | (action == "start" ? 0x0010u : 0x0020u);
+                    0x0004u | (action == "start" ? 0x0010u : 0x0020u) | (action=="delete"?0x00010000u:0u);
                 service = OpenService(scm, serviceName, access);
                 if (service == IntPtr.Zero) throw NativeError();
                 if (action == "startup")
@@ -171,6 +172,7 @@ namespace ServiceTool
                 else
                 {
                     ChangeRunningState(service, action == "start");
+                    if(action=="delete"&&!DeleteService(service))throw NativeError();
                 }
             }
             finally

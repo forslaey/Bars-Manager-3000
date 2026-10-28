@@ -540,7 +540,7 @@ namespace ServiceTool
             management.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 135));
             management.RowStyles.Add(new RowStyle(SizeType.Absolute, 20));
             management.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            Label managementLabel = new FlushLabel { Text = "Действия для выбранной службы", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = Padding.Empty, InkLeft = g => 0 };
+            Label managementLabel = new FlushLabel { Text = "Действия для выбранной службы", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = Padding.Empty, InkLeft = g => 3 };
             management.Controls.Add(managementLabel, 0, 0);
             management.SetColumnSpan(managementLabel, 3);
             Label startupLabel = new FlushLabel { Text = "Режим запуска:", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(8, 0, 0, 0) };
@@ -1431,6 +1431,19 @@ namespace ServiceTool
                 AppendLog(processStillRunning
                     ? "Ожидание .exe прекращено; процесс " + procedureProcessId + " ещё работает. Код выхода неизвестен. Проверяем регистрацию."
                     : "Выполнение работы со службой BARS завершено. Код выхода: " + exitCode + ".");
+                if(exitCode==unchecked((int)0x80008096))
+                {
+                    AppendLog("Не удалось найти совместимую версию фреймворка. Программа службы не дошла до выполнения ключа установки/удаления.");
+                    AppendLog("Что проверить: рядом с EXE открой .runtimeconfig.json и проверь требуемую ветку .NET и разрядность службы. Установи обычный .NET Runtime и ASP.NET Core Runtime нужной ветки и той же разрядности. Более новые основные ветки (например .NET 9/10) не заменяют .NET 8.");
+                    AppendLog("Важно: патч обычного .NET Runtime должен соответствовать требованиям установленного ASP.NET Core. Например, ASP.NET Core 8.0.33 требует .NET Runtime 8.0.33; 8.0.32 недостаточно. После установки совместимого runtime повтори операцию. Удалять старые runtime и менять конфиг службы не требуется.");
+                    if(!install&&verified&&matches.Count==1&&BrandMessageBox.Show(this,"EXE не запускается из-за отсутствующего .NET. Удалить регистрацию службы «"+matches[0].Name+"» средствами Windows?\r\n\r\nМенеджер остановит эту службу и удалит её регистрацию. Файлы и настройки останутся; дополнительные действия штатного деинсталлятора не выполняются.","Удаление службы без .NET",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)
+                    {
+                        string name=matches[0].Name;AppendLog("Удаляем регистрацию средствами Windows без запуска EXE: "+name);
+                        exitCode=await Task.Factory.StartNew(delegate{using(var helper=Process.Start(ServiceManagement.BuildHelperStartInfo(Application.ExecutablePath,name,"delete","none"))){helper.WaitForExit();return helper.ExitCode;}});
+                        AppendLog(exitCode==0?"Windows приняла запрос удаления регистрации. Если служба ещё видна, закрой оснастку служб и обнови список: удаление может ожидать освобождения системных дескрипторов.":"Windows не смогла удалить регистрацию. Код: "+exitCode+". Проверь права администратора и возможность остановки службы.");
+                    }
+                    else if(!install)AppendLog("Без запуска EXE можно удалить регистрацию средствами Windows; это требует однозначно найденной службы. Выбери установленную службу в таблице и повтори удаление. Файлы при таком удалении не стираются.");
+                }
                 SetStatus("Проверяем результат…", "Повторно читаем регистрацию службы после выполнения процедуры.", blue);
                 Exception lastError = null;
                 verified = false;
@@ -1461,7 +1474,7 @@ namespace ServiceTool
                 }
                 else if (exitCode != 0)
                 {
-                    SetStatus("Процедура вернула ошибку с кодом " + exitCode,
+                    SetStatus(exitCode==unchecked((int)0x80008096)?"Не удалось найти совместимую версию фреймворка.":"Процедура вернула ошибку с кодом " + exitCode,
                         !String.IsNullOrEmpty(executionDetail) ? executionDetail : verified ? "Наблюдаемое состояние регистрации показано ниже. Подробности смотри в журнале службы BARS." : "Дополнительно не удалось проверить регистрацию службы.", Color.Firebrick);
                 }
                 else if (!verified)
