@@ -25,6 +25,13 @@ namespace ServiceTool
     }
     internal static class LibraryPresentation
     {
+        internal static string SystemVersion(LibraryCheck check)
+        {
+            if(check.Package.Kind!=LibraryKind.DotNet)return String.IsNullOrEmpty(check.ActualVersion)?"—":check.ActualVersion;
+            var versions=(check.ActualVersion??"").Split(',').Select(v=>v.Trim()).Where(v=>LibraryVersions.Compatible(check.Package,v)).Distinct().ToArray();
+            if(versions.Length>0)return String.Join(", ",versions);
+            return check.State==LibraryState.Unknown?"Нужна проверка":check.State==LibraryState.NotApplicable?"Не подходит для этой ОС":"Не установлено";
+        }
         private static int Group(LibraryPackage p)
         {
             if (p.Group == "Microsoft .NET" || p.Group == ".NET Framework") return 0;

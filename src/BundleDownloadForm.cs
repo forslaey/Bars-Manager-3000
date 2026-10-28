@@ -48,10 +48,18 @@ namespace ServiceTool
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=7,Margin=Padding.Empty};body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(float height in new[]{50F,40F,104F,0F,60F,38F,100F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
             body.Controls.Add(ModuleHeading("Загрузка комплекта"),0,0);
-            var path=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,178));path.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var path=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,168));path.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var caption=Caption("Папка комплекта",false);path.Controls.Add(caption,0,0);folder.ReadOnly=true;folder.AutoSize=false;folder.Text=libraryRoot??BundlePreferences.Load();folder.Dock=DockStyle.None;folder.Anchor=AnchorStyles.Left|AnchorStyles.Right;folder.Margin=Padding.Empty;
             choose=Button("Выбрать папку",false);choose.Dock=DockStyle.None;choose.Anchor=AnchorStyles.Right;choose.Size=new Size(168,40);choose.Margin=Padding.Empty;choose.Click+=delegate{using(var dialog=new FolderBrowserDialog {SelectedPath=folder.Text})if(dialog.ShowDialog(this)==DialogResult.OK){folder.Text=dialog.SelectedPath;entries.Clear();scannedRoot=null;UpdateState();}};
-            path.Controls.Add(folder,1,0);path.Controls.Add(choose,2,0);path.Layout+=delegate{int h=PathFieldMetrics.Measure(folder).Height;folder.Height=h;};body.Controls.Add(path,0,1);
+            path.Controls.Add(folder,1,0);path.Controls.Add(choose,2,0);path.Layout+=delegate{
+                using(var graphics=path.CreateGraphics()){
+                    int textWidth=TextRenderer.MeasureText(graphics,caption.Text,caption.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;
+                    int gap=(int)Math.Round(12*graphics.DpiX/96F);
+                    float wanted=textWidth+gap;
+                    if(Math.Abs(path.ColumnStyles[0].Width-wanted)>.5F)path.ColumnStyles[0].Width=wanted;
+                    folder.Margin=new Padding(0,0,gap,0);folder.Height=PathFieldMetrics.Measure(folder).Height;
+                }
+            };body.Controls.Add(path,0,1);
             var groups=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty,Padding=new Padding(0,16,0,16)};groups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));groups.RowStyles.Add(new RowStyle(SizeType.Percent,50));groups.RowStyles.Add(new RowStyle(SizeType.Percent,50));int row=0;foreach(var option in new[]{libraries,tools}){option.Dock=DockStyle.Fill;option.Margin=Padding.Empty;option.Palette=Colors;option.CheckedChanged+=delegate{if(!busy){foreach(var entry in entries)entry.Selected=entry.Allowed&&!entry.Done&&GroupSelected(entry.File.Group);UpdateState();}};groups.Controls.Add(option,0,row++);}body.Controls.Add(groups,0,2);
             body.Controls.Add(JournalPanel.Create(journal,"Журнал загрузки комплекта",Colors),0,3);
             summary=Label("Проверка сверяет файлы; установка в Windows не выполняется.",true);summary.Margin=new Padding(0,12,0,12);body.Controls.Add(summary,0,4);total.Margin=new Padding(0,4,0,14);body.Controls.Add(total,0,5);

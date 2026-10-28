@@ -300,7 +300,7 @@ namespace ServiceTool
                 {
                     LibraryPackage package = check.Package;
                     string detail = (package.Preview ? "Предварительная версия. " : "") + (package.Interactive ? "С собственным окном установки. " : "") + check.Detail;
-                    int index = grid.Rows.Add(selection.Contains(package.Id), package.Name, LibraryVersions.Required(package), String.IsNullOrEmpty(check.ActualVersion) ? "—" : check.ActualVersion, package.Architecture == "both" ? "x86 / x64" : package.Architecture, check.Caption, LibraryVersions.Advice(check));
+                    int index = grid.Rows.Add(selection.Contains(package.Id), package.Name, LibraryVersions.Required(package), LibraryPresentation.SystemVersion(check), package.Architecture == "both" ? "x86 / x64" : package.Architecture, check.Caption, LibraryVersions.Advice(check));
                     foreach (DataGridViewCell cell in grid.Rows[index].Cells) cell.ToolTipText = detail;
                     grid.Rows[index].Tag = package; grid.Rows[index].Cells[0].ReadOnly = true;
                     if (check.State == LibraryState.NotApplicable) grid.Rows[index].DefaultCellStyle.ForeColor = Colors.Muted;
