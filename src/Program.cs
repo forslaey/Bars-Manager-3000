@@ -540,7 +540,7 @@ namespace ServiceTool
             management.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 135));
             management.RowStyles.Add(new RowStyle(SizeType.Absolute, 20));
             management.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            Label managementLabel = new FlushLabel { Text = "Действия для выбранной службы", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(12, 0, 0, 0) };
+            Label managementLabel = new FlushLabel { Text = "Действия для выбранной службы", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = Padding.Empty, InkLeft = g => 0 };
             management.Controls.Add(managementLabel, 0, 0);
             management.SetColumnSpan(managementLabel, 3);
             Label startupLabel = new FlushLabel { Text = "Режим запуска:", Tag = "muted", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Dock = DockStyle.Fill, Margin = new Padding(8, 0, 0, 0) };
