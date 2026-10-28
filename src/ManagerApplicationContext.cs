@@ -93,6 +93,7 @@ namespace ServiceTool
             var services=window as MainForm; if(services!=null)return services.MenuRequested;
             var library=window as LibraryManagerForm; if(library!=null)return library.MenuRequested;
             var software=window as SoftwareManagerForm; if(software!=null)return software.MenuRequested;
+            var bundle=window as BundleDownloadForm;if(bundle!=null)return bundle.MenuRequested;
             var utility=window as UtilityModuleForm; return utility!=null&&utility.MenuRequested;
         }
         protected override void ExitThreadCore()

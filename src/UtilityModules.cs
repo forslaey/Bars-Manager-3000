@@ -227,7 +227,7 @@ namespace ServiceTool
         private string source;
         internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(640,500))
         {
-            preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,500));ClientSize=new Size(640,500);
+            FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,500));ClientSize=new Size(640,500);
             Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,12);
             Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
             Body.GetControlFromPosition(0,0).Margin=new Padding(0,8,0,12);

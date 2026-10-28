@@ -34,7 +34,7 @@ namespace ServiceTool
         internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,780))
         {
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
-            preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
+            FormBorderStyle=FormBorderStyle.FixedSingle;preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=Size.Empty}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(float height in new[]{100F,0F,56F,100F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=3,Margin=new Padding(0,0,0,12),Padding=new Padding(0,8,0,0)};
@@ -91,8 +91,6 @@ namespace ServiceTool
             var footer=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,0)};footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             activity=Label("Установка начнётся только по кнопке",true);activity.Font=new Font("Segoe UI",9);footer.Controls.Add(activity,0,0);
 
-            activity.Text="Скачать / сверить комплект…";activity.Cursor=Cursors.Hand;
-            activity.Click+=async delegate{if(busy)return;using(var dialog=new BundleDownloadForm(String.IsNullOrEmpty(source)?null:Path.GetDirectoryName(source))){dialog.ShowDialog(this);if(dialog.RootAccepted){source=SoftwarePackageStorage.Folder(dialog.LibraryRoot);sourceLabel.Text=source;await RefreshPackages();}}};
             back=Button("В меню",false);ModuleNavigation.Configure(back);back.Click+=delegate{MenuRequested=true;Close();};footer.Controls.Add(back,1,0);
             // Navigation and the journal stay outside the scrolling work area.
             // Only unusually short screens or large text require scrolling it.
