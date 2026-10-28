@@ -57,6 +57,9 @@ $taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','
 $taskUiSources += @('BrandMessageBox.cs','JournalPanel.cs','SystemSettingsPresentation.cs','GuideReader.cs','ModuleNavigation.cs') | ForEach-Object { Join-Path $taskSource $_ }
 $taskUiSources += Join-Path $taskSource 'ManagerApplicationContext.cs'
 $taskUiSources += Join-Path $taskSource 'WindowPlacement.cs'
+$taskUiSources += Join-Path $taskSource 'ExecutableArchitecture.cs'
+$taskUiSources += Join-Path $taskSource 'DotNetUpdates.cs'
+$taskUiSources += Join-Path $taskSource 'DotNetUpdatesForm.cs'
 Invoke-TaskTests 'NavigationTests' 'ServiceTool.NavigationTests' ($taskUiSources + (Join-Path $taskTests 'NavigationTests.cs'))
 Invoke-TaskTests 'ReviewRegressionTests' 'ServiceTool.ReviewRegressionTests' ($taskUiSources + (Join-Path $taskTests 'ReviewRegressionTests.cs'))
 & (Join-Path $taskTests 'WindowsFeatureCommands.Tests.ps1') -AssemblyPath (Join-Path $taskPackage $taskPackageName)
@@ -122,3 +125,5 @@ Write-Output 'Реальные процедуры установки, удале
 Invoke-TaskTests 'WindowSessionTests' 'ServiceTool.WindowSessionTests' ($taskUiSources + (Join-Path $taskTests 'WindowSessionTests.cs'))
 
 Invoke-TaskTests 'InkAlignmentTests' 'ServiceTool.InkAlignmentTests' ($taskUiSources + (Join-Path $taskTests 'InkAlignmentTests.cs'))
+
+Invoke-TaskTests 'RuntimeFeatureTests' 'ServiceTool.RuntimeFeatureTests' ($taskUiSources + (Join-Path $taskTests 'RuntimeFeatureTests.cs'))

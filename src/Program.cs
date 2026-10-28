@@ -880,7 +880,8 @@ namespace ServiceTool
             selectedPath = executable;
             revision++;
             pathBox.Text = executable ?? "Путь .exe этой службы недоступен";
-            fileTitle.Text = executable == null ? "Выбери .exe для установки" : Path.GetFileName(executable);
+            fileTitle.Text = executable == null ? "Выбери .exe для установки" : ExecutableArchitecture.FileCaption(executable);
+            toolTips.SetToolTip(fileTitle,fileTitle.Text);
             SetSelectedMatches();
             ShowRegistrationStatus();
             ShowCatalogWarning();
@@ -1066,7 +1067,8 @@ namespace ServiceTool
                 startupDirty = false;
                 UpdateServiceControls(true);
                 pathBox.Text = fullPath;
-                fileTitle.Text = Path.GetFileName(fullPath);
+                fileTitle.Text = ExecutableArchitecture.FileCaption(fullPath);
+                toolTips.SetToolTip(fileTitle,fileTitle.Text);
                 SetStatus("Проверяем регистрацию…", "Читаем список служб локального компьютера.", muted);
                 AppendLog("Выбран .exe службы BARS: " + fullPath);
                 UpdateActions();
