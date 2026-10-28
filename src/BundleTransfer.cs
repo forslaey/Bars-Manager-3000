@@ -61,13 +61,13 @@ namespace ServiceTool
                 // Quarantine only this manager's failed part; preserve it for diagnosis.
                 File.Move(part,part+".invalid-"+Guid.NewGuid().ToString("N"));offset=0;
             }
-            progress(offset);
+            progress(offset==file.Size&&file.Size>0?file.Size-1:offset);
             if(offset<file.Size)
             {
                 if(stage!=null)stage("Скачивание");
                 Uri link=linkProvider(file,token);
                 if(link.Scheme!=Uri.UriSchemeHttps&&!(testLoopback&&link.IsLoopback))throw new IOException("Требуется HTTPS");
-                var request=(HttpWebRequest)WebRequest.Create(link);request.Timeout=30000;request.ReadWriteTimeout=30000;request.UserAgent="BARS-Manager-3000";
+                var request=(HttpWebRequest)WebRequest.Create(link);request.Timeout=90000;request.ReadWriteTimeout=30000;request.ServicePoint.ConnectionLimit=6;request.UserAgent="BARS-Manager-3000";
                 if(offset>0)request.AddRange(offset);
                 using(token.Register(()=>request.Abort()))
                 {
@@ -94,7 +94,7 @@ namespace ServiceTool
                                 try{count=input.Read(buffer,0,buffer.Length);}catch(IOException ex){throw new BundleTransientException("Сетевое чтение прервано",ex);}
                                 if(count==0)break;
                                 token.ThrowIfCancellationRequested();if(offset+count>file.Size)throw new IOException("Файл больше заявленного размера");
-                                output.Write(buffer,0,count);offset+=count;if(received!=null)received(count);progress(offset);
+                                output.Write(buffer,0,count);offset+=count;if(received!=null)received(count);progress(offset==file.Size&&file.Size>0?file.Size-1:offset);
                             }
                             output.Flush(true);
                         }

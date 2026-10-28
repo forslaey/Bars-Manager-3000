@@ -96,6 +96,7 @@ namespace ServiceTool
             if (card != null) { background = Colors.Surface; card.BorderColor = Colors.Border; }
             control.BackColor = background; control.ForeColor = Convert.ToString(control.Tag) == "muted" ? Colors.Muted : Colors.Text;
             var button = control as BrandButton; if (button != null) button.Palette = Colors;
+            var check = control as BrandCheckBox; if(check!=null)check.Palette=Colors;
             var journalScroll = control as JournalScrollBar; if (journalScroll != null) journalScroll.Palette = Colors;
             var toggle = control as RefreshToggle; if (toggle != null) toggle.Palette = Colors;
             var input = control as BrandTextBox; if (input != null) { input.Palette = Colors; input.BackColor = Colors.SurfaceAlt; }

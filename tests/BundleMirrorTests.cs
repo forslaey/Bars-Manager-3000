@@ -8,6 +8,7 @@ namespace ServiceTool
   static int count;static void Check(bool ok,string name){if(!ok)throw new Exception(name);count++;}
   static System.Collections.Generic.IEnumerable<Control> Children(Control c){foreach(Control child in c.Controls){yield return child;foreach(var nested in Children(child))yield return nested;}}
   [STAThread]static int Main(){try{
+   var link=GoogleBundleSource.ConfirmationLink("<form action=\"https://drive.usercontent.google.com/download\"><input name=\"id\" value=\"abc\"><input name=\"confirm\" value=\"a&amp;b\"></form>");Check(link.Query.Contains("a%26b"),"Google confirmation safely encoded");bool unsafeLink=false;try{GoogleBundleSource.ConfirmationLink("<form action=\"https://evil.test/download\"><input name=\"id\" value=\"x\"></form>");}catch(System.IO.IOException){unsafeLink=true;}Check(unsafeLink,"Foreign confirmation host denied");
    var baseline=BundleCloudSource.Baseline();Check(baseline.Count==187&&baseline.All(f=>f.Path!=null&&f.Sha256.Length==64),"Embedded hash manifest complete");
    string html="window['_DRIVE_ivd'] = '[[[\"abc\",[\"parent\"],\"file.txt\",\"text/plain\",0,null,0,0,0,0,0,null,null,10]],null,null]';";Check(GoogleBundleSource.Parse(html).Length==1,"Public Google listing parser");
    bool denied=false;try{GoogleBundleSource.Parse(html.Replace("null,null]","\"next\",null]"));}catch(System.IO.InvalidDataException){denied=true;}Check(denied,"Incomplete listing fails closed");

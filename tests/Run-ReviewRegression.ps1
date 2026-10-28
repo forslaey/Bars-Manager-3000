@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([string]$BuildDirectory,[string[]]$TestNames=@('ReviewRegressionTests','UtilityModuleTests','SoftwareTests','SoftwareMaintenanceTests','SoftwareConfirmationTests','SoftwareStorageTests','Ui2332Tests','LayoutFitTests','UserGuideTests','KioskTouchTests'))
+param([switch]$CompileOnly,[string]$BuildDirectory,[string[]]$TestNames=@('ReviewRegressionTests','UtilityModuleTests','SoftwareTests','SoftwareMaintenanceTests','SoftwareConfirmationTests','SoftwareStorageTests','Ui2332Tests','LayoutFitTests','UserGuideTests','KioskTouchTests'))
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 if([string]::IsNullOrWhiteSpace($BuildDirectory)){$BuildDirectory=Join-Path $root 'work\review-regression'}
@@ -31,6 +31,7 @@ foreach($name in $TestNames){
     $exe=Join-Path $BuildDirectory ($name+'.exe')
     & $compiler @args @resources ('/out:'+$exe) ('/main:'+$main) @sources $file
     if($LASTEXITCODE -ne 0){throw "Compilation failed: $name"}
+    if($CompileOnly){continue}
     & $exe
     if($LASTEXITCODE -ne 0){throw "Test failed: $name"}
 }

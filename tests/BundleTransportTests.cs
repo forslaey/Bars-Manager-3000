@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -42,12 +42,13 @@ namespace ServiceTool
    try
    {
     if(mode=="range"||mode=="ignore"||mode=="malformed"){string part=BundleTransfer.PartPath(root,file);Directory.CreateDirectory(Path.GetDirectoryName(part));File.WriteAllBytes(part,data.Take(12000).ToArray());}
-    bool failed=false;
-    try{new BundleTransfer((f,t)=>new Uri("http://127.0.0.1:"+port+"/fixture")).Download(file,root,null,x=>{},CancellationToken.None);}catch(IOException){failed=true;}
+    bool failed=false;long network=0,lastProgress=0;bool earlyComplete=false;
+    try{new BundleTransfer((f,t)=>new Uri("http://127.0.0.1:"+port+"/fixture")).Download(file,root,null,x=>{lastProgress=x;if(x==file.Size&&!File.Exists(YandexBundleSource.LocalPath(root,file.Path)))earlyComplete=true;},CancellationToken.None,n=>network+=n,null);}catch(IOException){failed=true;}
     Check(server.Wait(10000),"Server completed");
     string target=YandexBundleSource.LocalPath(root,file.Path);
     if(mode=="bad"||mode=="malformed")Check(failed&&!File.Exists(target),"Invalid content not published");
     else{Check(!failed&&File.Exists(target),"Published "+mode);Check(YandexBundleSource.Hash(target,CancellationToken.None)==file.Sha256,"Verified "+mode);}
+    Check(!earlyComplete,"No completion before verified publication");if(!failed){Check(lastProgress==file.Size,"Final progress complete");Check(network==data.Length-(mode=="range"?12000:0),"Network bytes exclude resumed prefix");}
     if(mode=="short")Check(requests==2,"Short response resumed automatically");
     if(mode=="retry")Check(requests==2,"Retry count");
    }finally{listener.Stop();}
