@@ -59,7 +59,7 @@ namespace ServiceTool
             }
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 84));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
             var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(ModuleHeadingStyle.Left,ModuleHeadingStyle.Top,12,12), Margin = new Padding(0, 0, 0, 12) };
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
@@ -85,7 +85,7 @@ namespace ServiceTool
             var tableLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
             tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,0)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 6, RowCount = 1, Margin = new Padding(0, 0, 0, 10) };
-            foreach (int weight in new[] { 1, 1, 1, 1, 1, 1 }) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F/6)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            foreach (int weight in new[] { 1, 1, 1, 1, 1, 1 }) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F/6)); actions.Padding=new Padding(0,0,14,0);actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             refresh = Button("Сканировать систему", false); refresh.Click += async delegate { await RefreshAsync(true); };
             BrandButton select = Button("Выбрать недостающие", false); select.Click += delegate { if (installing || checking) return; SelectMissing(); RenderRows(); };
             selectAll = Button("Выбрать всё", false); selectAll.Click += delegate { ToggleAll(); };
@@ -93,9 +93,9 @@ namespace ServiceTool
             stop = Button("Отменить операцию", false); stop.Margin = Padding.Empty; stop.Enabled = false;
             stop.Click += delegate { if (installing && !cancelRequested && ConfirmCancel(false)) RequestCancellation(false); };
             actions.Controls.Add(install, 0, 0); actions.Controls.Add(select, 1, 0); actions.Controls.Add(selectAll, 2, 0); actions.Controls.Add(refresh, 3, 0); actions.Controls.Add(stop, 5, 0); tableLayout.Controls.Add(actions, 0, 1);
-            var network=Button("Проверить обновления .NET",false);network.Margin=Padding.Empty;
+            var network=Button("Проверить обновления .NET",false);network.Margin=new Padding(0,0,10,0);
             network.Click+=async delegate{if(installing||checking)return;bool wasRunning=timer.Enabled;timer.Stop();try{using(var dialog=new DotNetUpdatesForm(()=>{if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){using(var folder=new FolderBrowserDialog()){folder.Description="Выбери папку Библиотеки";if(folder.ShowDialog(this)!=DialogResult.OK)return null;source=LibrarySource.NormalizeRoot(folder.SelectedPath);UpdateSource();}}return source;},source)){dialog.ShowDialog(this);if(dialog.FilesChanged)await RefreshAsync(true);}}finally{timer.Enabled=wasRunning&&Visible&&!preview&&!installing;}};
-            actions.Controls.Add(network,4,0);
+            actions.Controls.Add(network,4,0);ModuleNavigation.EqualButtons(actions,gridScroll);
             ConfigureGrid(); var gridSlot = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             gridScroll.Dock = DockStyle.Right; gridScroll.Width = 14; gridScroll.Bind(grid); gridSlot.Controls.Add(grid); gridSlot.Controls.Add(gridScroll); tableLayout.Controls.Add(gridSlot, 0, 2); tableCard.Controls.Add(tableLayout); body.Controls.Add(tableCard, 0, 1);
             var logCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(12, 8, 12, 8), Margin = Padding.Empty };
@@ -103,9 +103,9 @@ namespace ServiceTool
             journal.Dock = DockStyle.Fill; journal.Font = new Font("Consolas", 9); journalScroll.Dock = DockStyle.Right; journalScroll.Width = 14; journalScroll.Bind(journal);
             logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(logCard, 0, 2);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 2, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 0)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             restart = Button("Перезагрузка", false); ModuleNavigation.Configure(restart); restart.Margin = new Padding(0, 0, 10, 0); restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
-            activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0); footer.SetColumnSpan(activity, 5);
+            activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0); footer.SetColumnSpan(activity, 1);footer.SetRow(activity,1);
             report = Button("Открыть журнал", false); ModuleNavigation.Configure(report); report.Width=180; report.Margin=new Padding(0,0,10,0); report.Click += delegate { OpenJournal(); }; footer.Controls.Add(report, 1, 1);
             BrandButton back = Button("В меню", false); ModuleNavigation.Configure(back); back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
             windowsComponents = Button("Компоненты", false); ModuleNavigation.Configure(windowsComponents); windowsComponents.Margin=new Padding(0,0,10,0); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);

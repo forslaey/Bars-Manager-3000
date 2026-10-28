@@ -12,7 +12,7 @@ namespace ServiceTool
  internal sealed class DotNetUpdate
  {
   internal LibraryPackage Local;
-  internal string Version,Url,Hash,FileName;
+  internal string Version,Url,Hash,FileName,SupportInfo;
   internal bool Newer {get{return LibraryVersions.Compare(Version,Local.Version)>0;}}
  }
  internal static class DotNetUpdates
@@ -32,12 +32,13 @@ namespace ServiceTool
       string prefix=p.RuntimeFamily=="Microsoft.NETCore.App"?"dotnet-runtime-":"aspnetcore-runtime-";if(!name.StartsWith(prefix,StringComparison.OrdinalIgnoreCase))continue;
       string url=Convert.ToString(f["url"]),hash=Convert.ToString(f["hash"]);ValidateUrl(url);
       if(hash.Length!=128||!hash.All(Uri.IsHexDigit))throw new InvalidDataException("Некорректная контрольная сумма Microsoft");
-      var candidate=new DotNetUpdate {Local=p,Version=version,Url=url,Hash=hash,FileName=prefix+version+"-"+rid+".exe"};
+      var candidate=new DotNetUpdate {Local=p,Version=version,Url=url,Hash=hash,FileName=prefix+version+"-"+rid+".exe",SupportInfo=Support(root)};
       var old=output.FirstOrDefault(x=>x.Local.Id==p.Id);if(old==null)output.Add(candidate);else if(LibraryVersions.Compare(version,old.Version)>0){output.Remove(old);output.Add(candidate);}
      }
     }
    }return output;
   }
+  static string Support(Dictionary<string,object> root){Func<string,string> get=k=>root.ContainsKey(k)?Convert.ToString(root[k]):"Нет сведений";string type=get("release-type");string phase=get("support-phase");return "Тип выпуска: "+(type=="lts"?"Долгосрочная поддержка (LTS)":type=="sts"?"Стандартная поддержка (STS)":type)+"\r\nПоследняя дата выпуска: "+get("latest-release-date")+"\r\nЭтап поддержки: "+(phase=="active"?"Активный":phase=="maintenance"?"Обслуживание":phase=="eol"?"Поддержка завершена":phase=="go-live"?"Go-live":phase)+"\r\nОкончание поддержки: "+get("eol-date");}
   internal static void ValidateUrl(string value){Uri u;if(!Uri.TryCreate(value,UriKind.Absolute,out u)||u.Scheme!="https"||u.Port!=443||u.UserInfo.Length!=0||!(u.Host=="builds.dotnet.microsoft.com"||u.Host=="download.visualstudio.microsoft.com"||u.Host=="dotnetcli.azureedge.net"))throw new InvalidDataException("Неожиданный адрес загрузки Microsoft");}
   static byte[] Receive(string url,int limit,CancellationToken cancel,Action<long> progress)
   {

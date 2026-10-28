@@ -136,7 +136,7 @@ namespace ServiceTool
             body.Controls.Add(modules, 0, 1);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            footer.Controls.Add(Label("Версия " + typeof(ManagerHub).Assembly.GetName().Version.ToString(3), true), 0, 0);
+            footer.Margin=new Padding(5,0,5,0);footer.Controls.Add(Label("Версия " + typeof(ManagerHub).Assembly.GetName().Version.ToString(3), true), 0, 0);
             BrandButton guide = Button("Инструкция", false); guide.AccessibleName = "Открыть инструкцию";
             guide.Click += delegate { ModuleNavigation.ShowDialog(this, () => new UserGuideForm()); SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
             BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 2, 0);
@@ -167,7 +167,7 @@ namespace ServiceTool
             var heading = new Label { Text = title, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = Padding.Empty }; heading.Font = new Font("Segoe UI", 13, FontStyle.Bold); layout.Controls.Add(heading, 0, 0);
             var detail = new Label { Text = description, Tag = "muted", Dock = DockStyle.Fill, Margin = Padding.Empty }; detail.TextAlign = ContentAlignment.MiddleCenter; detail.AutoEllipsis = false; layout.Controls.Add(detail, 0, 1);
             BrandButton open = Button(action, true); open.Margin = new Padding(0, 0, 0, 0); open.Dock = DockStyle.None; open.Anchor = AnchorStyles.Bottom; open.Size = new Size(280, 50); open.Click += click;
-            layout.Controls.Add(open, 0, 2); card.Controls.Add(layout); return card;
+            layout.Controls.Add(open, 0, 2);layout.Layout+=delegate{int width=Math.Max(1,Math.Min((int)Math.Round(280F*open.Height/50F),layout.ClientSize.Width));if(open.Width!=width)open.Width=width;}; card.Controls.Add(layout); return card;
         }
         internal Func<Form> RequestedModule { get; private set; }
         internal Type RequestedModuleType { get; private set; }

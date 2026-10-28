@@ -358,7 +358,7 @@ namespace ServiceTool
             serviceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
-            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             registered.Controls.Add(serviceLayout);
@@ -405,14 +405,14 @@ namespace ServiceTool
                     int text=TextRenderer.MeasureText(graphics,autoRefreshToggle.Text,autoRefreshToggle.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;
                     int width=Math.Min(refreshSlot.ClientSize.Width,prefix+text+4);
                     int height=Math.Min(refreshSlot.ClientSize.Height,(int)Math.Round(28*graphics.DpiY/96F));
-                    autoRefreshToggle.Bounds=new Rectangle(Math.Max(0,refreshSlot.ClientSize.Width-width),Math.Max(0,(refreshSlot.ClientSize.Height-height)/2),width,height);
+                    autoRefreshToggle.Bounds=new Rectangle(Math.Max(0,refreshSlot.ClientSize.Width-width-serviceScroll.Width),Math.Max(0,(refreshSlot.ClientSize.Height-height-(int)Math.Round(7*graphics.DpiY/96F))/2),width,height);
                 }
             };
             serviceLayout.Controls.Add(statusLayout, 0, 2);
 
             Panel actions = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty, Padding = new Padding(0, 7, 0, 7) };
             TableLayoutPanel actionButtons = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), ColumnCount = 5, RowCount = 1 };
-            actionButtons.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            actionButtons.Padding=new Padding(0,0,14,0);actionButtons.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             for (int i = 0; i < 5; i++) actionButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
             installButton = MakeButton("Установить службу", true);
             removeButton = MakeButton("Удалить службу", false);
@@ -438,7 +438,7 @@ namespace ServiceTool
             actionButtons.Controls.Add(removeButton, 1, 0);
             actionButtons.Controls.Add(installProfileButton, 2, 0);
             actionButtons.Controls.Add(refreshButton, 3, 0);
-            actionButtons.Controls.Add(servicesButton, 4, 0);
+            actionButtons.Controls.Add(servicesButton, 4, 0);ModuleNavigation.EqualButtons(actionButtons,serviceScroll);
             // Match the right header slot to the actual last action column, including DPI rounding.
             EventHandler alignRefresh = delegate
             {
@@ -491,22 +491,22 @@ namespace ServiceTool
             servicesGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 236, 255);
             servicesGrid.DefaultCellStyle.SelectionForeColor = ink;
             servicesGrid.GridColor = Color.FromArgb(235, 239, 245);
-            servicesGrid.Columns.Add("DisplayName", "Название");
-            servicesGrid.Columns.Add("Name", "Системное имя");
+            servicesGrid.Columns.Add("DisplayName", "Название службы");
+            servicesGrid.Columns.Add("Name", "Системное имя службы");
             servicesGrid.Columns.Add("State", "Состояние");
-            servicesGrid.Columns.Add("StartMode", "Запуск");
+            servicesGrid.Columns.Add("StartMode", "Режим запуска");
             servicesGrid.Columns[0].FillWeight = 37;
             servicesGrid.Columns[1].FillWeight = 28;
             servicesGrid.Columns[2].FillWeight = 20;
             servicesGrid.Columns[3].FillWeight = 15;
-            int[] minWidths = { 185, 160, 150, 160 };
+            int[] minWidths = { 185, 185, 100, 285 };
             for (int i = 0; i < servicesGrid.Columns.Count; i++)
             {
                 servicesGrid.Columns[i].Resizable = DataGridViewTriState.False;
                 servicesGrid.Columns[i].SortMode = DataGridViewColumnSortMode.NotSortable;
                 servicesGrid.Columns[i].MinimumWidth = minWidths[i];
             }
-            float[] columnWeights = { 34, 28, 18, 20 };
+            float[] columnWeights = { 30, 27, 12, 31 };
             for (int i = 0; i < servicesGrid.Columns.Count; i++) servicesGrid.Columns[i].FillWeight = columnWeights[i];
             servicesGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             servicesGrid.CellFormatting += delegate(object sender, DataGridViewCellFormattingEventArgs e)
