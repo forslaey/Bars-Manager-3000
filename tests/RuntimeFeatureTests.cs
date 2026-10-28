@@ -34,7 +34,7 @@ namespace ServiceTool
     form.SetTheme(dark,false);form.Show();Application.DoEvents();Check(Children(form).OfType<DataGridView>().Single().Rows.Count==0,"No automatic query/download");
     foreach(var b in Children(form).OfType<BrandButton>())Check(b.Parent.ClientRectangle.Contains(b.Bounds),"Update button fits: "+b.Text);
     var table=Children(form).OfType<DataGridView>().Single();table.Rows.Add(false,".NET Runtime 8.0, x64","8.0.31","8.0.33","Доступно обновление");
-    string proof=@"C:\ServiceManager3000\work\runtime-updates";using(var image=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,form.Size));image.Save(Path.Combine(proof,"updates-"+dark+".png"));}
+    string proof=@"C:\ServiceManager3000\work\runtime-updates";Directory.CreateDirectory(proof);using(var image=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,form.Size));image.Save(Path.Combine(proof,"updates-"+dark+".png"));}
    }
    foreach(bool dark in new[]{false,true})using(var form=new LibraryManagerForm(true)){
     form.SetTheme(dark,false);form.Show();Application.DoEvents();var filter=Children(form).OfType<BrandComboBox>().Single(c=>c.Items.Contains("Microsoft .NET"));filter.SelectedIndex=1;Application.DoEvents();
