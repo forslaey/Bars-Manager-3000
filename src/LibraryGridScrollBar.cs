@@ -27,6 +27,8 @@ namespace ServiceTool
         private bool dragging; private int dragOffset;
         private bool correcting;
         private bool viewportPending,updatingViewport;
+        internal bool UseCardBackground {get;set;}
+        internal Color TrackBackground {get{return Palette==null?BackColor:UseCardBackground?Palette.Surface:Palette.Canvas;}}
         internal bool AutoHideWhenUnused {get;set;}
         private void QueueViewport()
         {
@@ -38,7 +40,7 @@ namespace ServiceTool
             if(grid==null||grid.Parent==null||updatingViewport)return;updatingViewport=true;
             try
             {
-                BackColor=Palette==null?grid.Parent.BackColor:Palette.Canvas;grid.Parent.BackColor=BackColor;
+                BackColor=TrackBackground;grid.Parent.BackColor=BackColor;
                 if(AutoHideWhenUnused)
                 {
                     int height=grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0;
@@ -112,7 +114,7 @@ namespace ServiceTool
         }
         protected override void OnPaint(PaintEventArgs e)
         {
-            ThemePalette p = Palette ?? ThemePalette.Create(false); e.Graphics.Clear(p.Canvas);
+            ThemePalette p = Palette ?? ThemePalette.Create(false); e.Graphics.Clear(TrackBackground);
             if (Maximum == 0) return; e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using (var path = BrandButton.RoundRect(Thumb, 3)) using (var fill = new SolidBrush(dragging ? p.Accent : p.Border)) e.Graphics.FillPath(fill, path);
             if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle, p.Text, BackColor);
