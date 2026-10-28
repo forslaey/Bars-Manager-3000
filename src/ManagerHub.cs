@@ -137,9 +137,15 @@ namespace ServiceTool
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty, Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             footer.Margin=new Padding(5,0,5,0);footer.Controls.Add(Label("Версия " + typeof(ManagerHub).Assembly.GetName().Version.ToString(3), true), 0, 0);
+            footer.ColumnCount=4;
+            footer.ColumnStyles[0].Width=100;
+            footer.ColumnStyles.Insert(1,new ColumnStyle(SizeType.Absolute,220));
+            var bundle=Button("Скачать комплект…",false);
+            bundle.Click+=delegate {using(var dialog=new BundleDownloadForm())dialog.ShowDialog(this);};
+            footer.Controls.Add(bundle,1,0);
             BrandButton guide = Button("Инструкция", false); guide.AccessibleName = "Открыть инструкцию";
-            guide.Click += delegate { ModuleNavigation.ShowDialog(this, () => new UserGuideForm()); SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 1, 0);
-            BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 2, 0);
+            guide.Click += delegate { ModuleNavigation.ShowDialog(this, () => new UserGuideForm()); SetTheme(ThemePreference.LoadDark(), false); }; footer.Controls.Add(guide, 2, 0);
+            BrandButton about = Button("О программе", false); about.Margin = Padding.Empty; about.Click += delegate { using (var dialog = new AboutDialog(Colors, Icon)) dialog.ShowDialog(this); }; footer.Controls.Add(about, 3, 0);
             body.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { OpenModule(() => new InitialSystemSettingsForm()); }),0,2);
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1);

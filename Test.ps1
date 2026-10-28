@@ -49,6 +49,8 @@ $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
 $taskUiSources += Join-Path $taskSource 'SoftwarePackageStorage.cs'
 $taskUiSources += Join-Path $taskSource 'GuideSectionListBox.cs'
 $taskUiSources += Join-Path $taskSource 'TouchGrid.cs'
+$taskUiSources += @('BundleDownloadForm.cs','BundleReceipts.cs','BundleTransfer.cs','YandexBundleSource.cs') | ForEach-Object { Join-Path $taskSource $_ }
+$taskUiSources += Join-Path $taskSource 'TouchScrollSupport.cs'
 $taskUiSources += Join-Path $taskSource 'BoundedContentPanel.cs'
 $taskUiSources += Join-Path $taskSource 'LibraryJournal.cs'
 $taskUiSources += Join-Path $taskSource 'BarsFolderPermissions.cs'
@@ -99,6 +101,9 @@ Invoke-TaskTests 'ProductTests' 'ServiceTool.ProductTests' ($taskUiSources + (Jo
 Invoke-TaskTests 'RegressionTests' 'ServiceTool.RegressionTests' ($taskUiSources + (Join-Path $taskTests 'RegressionTests.cs'))
 
 Invoke-TaskTests 'TouchGridTests' 'ServiceTool.TouchGridTests' ($taskUiSources + (Join-Path $taskTests 'TouchGridTests.cs'))
+Invoke-TaskTests 'BundleTests' 'ServiceTool.BundleTests' ($taskUiSources + (Join-Path $taskTests 'BundleTests.cs'))
+Invoke-TaskTests 'BundleTransportTests' 'ServiceTool.BundleTransportTests' ($taskUiSources + (Join-Path $taskTests 'BundleTransportTests.cs'))
+Invoke-TaskTests 'TouchTextTests' 'ServiceTool.TouchTextTests' ($taskUiSources + (Join-Path $taskTests 'TouchTextTests.cs'))
 Invoke-TaskTests 'LibraryJournalTests' 'ServiceTool.LibraryJournalTests' ($taskUiSources + (Join-Path $taskTests 'LibraryJournalTests.cs'))
 
 Invoke-TaskTests 'SoftwareConfirmationTests' 'ServiceTool.SoftwareConfirmationTests' ($taskUiSources + (Join-Path $taskTests 'SoftwareConfirmationTests.cs'))

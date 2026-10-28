@@ -68,6 +68,19 @@ namespace ServiceTool
             remote.Dock=DockStyle.Fill;remote.Margin=Padding.Empty;remote.Palette=Colors;
             remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=false;
             options.Controls.Add(remote,0,0);body.Controls.Add(options,0,2);
+            // Align the painted left edge, not the checkbox control bounds.
+            options.Layout+=delegate
+            {
+                if(!grid.IsHandleCreated||!options.IsHandleCreated||grid.Columns.Count==0)return;
+                using(var graphics=grid.CreateGraphics())
+                {
+                    var cell=grid.GetCellDisplayRectangle(0,-1,false);
+                    int diameter=(int)Math.Round(18*graphics.DpiX/96F);
+                    int left=options.PointToClient(grid.PointToScreen(new Point(cell.Left+(cell.Width-diameter)/2,0))).X-1;
+                    var margin=new Padding(Math.Max(0,left),0,0,0);
+                    if(remote.Margin!=margin)remote.Margin=margin;
+                }
+            };
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=new Padding(0,0,0,10)};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
             install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=true;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить удалённый доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
             refresh=Button("Проверить версии в сети",false);refresh.Click+=async delegate{await RefreshPackages(true);};associations=Button("Приложения по умолчанию",false);associations.Click+=delegate{OpenDefaultApps();};
@@ -78,6 +91,8 @@ namespace ServiceTool
             var footer=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,0)};footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             activity=Label("Установка начнётся только по кнопке",true);activity.Font=new Font("Segoe UI",9);footer.Controls.Add(activity,0,0);
 
+            activity.Text="Скачать / сверить комплект…";activity.Cursor=Cursors.Hand;
+            activity.Click+=async delegate{if(busy)return;using(var dialog=new BundleDownloadForm()){dialog.ShowDialog(this);if(Directory.Exists(dialog.LibraryRoot)){source=SoftwarePackageStorage.Folder(dialog.LibraryRoot);sourceLabel.Text=source;await RefreshPackages();}}};
             back=Button("В меню",false);ModuleNavigation.Configure(back);back.Click+=delegate{MenuRequested=true;Close();};footer.Controls.Add(back,1,0);
             // Navigation and the journal stay outside the scrolling work area.
             // Only unusually short screens or large text require scrolling it.
@@ -86,7 +101,7 @@ namespace ServiceTool
             try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){Log(ex.Message);}
             SetTheme(Colors.Dark,false);
             UpdateRows();
-            Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else await RefreshPackages();grid.PerformLayout();body.PerformLayout();};
+            Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else {if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){string root=BundleDownloadForm.Offer(this,null);if(!String.IsNullOrEmpty(root))source=SoftwarePackageStorage.Folder(root);}await RefreshPackages();}grid.PerformLayout();body.PerformLayout();};
             FormClosing+=delegate(object sender,FormClosingEventArgs e)
             {
                 if(!busy)return;if(checking){cancelled=true;if(session!=null)session.Cancel();return;}e.Cancel=true;
@@ -109,9 +124,9 @@ namespace ServiceTool
             for(int i=0;i<names.Length;i++){int column=grid.Columns.Add("c"+i,names[i]);grid.Columns[column].FillWeight=weights[i];grid.Columns[column].MinimumWidth=130;}
             foreach(DataGridViewColumn column in grid.Columns)column.SortMode=DataGridViewColumnSortMode.NotSortable;
             grid.EditMode=DataGridViewEditMode.EditProgrammatically;
-            grid.CellMouseDown+=delegate(object sender,DataGridViewCellMouseEventArgs e){if(e.Button==MouseButtons.Left&&e.ColumnIndex==0)ToggleSelection(e.RowIndex);};
+            grid.CellMouseDown+=delegate(object sender,DataGridViewCellMouseEventArgs e){if(e.Button==MouseButtons.Left&&e.RowIndex>=0&&e.ColumnIndex>=0)ToggleSelection(e.RowIndex);};
             grid.KeyDown+=delegate(object sender,KeyEventArgs e){if(e.KeyCode==Keys.Space&&!e.Alt&&!e.Control&&grid.CurrentRow!=null){ToggleSelection(grid.CurrentRow.Index);e.Handled=e.SuppressKeyPress=true;}};
-            grid.CellMouseEnter+=delegate(object sender,DataGridViewCellEventArgs e){grid.Cursor=e.RowIndex>=0&&e.ColumnIndex==0?Cursors.Hand:Cursors.Default;};
+            grid.CellMouseEnter+=delegate(object sender,DataGridViewCellEventArgs e){grid.Cursor=e.RowIndex>=0?Cursors.Hand:Cursors.Default;};
             grid.CellPainting+=delegate(object sender,DataGridViewCellPaintingEventArgs e)
             {
                 if(e.RowIndex<0||e.ColumnIndex!=0)return;

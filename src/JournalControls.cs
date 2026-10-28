@@ -17,6 +17,8 @@ namespace ServiceTool
         private const int EM_GETFIRSTVISIBLELINE = 0x00CE;
         private const int WM_MOUSEWHEEL = 0x020A;
         private int wheelRemainder;
+        private double touchPixels;
+        private readonly TouchScrollSupport touchScroll;
         private bool notifying;
         private int observedFirst = -1, observedVisible = -1, observedTotal = -1;
 
@@ -39,6 +41,11 @@ namespace ServiceTool
             ScrollBars = ScrollBars.None;
             BorderStyle = BorderStyle.None;
             HideSelection = false;
+            touchScroll = new TouchScrollSupport(this, delegate(int delta) {
+                touchPixels += delta;
+                int lines = (int)(touchPixels / Math.Max(1, Font.Height));
+                if (lines != 0) { touchPixels -= lines * Math.Max(1, Font.Height); ScrollByLines(lines); }
+            });
         }
 
         public int FirstVisibleLine

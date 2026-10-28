@@ -8,6 +8,19 @@ namespace ServiceTool
     internal sealed class GuideSectionListBox : ListBox
     {
         private bool measuring;
+        private readonly TouchScrollSupport touchScroll;
+        private int touchPixels;
+        private void ScrollTouch(int delta)
+        {
+            touchPixels+=delta;
+            int index=TopIndex;
+            if(index<0||Items.Count==0){touchPixels=0;return;}
+            while(touchPixels>0&&index<Items.Count-1){int height=Math.Max(1,GetItemHeight(index));if(touchPixels<height)break;touchPixels-=height;index++;}
+            while(touchPixels<0&&index>0){int height=Math.Max(1,GetItemHeight(index-1));if(-touchPixels<height)break;touchPixels+=height;index--;}
+            if(index==0||index==Items.Count-1)touchPixels=0;
+            TopIndex=index;
+            if(ViewportChanged!=null)ViewportChanged(this,EventArgs.Empty);
+        }
         private bool hidingScroll;
         internal event EventHandler ViewportChanged;
         [DllImport("user32.dll")] private static extern bool ShowScrollBar(IntPtr handle,int bar,bool show);
@@ -23,7 +36,7 @@ namespace ServiceTool
         [DllImport("user32.dll",CharSet=CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr window,int message,IntPtr index,IntPtr value);
 
-        internal GuideSectionListBox(){DrawMode=DrawMode.OwnerDrawVariable;IntegralHeight=false;HorizontalScrollbar=false;}
+        internal GuideSectionListBox(){DrawMode=DrawMode.OwnerDrawVariable;IntegralHeight=false;HorizontalScrollbar=false;touchScroll=new TouchScrollSupport(this,ScrollTouch);}
         private static int Pixels(float dpi,int value){return Math.Max(1,(int)Math.Ceiling(value*dpi/96F));}
         internal Rectangle TitleBounds(Graphics graphics,Rectangle item)
         {

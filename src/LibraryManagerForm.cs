@@ -109,6 +109,8 @@ namespace ServiceTool
             report = Button("Открыть журнал", false); ModuleNavigation.Configure(report); report.Width=140; report.Margin=new Padding(0,0,10,0); report.Click += delegate { OpenJournal(); }; footer.Controls.Add(report, 1, 1);
             BrandButton back = Button("В меню", false); ModuleNavigation.Configure(back); back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
             windowsComponents = Button("Компоненты", false); ModuleNavigation.Configure(windowsComponents); windowsComponents.Margin=new Padding(0,0,10,0); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
+            activity.Text="Скачать / сверить комплект…";activity.Cursor=Cursors.Hand;
+            activity.Click+=async delegate{if(installing||checking)return;timer.Stop();try{using(var dialog=new BundleDownloadForm(source)){dialog.ShowDialog(this);if(Directory.Exists(dialog.LibraryRoot)){source=dialog.LibraryRoot;UpdateSource();await RefreshAsync(true);}}}finally{timer.Enabled=Visible&&monitor.Checked&&!preview&&!installing&&!checking;}};
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false); UpdateSource();
             VisibleChanged += delegate { timer.Enabled = Visible && monitor.Checked && !preview && !installing && !checking; };
@@ -116,6 +118,7 @@ namespace ServiceTool
             Shown += async delegate
             {
                 if (preview) { FillPreview(); return; }
+                if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){source=BundleDownloadForm.Offer(this,source);UpdateSource();}
                 if (!String.IsNullOrEmpty(sourceError)) Log(sourceError);
                 await RefreshAsync(true); if (!IsDisposed && !Disposing) timer.Enabled = Visible && monitor.Checked;
             };
@@ -183,13 +186,12 @@ namespace ServiceTool
             for (int i = 0; i < names.Length; i++) { int index = grid.Columns.Add("c" + i, names[i]); grid.Columns[index].ReadOnly = true; grid.Columns[index].FillWeight = weights[i]; grid.Columns[index].MinimumWidth = i == 0 ? 140 : i == 3 ? 100 : 70; }
             foreach (DataGridViewColumn column in grid.Columns) column.SortMode = DataGridViewColumnSortMode.NotSortable;
             grid.EditMode = DataGridViewEditMode.EditProgrammatically; grid.TouchScrollingEnabled=true;
-            grid.CellClick += delegate(object sender, DataGridViewCellEventArgs e) { if (!binding && e.RowIndex >= 0 && e.ColumnIndex > 0) { useFocusedRow = true; UpdateAction(); } };
             grid.CurrentCellChanged += delegate { if (!binding && grid.Focused && grid.CurrentCell != null && grid.CurrentCell.ColumnIndex > 0) { useFocusedRow = true; UpdateAction(); } };
             grid.CellMouseDown += delegate(object sender, DataGridViewCellMouseEventArgs e)
-            { if (e.Button == MouseButtons.Left && e.ColumnIndex == 0) ToggleSelection(e.RowIndex); };
+            { if (e.Button == MouseButtons.Left && e.RowIndex >= 0 && e.ColumnIndex >= 0) ToggleSelection(e.RowIndex); };
             grid.KeyDown += delegate(object sender, KeyEventArgs e)
             { if (e.KeyCode == Keys.Space && !e.Alt && !e.Control && grid.CurrentRow != null) { ToggleSelection(grid.CurrentRow.Index); e.Handled = e.SuppressKeyPress = true; } };
-            grid.CellMouseEnter += delegate(object sender, DataGridViewCellEventArgs e) { grid.Cursor = e.RowIndex >= 0 && e.ColumnIndex == 0 ? Cursors.Hand : Cursors.Default; };
+            grid.CellMouseEnter += delegate(object sender, DataGridViewCellEventArgs e) { grid.Cursor = e.RowIndex >= 0 ? Cursors.Hand : Cursors.Default; };
             grid.CellValueChanged += delegate(object sender, DataGridViewCellEventArgs e)
             {
                 if (binding || e.RowIndex < 0 || e.ColumnIndex != 0 || e.RowIndex >= grid.Rows.Count) return;

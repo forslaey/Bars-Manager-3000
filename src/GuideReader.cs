@@ -11,6 +11,8 @@ namespace ServiceTool
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr wParam,IntPtr lParam);
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr wParam,ref NativePoint point);
         private bool updating;
+        private readonly TouchScrollSupport touchScroll;
+        internal GuideReader(){touchScroll=new TouchScrollSupport(this,delta=>ScrollTo(ScrollPosition+delta));}
         internal event EventHandler ViewportChanged;
         internal int ScrollPosition {get{var p=new NativePoint();if(IsHandleCreated)SendMessage(Handle,0x4DD,IntPtr.Zero,ref p);return Math.Max(0,p.Y);}}
         internal int ContentHeight {get{if(!IsHandleCreated||TextLength==0)return ClientSize.Height;return Math.Max(ClientSize.Height,ScrollPosition+GetPositionFromCharIndex(TextLength-1).Y+Font.Height+8);}}
