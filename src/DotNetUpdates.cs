@@ -13,27 +13,27 @@ namespace ServiceTool
  {
   internal LibraryPackage Local;
   internal string Version,Url,Hash,FileName;
-  internal bool Newer {get{return new Version(Version)>new Version(Local.Version);}}
+  internal bool Newer {get{return LibraryVersions.Compare(Version,Local.Version)>0;}}
  }
  internal static class DotNetUpdates
  {
-  internal static bool Supported(LibraryPackage p){Version v;return p.Kind==LibraryKind.DotNet&&!p.Preview&&Version.TryParse(p.Version,out v)&&(p.Architecture=="x86"||p.Architecture=="x64")&&(p.RuntimeFamily=="Microsoft.NETCore.App"||p.RuntimeFamily=="Microsoft.AspNetCore.App");}
+  internal static bool Supported(LibraryPackage p){Version v;return p.Kind==LibraryKind.DotNet&&(!p.Preview||p.Version.StartsWith("11.0.0-rc.",StringComparison.OrdinalIgnoreCase))&&Version.TryParse(p.Version.Split('-')[0],out v)&&(p.Architecture=="x86"||p.Architecture=="x64")&&(p.RuntimeFamily=="Microsoft.NETCore.App"||p.RuntimeFamily=="Microsoft.AspNetCore.App");}
   static Dictionary<string,object> Obj(object x){return (Dictionary<string,object>)x;}
   internal static List<DotNetUpdate> Parse(string json,IEnumerable<LibraryPackage> packages)
   {
    var serializer=new JavaScriptSerializer {MaxJsonLength=32*1024*1024};var root=Obj(serializer.DeserializeObject(json));var output=new List<DotNetUpdate>();
    foreach(var p in packages.Where(Supported)){
-    Version local=new Version(p.Version);string channel=local.Major+"."+local.Minor;if(Convert.ToString(root["channel-version"])!=channel)continue;
+    Version local=new Version(p.Version.Split('-')[0]);string channel=local.Major+"."+local.Minor;if(Convert.ToString(root["channel-version"])!=channel)continue;
     foreach(var release in ((object[])root["releases"])){
      var r=Obj(release);object component;if(!r.TryGetValue(p.RuntimeFamily=="Microsoft.NETCore.App"?"runtime":"aspnetcore-runtime",out component))continue;
-     var c=Obj(component);string version=Convert.ToString(c["version"]);Version number;if(!Version.TryParse(version,out number)||number.Major!=local.Major||number.Minor!=local.Minor)continue;
+     var c=Obj(component);string version=Convert.ToString(c["version"]);Version number;if(!Version.TryParse(version.Split('-')[0],out number)||(p.Preview?!version.Contains("-rc."):version.Contains("-"))||number.Major!=local.Major||number.Minor!=local.Minor)continue;
      foreach(var item in (object[])c["files"]){var f=Obj(item);string rid="win-"+p.Architecture;string name=Convert.ToString(f["name"]);
       if(Convert.ToString(f["rid"])!=rid||!name.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)||name.IndexOf("hosting",StringComparison.OrdinalIgnoreCase)>=0)continue;
       string prefix=p.RuntimeFamily=="Microsoft.NETCore.App"?"dotnet-runtime-":"aspnetcore-runtime-";if(!name.StartsWith(prefix,StringComparison.OrdinalIgnoreCase))continue;
       string url=Convert.ToString(f["url"]),hash=Convert.ToString(f["hash"]);ValidateUrl(url);
       if(hash.Length!=128||!hash.All(Uri.IsHexDigit))throw new InvalidDataException("Некорректная контрольная сумма Microsoft");
       var candidate=new DotNetUpdate {Local=p,Version=version,Url=url,Hash=hash,FileName=prefix+version+"-"+rid+".exe"};
-      var old=output.FirstOrDefault(x=>x.Local.Id==p.Id);if(old==null)output.Add(candidate);else if(new Version(version)>new Version(old.Version)){output.Remove(old);output.Add(candidate);}
+      var old=output.FirstOrDefault(x=>x.Local.Id==p.Id);if(old==null)output.Add(candidate);else if(LibraryVersions.Compare(version,old.Version)>0){output.Remove(old);output.Add(candidate);}
      }
     }
    }return output;
@@ -52,8 +52,8 @@ namespace ServiceTool
   internal static List<DotNetUpdate> Check(IEnumerable<LibraryPackage> packages,CancellationToken cancel)
   {
    var all=packages.Where(Supported).ToList();var result=new List<DotNetUpdate>();
-   foreach(var channel in all.GroupBy(p=>{var v=new Version(p.Version);return v.Major+"."+v.Minor;})){
-    cancel.ThrowIfCancellationRequested();string json=Encoding.UTF8.GetString(Receive("https://builds.dotnet.microsoft.com/dotnet/release-metadata/"+channel.Key+"/releases.json",32*1024*1024,cancel,null));result.AddRange(Parse(json,channel));
+   foreach(var channel in all.GroupBy(p=>{var v=new Version(p.Version.Split('-')[0]);return v.Major+"."+v.Minor;})){
+    cancel.ThrowIfCancellationRequested();if(channel.All(p=>p.Version=="6.0.36"||p.Version=="7.0.20")){foreach(var p in channel)result.Add(new DotNetUpdate {Local=p,Version=p.Version});continue;}string json=Encoding.UTF8.GetString(Receive("https://builds.dotnet.microsoft.com/dotnet/release-metadata/"+channel.Key+"/releases.json",32*1024*1024,cancel,null));result.AddRange(Parse(json,channel));
    }return result;
   }
   internal static bool Download(DotNetUpdate update,string root,CancellationToken cancel,Action<long> progress)

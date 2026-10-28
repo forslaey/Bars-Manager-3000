@@ -33,6 +33,6 @@ namespace ServiceTool
     return machine==0x14c?"32-разрядная":machine==0x8664?"64-разрядная":machine==0xaa64?"ARM64":"неподдерживаемая архитектура";
    }
   }
-  internal static string FileCaption(string path){return Path.GetFileName(path)+" ("+Caption(path)+")";}
+  internal static string FileCaption(string path){string value=Caption(path);if(value=="AnyCPU")value="AnyCPU - универсальная разрядность";else if(value=="32-разрядная")value="Разрядность x86";else if(value=="64-разрядная")value="Разрядность x64";return Path.GetFileName(path)+" ("+value+")";}
  }
 }

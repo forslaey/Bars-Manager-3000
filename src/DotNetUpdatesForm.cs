@@ -10,11 +10,12 @@ namespace ServiceTool
  internal sealed class DotNetUpdatesForm:ManagerModuleForm
  {
   readonly ServiceGrid grid=new ServiceGrid();readonly Label status;readonly BrandButton check,download,back;
+  readonly HashSet<string> missing=new HashSet<string>();
   readonly HashSet<string> saved=new HashSet<string>();
   readonly List<DotNetUpdate> updates=new List<DotNetUpdate>();readonly Func<string> source;
   CancellationTokenSource cancellation;bool busy,closing;
   internal bool FilesChanged {get;private set;}
-  internal DotNetUpdatesForm(Func<string> chooseSource):base("Обновление установщиков Microsoft .NET",new Size(1060,700))
+  internal DotNetUpdatesForm(Func<string> chooseSource,string libraryRoot=null):base("Обновление установщиков Microsoft .NET",new Size(1060,700))
   {
    source=chooseSource;MinimumSize=new Size(900,600);
    var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Margin=Padding.Empty};body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -30,13 +31,16 @@ namespace ServiceTool
    status=Label("Проверка получает только версии. Установка в Windows здесь не выполняется.",true);body.Controls.Add(status,0,2);
    var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));foreach(int value in new[]{40,40,20})actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,value));
    check=Button("Проверить версии в сети",false);download=Button("Обновить выбранные установщики",true);back=Button("Закрыть",false);download.Enabled=false;
-   check.Click+=async delegate{await Run(async()=>{var found=await Task.Run(()=>DotNetUpdates.Check(LibraryCatalog.All(),cancellation.Token));saved.Clear();updates.Clear();updates.AddRange(found);grid.Rows.Clear();foreach(var u in updates)grid.Rows.Add(false,(u.Local.RuntimeFamily=="Microsoft.NETCore.App"?".NET Runtime ":"ASP.NET Core ")+new Version(u.Local.Version).Major+"."+new Version(u.Local.Version).Minor+" ("+u.Local.Architecture+")",u.Local.Version,u.Version,u.Newer?"Доступно обновление":"Обновление не требуется");status.Text="Проверка завершена. Отметь установщики для обновления.";});};
+   check.Click+=async delegate{await Run(async()=>{var found=await Task.Run(()=>DotNetUpdates.Check(updates.Select(u=>u.Local).ToList(),cancellation.Token));saved.Clear();updates.Clear();updates.AddRange(found);grid.Rows.Clear();foreach(var u in updates)grid.Rows.Add(false,(u.Local.RuntimeFamily=="Microsoft.NETCore.App"?".NET Runtime ":"ASP.NET Core ")+new Version(u.Local.Version.Split('-')[0]).Major+"."+new Version(u.Local.Version.Split('-')[0]).Minor+" ("+u.Local.Architecture+")",missing.Contains(u.Local.Id)?"Нет в папке":u.Local.Version,u.Version,u.Newer?"Доступно обновление":"Обновление не требуется");foreach(DataGridViewRow row in grid.Rows)if(missing.Contains(updates[row.Index].Local.Id))row.DefaultCellStyle.ForeColor=Color.IndianRed;status.Text="Проверка завершена. Отметь установщики для обновления.";});};
    download.Click+=async delegate{
     var chosen=grid.Rows.Cast<DataGridViewRow>().Where(r=>Convert.ToBoolean(r.Cells[0].Value)).Select(r=>updates[r.Index]).Where(u=>u.Newer&&!saved.Contains(u.Local.Id)).ToList();if(chosen.Count==0){status.Text="Отметь нужные установщики в первом столбце";return;}
     string root=source();if(String.IsNullOrEmpty(root))return;
     await Run(async()=>{foreach(var u in chosen){cancellation.Token.ThrowIfCancellationRequested();status.Text="Загружаем "+u.Local.Name+" → "+u.Version;bool removed=await Task.Run(()=>DotNetUpdates.Download(u,root,cancellation.Token,null));FilesChanged=true;saved.Add(u.Local.Id);grid.Rows[updates.IndexOf(u)].Cells[2].Value=u.Version;grid.Rows[updates.IndexOf(u)].Cells[0].Value=false;grid.Rows[updates.IndexOf(u)].Cells[4].Value=removed?"Сохранён в библиотеку":"Сохранён; старый файл оставлен (изменён или занят)";}status.Text="Файлы обновлены. Компоненты Windows не устанавливались.";});
    };
    back.Click+=delegate{Close();};actions.Controls.Add(check,0,0);actions.Controls.Add(download,1,0);actions.Controls.Add(back,2,0);body.Controls.Add(actions,0,3);Root.Controls.Add(body,0,1);SetTheme(Colors.Dark,false);
+   var initial=LibraryCatalog.All().Where(DotNetUpdates.Supported).ToList();
+   foreach(string arch in new[]{"x86","x64"})foreach(string family in new[]{"Microsoft.NETCore.App","Microsoft.AspNetCore.App"})if(!initial.Any(p=>p.Version.StartsWith("7.0.")&&p.Architecture==arch&&p.RuntimeFamily==family))initial.Add(new LibraryPackage {Id="net7-"+arch+family,Kind=LibraryKind.DotNet,Version="7.0.0",Architecture=arch,RuntimeFamily=family,Name=".NET 7 "+arch,RelativePath="Microsoft .NET\\.NET 7\\"+(family=="Microsoft.NETCore.App"?"dotnet":"aspnetcore")+"-missing-"+arch+".exe"});
+   foreach(var entry in initial){var p=entry;bool present=!String.IsNullOrEmpty(libraryRoot)&&System.IO.File.Exists(System.IO.Path.Combine(libraryRoot,p.RelativePath));string shown=p.Version;if(!present){var copy=new LibraryPackage();foreach(var field in typeof(LibraryPackage).GetFields())field.SetValue(copy,field.GetValue(p));p=copy;p.Version=p.Preview?"11.0.0-rc.0":new Version(p.Version.Split('-')[0]).Major+".0.0";missing.Add(p.Id);}updates.Add(new DotNetUpdate {Local=p,Version=p.Version});int index=grid.Rows.Add(false,p.Name,present?shown:"Нет в папке","Не проверено","Нажми проверку версий");if(!present){grid.Rows[index].Cells[2].Value="Нет в папке";grid.Rows[index].DefaultCellStyle.ForeColor=Color.IndianRed;}}
    FormClosing+=delegate(object s,FormClosingEventArgs e){if(busy){closing=true;cancellation.Cancel();e.Cancel=true;status.Text="Отменяем загрузку; старые установщики сохраняются…";}};
   }
   async Task Run(Func<Task> action){if(busy)return;busy=true;cancellation=new CancellationTokenSource();check.Enabled=download.Enabled=false;try{await action();}catch(Exception ex){status.Text=cancellation.IsCancellationRequested?"Операция отменена":"Не выполнено: "+ex.Message;}finally{busy=false;cancellation.Dispose();cancellation=null;if(!IsDisposed){check.Enabled=!FilesChanged;download.Enabled=updates.Any(u=>u.Newer&&!saved.Contains(u.Local.Id));if(closing)Close();}}}

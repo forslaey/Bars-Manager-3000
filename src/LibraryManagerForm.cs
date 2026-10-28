@@ -39,7 +39,7 @@ namespace ServiceTool
         private readonly BrandButton windowsComponents;
         private Func<bool, DialogResult> confirmCancellation = null;
         internal const string CancelWarning = "Отменить очередь и завершить процессы текущего установщика?\r\n\r\nСначала отправим запрос закрытия; через 2 секунды завершим оставшиеся процессы этой очереди. Принудительное прерывание может оставить компонент установленным частично. Полный откат не гарантирован; после отмены нужна проверка.\r\n\r\nСистемную службу Windows Installer и посторонние установки не завершаем. Windows может продолжить завершение своей операции или откат.";
-        private bool dotNetOnly;
+        private bool dotNetOnly=false;
         private IEnumerable<LibraryCheck> VisibleChecks {get{return checks.Values.Where(c=>!dotNetOnly||c.Package.Kind==LibraryKind.DotNet||c.Package.Kind==LibraryKind.Framework);}}
         internal bool MenuRequested { get; private set; }
         internal override void ResumeSession() { MenuRequested=false; base.ResumeSession(); }
@@ -83,22 +83,19 @@ namespace ServiceTool
             body.Controls.Add(status, 0, 0);
             var tableCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 12), Margin = new Padding(0, 0, 0, 12) };
             var tableLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
-            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,52)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, Margin = new Padding(0, 0, 0, 10) };
-            foreach (int weight in new[] { 28, 18, 15, 22, 17 }) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, weight)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            refresh = Button("Проверить систему", false); refresh.Click += async delegate { await RefreshAsync(true); };
+            tableLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,0)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68)); tableLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 6, RowCount = 1, Margin = new Padding(0, 0, 0, 10) };
+            foreach (int weight in new[] { 1, 1, 1, 1, 1, 1 }) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F/6)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            refresh = Button("Сканировать систему", false); refresh.Click += async delegate { await RefreshAsync(true); };
             BrandButton select = Button("Выбрать недостающие", false); select.Click += delegate { if (installing || checking) return; SelectMissing(); RenderRows(); };
             selectAll = Button("Выбрать всё", false); selectAll.Click += delegate { ToggleAll(); };
             install = Button("Установить выбранные", true); install.Click += async delegate { await InstallAsync(); };
             stop = Button("Отменить операцию", false); stop.Margin = Padding.Empty; stop.Enabled = false;
             stop.Click += delegate { if (installing && !cancelRequested && ConfirmCancel(false)) RequestCancellation(false); };
-            actions.Controls.Add(install, 0, 0); actions.Controls.Add(select, 1, 0); actions.Controls.Add(selectAll, 2, 0); actions.Controls.Add(refresh, 3, 0); actions.Controls.Add(stop, 4, 0); tableLayout.Controls.Add(actions, 0, 1);
-            var groups=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(0,0,0,8)};groups.RowStyles.Add(new RowStyle(SizeType.Percent,100));groups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));groups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
-            var filter=new BrandComboBox {Dock=DockStyle.None,Anchor=AnchorStyles.Left|AnchorStyles.Right,DropDownStyle=ComboBoxStyle.DropDownList,Palette=Colors};filter.Items.AddRange(new object[]{"Все библиотеки","Microsoft .NET"});filter.SelectedIndex=0;
-            filter.SelectedIndexChanged+=delegate{if(installing||checking){filter.SelectedIndex=dotNetOnly?1:0;return;}dotNetOnly=filter.SelectedIndex==1;selection.Clear();useFocusedRow=false;RenderRows();};
-            var network=Button("Обновления Microsoft .NET…",false);network.Margin=Padding.Empty;
-            network.Click+=async delegate{if(installing||checking)return;bool wasRunning=timer.Enabled;timer.Stop();try{using(var dialog=new DotNetUpdatesForm(()=>{if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){using(var folder=new FolderBrowserDialog()){folder.Description="Выбери папку Библиотеки";if(folder.ShowDialog(this)!=DialogResult.OK)return null;source=LibrarySource.NormalizeRoot(folder.SelectedPath);UpdateSource();}}return source;})){dialog.ShowDialog(this);if(dialog.FilesChanged)await RefreshAsync(true);}}finally{timer.Enabled=wasRunning&&Visible&&!preview&&!installing;}};
-            groups.Controls.Add(filter,0,0);groups.Controls.Add(network,1,0);tableLayout.Controls.Add(groups,0,0);
+            actions.Controls.Add(install, 0, 0); actions.Controls.Add(select, 1, 0); actions.Controls.Add(selectAll, 2, 0); actions.Controls.Add(refresh, 3, 0); actions.Controls.Add(stop, 5, 0); tableLayout.Controls.Add(actions, 0, 1);
+            var network=Button("Проверить обновления .NET",false);network.Margin=Padding.Empty;
+            network.Click+=async delegate{if(installing||checking)return;bool wasRunning=timer.Enabled;timer.Stop();try{using(var dialog=new DotNetUpdatesForm(()=>{if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){using(var folder=new FolderBrowserDialog()){folder.Description="Выбери папку Библиотеки";if(folder.ShowDialog(this)!=DialogResult.OK)return null;source=LibrarySource.NormalizeRoot(folder.SelectedPath);UpdateSource();}}return source;},source)){dialog.ShowDialog(this);if(dialog.FilesChanged)await RefreshAsync(true);}}finally{timer.Enabled=wasRunning&&Visible&&!preview&&!installing;}};
+            actions.Controls.Add(network,4,0);
             ConfigureGrid(); var gridSlot = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             gridScroll.Dock = DockStyle.Right; gridScroll.Width = 14; gridScroll.Bind(grid); gridSlot.Controls.Add(grid); gridSlot.Controls.Add(gridScroll); tableLayout.Controls.Add(gridSlot, 0, 2); tableCard.Controls.Add(tableLayout); body.Controls.Add(tableCard, 0, 1);
             var logCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(12, 8, 12, 8), Margin = Padding.Empty };

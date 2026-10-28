@@ -137,6 +137,7 @@ namespace ServiceTool
         private readonly Label statusDetail = new FlushLabel();
         private readonly Label hint = new FlushLabel();
         private readonly Label activity = new FlushLabel();
+        private readonly LibraryGridScrollBar serviceScroll = new LibraryGridScrollBar();
         private readonly RefreshToggle autoRefreshToggle = new RefreshToggle();
         private DateTime? lastChecked;
         private readonly Button chooseButton;
@@ -357,7 +358,7 @@ namespace ServiceTool
             serviceLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
-            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+            serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             serviceLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
             registered.Controls.Add(serviceLayout);
@@ -404,7 +405,7 @@ namespace ServiceTool
                     int text=TextRenderer.MeasureText(graphics,autoRefreshToggle.Text,autoRefreshToggle.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;
                     int width=Math.Min(refreshSlot.ClientSize.Width,prefix+text+4);
                     int height=Math.Min(refreshSlot.ClientSize.Height,(int)Math.Round(28*graphics.DpiY/96F));
-                    autoRefreshToggle.Bounds=new Rectangle(Math.Max(0,refreshSlot.ClientSize.Width-width),Math.Max(0,refreshSlot.ClientSize.Height-height),width,height);
+                    autoRefreshToggle.Bounds=new Rectangle(Math.Max(0,refreshSlot.ClientSize.Width-width),Math.Max(0,(refreshSlot.ClientSize.Height-height)/2),width,height);
                 }
             };
             serviceLayout.Controls.Add(statusLayout, 0, 2);
@@ -591,7 +592,7 @@ namespace ServiceTool
             servicesGrid.Margin = Padding.Empty;
             management.Margin = Padding.Empty;
             management.Dock = DockStyle.Fill;
-            serviceLayout.Controls.Add(servicesGrid, 0, 3);
+            var serviceSlot=new Panel {Dock=DockStyle.Fill,Margin=Padding.Empty};servicesGrid.ScrollBars=ScrollBars.None;serviceScroll.Dock=DockStyle.Right;serviceScroll.Width=14;serviceScroll.Bind(servicesGrid);serviceSlot.Controls.Add(servicesGrid);serviceSlot.Controls.Add(serviceScroll);serviceLayout.Controls.Add(serviceSlot,0,3);
             serviceLayout.Controls.Add(management, 0, 4);
             layout.Controls.Add(registered, 0, 2);
 
@@ -731,6 +732,7 @@ namespace ServiceTool
         internal void SetTheme(bool dark, bool persist)
         {
             palette = ThemePalette.Create(dark);
+            serviceScroll.Palette=palette;serviceScroll.BackColor=palette.Surface;
             SuspendLayout();
             ApplyThemeTree(this, palette.Canvas);
             brandImage.Image = dark ? darkBrandLogo : lightBrandLogo;
