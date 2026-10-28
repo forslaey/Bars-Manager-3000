@@ -38,7 +38,7 @@ namespace ServiceTool
             if(grid==null||grid.Parent==null||updatingViewport)return;updatingViewport=true;
             try
             {
-                BackColor=grid.BackgroundColor;grid.Parent.BackColor=grid.BackgroundColor;
+                BackColor=Palette==null?grid.Parent.BackColor:Palette.Canvas;grid.Parent.BackColor=BackColor;
                 if(AutoHideWhenUnused)
                 {
                     int height=grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0;
@@ -112,7 +112,7 @@ namespace ServiceTool
         }
         protected override void OnPaint(PaintEventArgs e)
         {
-            ThemePalette p = Palette ?? ThemePalette.Create(false); e.Graphics.Clear(BackColor);
+            ThemePalette p = Palette ?? ThemePalette.Create(false); e.Graphics.Clear(p.Canvas);
             if (Maximum == 0) return; e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using (var path = BrandButton.RoundRect(Thumb, 3)) using (var fill = new SolidBrush(dragging ? p.Accent : p.Border)) e.Graphics.FillPath(fill, path);
             if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, ClientRectangle, p.Text, BackColor);
