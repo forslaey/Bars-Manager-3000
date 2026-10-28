@@ -63,30 +63,17 @@ namespace ServiceTool
             tableCard.SizeChanged+=delegate{QueueFitRows();};
             body.Controls.Add(tableCard,0,1);
             grid.ColumnWidthChanged+=delegate{QueueFitRows();};
-            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=1,Margin=new Padding(4,0,0,0),Padding=new Padding(0,10,0,10)};
+            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,10)};
             options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));options.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             remote.Dock=DockStyle.Fill;remote.Margin=Padding.Empty;remote.Palette=Colors;
             remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=false;
             options.Controls.Add(remote,0,0);body.Controls.Add(options,0,2);
-            // Align the painted left edge, not the checkbox control bounds.
-            options.Layout+=delegate
-            {
-                if(!grid.IsHandleCreated||!options.IsHandleCreated||grid.Columns.Count==0)return;
-                using(var graphics=grid.CreateGraphics())
-                {
-                    var cell=grid.GetCellDisplayRectangle(0,-1,false);
-                    int diameter=(int)Math.Round(18*graphics.DpiX/96F);
-                    int left=options.PointToClient(grid.PointToScreen(new Point(cell.Left+(cell.Width-diameter)/2,0))).X-1;
-                    var margin=new Padding(Math.Max(0,left),0,0,0);
-                    if(remote.Margin!=margin)remote.Margin=margin;
-                }
-            };
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=new Padding(0,0,0,10)};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
             install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=true;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить удалённый доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
             refresh=Button("Проверить версии в сети",false);refresh.Click+=async delegate{await RefreshPackages(true);};associations=Button("Приложения по умолчанию",false);associations.Click+=delegate{OpenDefaultApps();};
             cancel=Button("Отменить",false);cancel.Margin=Padding.Empty;cancel.Enabled=false;cancel.Click+=delegate{if(busy&&BrandMessageBox.Show(this,LibraryManagerForm.CancelWarning,"Отмена",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)RequestCancel(false);};
             foreach(var button in new[]{install,remove,access})button.Margin=new Padding(button.Margin.Left,0,button.Margin.Right,6);
-            actions.Controls.Add(install,0,0);actions.Controls.Add(remove,1,0);actions.Controls.Add(access,2,0);actions.Controls.Add(refresh,0,1);actions.Controls.Add(associations,1,1);actions.Controls.Add(cancel,2,1);body.Controls.Add(actions,0,3);
+            actions.Controls.Add(install,0,0);actions.Controls.Add(remove,1,0);actions.Controls.Add(access,2,0);actions.Controls.Add(refresh,0,1);actions.Controls.Add(associations,1,1);actions.Controls.Add(cancel,2,1);body.Controls.Add(actions,0,3);UniformActionButtons.Bind(actions);
             var logCard=JournalPanel.Create(journal,"Журнал установки программ",Colors);
             var footer=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,0)};footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             activity=Label("Установка начнётся только по кнопке",true);activity.Font=new Font("Segoe UI",9);footer.Controls.Add(activity,0,0);
