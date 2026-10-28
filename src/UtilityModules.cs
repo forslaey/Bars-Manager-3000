@@ -225,9 +225,9 @@ namespace ServiceTool
         private readonly BrandCheckBox shortcuts=new BrandCheckBox();
         private readonly bool preview;
         private string source;
-        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(640,500))
+        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(520,500))
         {
-            FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;preview=previewMode; MinimumSize=SizeFromClientSize(new Size(620,500));ClientSize=new Size(640,500);
+            FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;preview=previewMode; MinimumSize=SizeFromClientSize(new Size(520,500));ClientSize=new Size(520,500);
             Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,12);
             Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
             Body.GetControlFromPosition(0,0).Margin=new Padding(0,8,0,12);
@@ -237,18 +237,18 @@ namespace ServiceTool
             foreach(float height in new[]{(float)PathFieldMetrics.CaptionHeight,(float)PathFieldMetrics.PickerHeight,12F,(float)PathFieldMetrics.CaptionHeight,(float)PathFieldMetrics.PickerHeight,44F})content.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
             var sourceCaption=Caption("Будет взято из:",false);content.Controls.Add(sourceCaption,0,0);content.SetColumnSpan(sourceCaption,2);
             sourceLabel=new BrandTextBox {Text=preview?@"C:\Библиотеки\_tools":"Выбери папку с утилитами",ReadOnly=true,AutoSize=false,Palette=Colors};
-            chooseSource=Button("Выбрать папку…",false);chooseSource.Click+=delegate{Choose();};var sourceRow=new PathPickerRow(sourceLabel,chooseSource,168){Dock=DockStyle.Fill};content.Controls.Add(sourceRow,0,1);content.SetColumnSpan(sourceRow,2);
+            chooseSource=Button("Выбрать папку…",false);chooseSource.Click+=delegate{Choose();};var sourceRow=new PathPickerRow(sourceLabel,chooseSource,168){Dock=DockStyle.Fill,FillAvailableWidth=true};content.Controls.Add(sourceRow,0,1);content.SetColumnSpan(sourceRow,2);
             var targetCaption=Caption("Путь распаковки:",false);content.Controls.Add(targetCaption,0,3);content.SetColumnSpan(targetCaption,2);
             destination=new BrandTextBox {AutoSize=false,Palette=Colors,Text=ToolsDeployment.DefaultTarget};
-            chooseTarget=Button("Выбрать путь…",false);chooseTarget.Click+=delegate{ChooseTarget();};var targetRow=new PathPickerRow(destination,chooseTarget,168){Dock=DockStyle.Fill};content.Controls.Add(targetRow,0,4);content.SetColumnSpan(targetRow,2);
+            chooseTarget=Button("Выбрать путь…",false);chooseTarget.Click+=delegate{ChooseTarget();};var targetRow=new PathPickerRow(destination,chooseTarget,168){Dock=DockStyle.Fill,FillAvailableWidth=true};content.Controls.Add(targetRow,0,4);content.SetColumnSpan(targetRow,2);
             shortcuts.Text=PathFieldMetrics.ShortcutCaption;shortcuts.Checked=true;shortcuts.Dock=DockStyle.Fill;shortcuts.Margin=new Padding(0,16,0,0);shortcuts.Palette=Colors;content.Controls.Add(shortcuts,0,5);content.SetColumnSpan(shortcuts,2);
             card.Controls.Add(content);Body.Controls.Add(card,0,1);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(0,4,0,0)};
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             deploy=Button("Установить",true);deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
-            remove=Button("Удалить",false);remove.Destructive=true;remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,1,0);Body.Controls.Add(actions,0,2);
+            remove=Button("Удалить",false);remove.Destructive=true;remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,1,0);actions.Layout+=delegate{int gap=(int)Math.Round(10F*actions.Font.Height/16F);int width=Math.Max(1,(actions.ClientSize.Width-gap)/2);foreach(var button in new[]{deploy,remove}){button.Dock=DockStyle.None;button.Anchor=AnchorStyles.Top|AnchorStyles.Left;button.Margin=Padding.Empty;button.Size=new Size(width,actions.ClientSize.Height);}deploy.Location=Point.Empty;remove.Location=new Point(width+gap,0);};Body.Controls.Add(actions,0,2);
             if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=ex.Message;}
-            LimitContent(new Size(640, 500));
+            LimitContent(new Size(520, 500));
             SetTheme(Colors.Dark,false);
         }
         protected override void OnThemeChanged(){shortcuts.Palette=Colors;}

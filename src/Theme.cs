@@ -675,6 +675,7 @@ namespace ServiceTool
         private System.Drawing.Size pickerSize;
         private int pickerDrop=4;
         private bool arranging;
+        internal bool FillAvailableWidth {get;set;}
         internal int PreferredRowHeight {get{return pickerSize.Height;}}
         internal int PreferredRowWidth {get{return PathFieldMetrics.Measure(field).Width+pickerSize.Width+(int)System.Math.Round(12F*pickerSize.Width/buttonWidth);}}
         internal PathPickerRow(BrandTextBox path,BrandButton button,int width)
@@ -697,7 +698,7 @@ namespace ServiceTool
                 var measure=PathFieldMetrics.Measure(field);
                 int width=pickerSize.Width,gap=(int)System.Math.Round(12F*width/buttonWidth);
                 int height=System.Math.Min(ClientSize.Height,pickerSize.Height);
-                int pathWidth=System.Math.Max(1,System.Math.Min(measure.Width,ClientSize.Width-gap-width));
+                int pathWidth=System.Math.Max(1,FillAvailableWidth?ClientSize.Width-gap-width:System.Math.Min(measure.Width,ClientSize.Width-gap-width));
                 picker.SetBounds(pathWidth+gap,ClientSize.Height-height,width,height);
                 field.SetBounds(0,ClientSize.Height-1-pickerDrop-measure.Height,pathWidth,measure.Height);
             }
