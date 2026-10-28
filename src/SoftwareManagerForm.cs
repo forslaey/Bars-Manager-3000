@@ -105,7 +105,7 @@ namespace ServiceTool
             grid.DefaultCellStyle.Font=new Font("Segoe UI",9.5F);grid.DefaultCellStyle.Padding=new Padding(4);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
             grid.CellBorderStyle=DataGridViewCellBorderStyle.Single;grid.ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.Single;grid.ScrollBars=ScrollBars.None;
             grid.Columns.Add(new DataGridViewCheckBoxColumn {Name="Selected",HeaderText="",Width=46,MinimumWidth=46,AutoSizeMode=DataGridViewAutoSizeColumnMode.None});
-            string[] names={"Программа","В системе","Доступно / источник"};int[] weights={24,20,56};
+            string[] names={"Программа","В системе","Доступно / Источник"};int[] weights={24,20,56};
             for(int i=0;i<names.Length;i++){int column=grid.Columns.Add("c"+i,names[i]);grid.Columns[column].FillWeight=weights[i];grid.Columns[column].MinimumWidth=130;}
             foreach(DataGridViewColumn column in grid.Columns)column.SortMode=DataGridViewColumnSortMode.NotSortable;
             grid.EditMode=DataGridViewEditMode.EditProgrammatically;
@@ -210,7 +210,7 @@ namespace ServiceTool
                 if(cancelled||IsDisposed)return;foreach(var candidate in updates.Where(p=>p!=null)){SoftwarePackage old;if(!packages.TryGetValue(candidate.Id,out old)||SoftwareCatalog.Compare(candidate.Version,old.Version)>=0)packages[candidate.Id]=candidate;}
                 if(cancelled)throw new OperationCanceledException();
                 selection.Clear();foreach(var app in SoftwareCatalog.Apps){if(packages.ContainsKey(app.Id)&&(checks[app.Id].State==LibraryState.Missing || checks[app.Id].State==LibraryState.Installed && packages[app.Id].Version!="0.0" && SoftwareCatalog.Compare(packages[app.Id].Version,checks[app.Id].Version)>0))selection.Add(app.Id);}
-                Log("Проверка завершена. Если официальный интернет-источник недоступен, предлагается установка проверенной локальной копии программ.");activity.Text="Выбери программы и проверь источник установщиков";
+                Log(resolveUnknownVersion&&updates.Any(u=>u==null)?"Проверка завершена. Официальный источник в сети недоступен, предлагается установка проверенных локальных копий программ.":"Проверка завершена.");activity.Text="Выбери программы и проверь источник установщиков";
             }
             catch(OperationCanceledException){if(!IsDisposed)Log("Проверка отменена");}catch(Exception ex){if(!IsDisposed)Log("Проверка не завершена: "+ex.Message);}
             finally{checking=false;if(!IsDisposed)Lock(false);}
@@ -223,7 +223,7 @@ namespace ServiceTool
             {
                 string id=Convert.ToString(row.Tag);SoftwareCheck check;SoftwarePackage package;checks.TryGetValue(id,out check);packages.TryGetValue(id,out package);
                 row.Cells[2].Value=check==null?"Не проверено":check.State==LibraryState.Installed?"Установлена, "+(check.Detail.Contains("x86")?"x86":check.Detail.Contains("x64")?"x64":"разрядность уточняется")+"\r\nВерсия "+check.Version:check.State==LibraryState.Missing?"Не установлена":"Требуется проверка";
-                row.Cells[3].Value=package==null?"Пакет не найден\r\nВыбери _soft или проверь доступ к сайту":(package.Version=="0.0"?"Версия после получения":package.Version)+", разрядность "+package.Architecture+"\r\n"+package.Source;
+                row.Cells[3].Value=package==null?"Пакет не найден\r\nВыбери _soft или проверь доступ к сайту":(package.Version=="0.0"?"Версия после получения":package.Version)+", разрядность "+package.Architecture+" / "+(package.Source=="Локальный _soft"?"Локальный источник - (папка: _soft)":package.Source);
                 bool allowed=check!=null&&check.State==LibraryState.Installed||package!=null&&check!=null&&check.State==LibraryState.Missing&&(package.Architecture=="x64"||id=="anydesk");
                 if(allowed)selectable.Add(id);else selection.Remove(id);row.Cells[0].Value=selection.Contains(id);
                 row.Cells[0].ToolTipText=allowed?"Щёлкни, чтобы выбрать или снять отметку":"Сначала проверь установленную программу и пакет";

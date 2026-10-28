@@ -253,7 +253,7 @@ namespace ServiceTool
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 390));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
             Panel viewport = new FillContentPanel(layout);
             Controls.Add(viewport);
 
@@ -399,13 +399,16 @@ namespace ServiceTool
             refreshSlot.Controls.Add(autoRefreshToggle);statusLayout.Controls.Add(refreshSlot,1,0);
             refreshSlot.Layout+=delegate
             {
-                using(var graphics=autoRefreshToggle.CreateGraphics())
+                if(servicesButton==null||servicesGrid.Parent==null)return;using(var graphics=autoRefreshToggle.CreateGraphics())
                 {
                     int prefix=1+(int)Math.Round(42*graphics.DpiX/96F)+(int)(8*graphics.DpiX/96F);
                     int text=TextRenderer.MeasureText(graphics,autoRefreshToggle.Text,autoRefreshToggle.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;
-                    int width=Math.Min(refreshSlot.ClientSize.Width,prefix+text+4);
+                    int width=prefix+text;
                     int height=Math.Min(refreshSlot.ClientSize.Height,(int)Math.Round(28*graphics.DpiY/96F));
-                    autoRefreshToggle.Bounds=new Rectangle(Math.Max(0,refreshSlot.ClientSize.Width-width-serviceScroll.Width),Math.Max(0,(refreshSlot.ClientSize.Height-height-(int)Math.Round(7*graphics.DpiY/96F))/2),width,height);
+                    int end=refreshSlot.PointToClient(servicesGrid.PointToScreen(new Point(servicesGrid.ClientSize.Width,0))).X;
+                    int above=refreshSlot.PointToClient(servicesButton.PointToScreen(new Point(0,servicesButton.Height))).Y;
+                    int below=refreshSlot.PointToClient(servicesGrid.PointToScreen(Point.Empty)).Y;
+                    autoRefreshToggle.Bounds=new Rectangle(end-width,(above+below-height)/2,width,height);
                 }
             };
             serviceLayout.Controls.Add(statusLayout, 0, 2);
@@ -442,9 +445,10 @@ namespace ServiceTool
             // Match the right header slot to the actual last action column, including DPI rounding.
             EventHandler alignRefresh = delegate
             {
-                if (servicesButton.Width > 0 && statusLayout.ColumnStyles[1].Width != servicesButton.Width)
-                    statusLayout.ColumnStyles[1].Width = servicesButton.Width;
+                int required=Math.Max(servicesButton.Width,autoRefreshToggle.PreferredSize.Width+serviceScroll.Width+30);
+                if(statusLayout.ColumnStyles[1].Width!=required)statusLayout.ColumnStyles[1].Width=required;
             };
+            servicesGrid.SizeChanged+=delegate{refreshSlot.PerformLayout();};
             servicesButton.SizeChanged += alignRefresh;
             actionButtons.Layout += delegate { alignRefresh(null, EventArgs.Empty); };
             actions.Controls.Add(actionButtons);
