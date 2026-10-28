@@ -23,7 +23,7 @@ namespace ServiceTool
         {
             bool arranging=false;
             row.Layout+=delegate{if(arranging||row.Width<1)return;arranging=true;try{
-                int n=row.ColumnCount,gap=System.Math.Max(1,(int)System.Math.Round(10F*row.Font.Height/16F)),inset=scroll.Width;
+                int n=row.ColumnCount,gap=System.Math.Max(1,(int)System.Math.Round(10F*row.Font.Height/16F)),inset=scroll.Visible?scroll.Width:0;
                 int available=System.Math.Max(n,row.ClientSize.Width-inset),width=System.Math.Max(1,(available-gap*(n-1))/n),extra=available-width*n-gap*(n-1);
                 row.Padding=new Padding(0,0,inset,0);
                 for(int i=0;i<n;i++){int spacing=i==n-1?0:gap+extra/(n-1)+(i<extra%(n-1)?1:0);var control=row.GetControlFromPosition(i,0);if(control!=null)control.Margin=new Padding(0,0,spacing,0);float wanted=width+spacing;if(row.ColumnStyles[i].SizeType!=SizeType.Absolute||System.Math.Abs(row.ColumnStyles[i].Width-wanted)>.1){row.ColumnStyles[i].SizeType=SizeType.Absolute;row.ColumnStyles[i].Width=wanted;}}

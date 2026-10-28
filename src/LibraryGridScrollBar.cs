@@ -26,15 +26,42 @@ namespace ServiceTool
         private DataGridView grid;
         private bool dragging; private int dragOffset;
         private bool correcting;
+        private bool viewportPending,updatingViewport;
+        internal bool AutoHideWhenUnused {get;set;}
+        private void QueueViewport()
+        {
+            if(viewportPending||!IsHandleCreated||IsDisposed)return;viewportPending=true;
+            BeginInvoke((MethodInvoker)delegate{viewportPending=false;if(!IsDisposed)UpdateViewport();});
+        }
+        internal void UpdateViewport()
+        {
+            if(grid==null||grid.Parent==null||updatingViewport)return;updatingViewport=true;
+            try
+            {
+                BackColor=grid.BackgroundColor;grid.Parent.BackColor=grid.BackgroundColor;
+                if(AutoHideWhenUnused)
+                {
+                    int height=grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0;
+                    foreach(DataGridViewRow row in grid.Rows)if(row.Visible)height+=row.Height;
+                    Visible=height>grid.ClientSize.Height;
+                }
+                CorrectPosition();Invalidate();
+            }
+            finally{updatingViewport=false;}
+        }
+        protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);QueueViewport();}
         internal bool AlignToRows { get; set; }
         public ThemePalette Palette;
         public LibraryGridScrollBar()
         {
+            AutoHideWhenUnused=true;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             Cursor = Cursors.Hand; AccessibleRole = AccessibleRole.ScrollBar; AccessibleName = "Прокрутка компонентов"; TabStop = true;
         }
         public void Bind(DataGridView target)
         {
+            grid = target;AlignToRows=true;
+            grid.RowsAdded+=delegate{QueueViewport();};grid.RowsRemoved+=delegate{QueueViewport();};grid.SizeChanged+=delegate{QueueViewport();};grid.RowHeightChanged+=delegate{QueueViewport();};grid.ColumnWidthChanged+=delegate{QueueViewport();};grid.DataBindingComplete+=delegate{QueueViewport();};grid.VisibleChanged+=delegate{QueueViewport();};grid.BackgroundColorChanged+=delegate{QueueViewport();};
             grid = target; grid.Scroll += delegate { CorrectPosition(); Invalidate(); }; grid.RowsAdded += delegate { Invalidate(); }; grid.RowsRemoved += delegate { Invalidate(); }; grid.SizeChanged += delegate { CorrectPosition(); Invalidate(); };
             grid.MouseWheel += delegate(object sender, MouseEventArgs e) { MoveBy(-Math.Sign(e.Delta) * 3); var handled = e as HandledMouseEventArgs; if (handled != null) handled.Handled = true; };
         }

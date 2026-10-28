@@ -58,7 +58,7 @@ namespace ServiceTool
             };
             body.Controls.Add(heading,0,0);
             var tableCard=new Panel {Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
-            ConfigureGrid();gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);tableCard.Controls.Add(grid);tableCard.Controls.Add(gridScroll);
+            ConfigureGrid();gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.AutoHideWhenUnused=false;gridScroll.Bind(grid);tableCard.Controls.Add(grid);tableCard.Controls.Add(gridScroll);
             // Measure against the narrow lane first, then reclaim it only when all rows fit.
             tableCard.SizeChanged+=delegate{QueueFitRows();};
             body.Controls.Add(tableCard,0,1);
