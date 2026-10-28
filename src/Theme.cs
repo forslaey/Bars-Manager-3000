@@ -244,7 +244,7 @@ namespace ServiceTool
             }
             Rectangle label = new Rectangle(box.Right + (int)(9 * scale), 0, Math.Max(0, Width - box.Right - (int)(9 * scale)), Height);
             TextRenderer.DrawText(e.Graphics, Text, Font, label, Enabled ? p.Text : p.Muted,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.PreserveGraphicsTranslateTransform);
             if (Enabled && Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, label, p.Text, BackColor);
         }
     }

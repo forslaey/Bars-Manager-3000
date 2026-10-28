@@ -92,7 +92,7 @@ namespace ServiceTool
             activity=Label("Установка начнётся только по кнопке",true);activity.Font=new Font("Segoe UI",9);footer.Controls.Add(activity,0,0);
 
             activity.Text="Скачать / сверить комплект…";activity.Cursor=Cursors.Hand;
-            activity.Click+=async delegate{if(busy)return;using(var dialog=new BundleDownloadForm()){dialog.ShowDialog(this);if(Directory.Exists(dialog.LibraryRoot)){source=SoftwarePackageStorage.Folder(dialog.LibraryRoot);sourceLabel.Text=source;await RefreshPackages();}}};
+            activity.Click+=async delegate{if(busy)return;using(var dialog=new BundleDownloadForm(String.IsNullOrEmpty(source)?null:Path.GetDirectoryName(source))){dialog.ShowDialog(this);if(dialog.RootAccepted){source=SoftwarePackageStorage.Folder(dialog.LibraryRoot);sourceLabel.Text=source;await RefreshPackages();}}};
             back=Button("В меню",false);ModuleNavigation.Configure(back);back.Click+=delegate{MenuRequested=true;Close();};footer.Controls.Add(back,1,0);
             // Navigation and the journal stay outside the scrolling work area.
             // Only unusually short screens or large text require scrolling it.

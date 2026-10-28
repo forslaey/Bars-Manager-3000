@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading;
+using System.Linq;
 namespace ServiceTool
 {
  internal static class BundleTests
@@ -35,6 +36,15 @@ namespace ServiceTool
     Check(File.Exists(conflictPart),"Conflict preserves verified replacement");
     using(var cancel=new CancellationTokenSource()){cancel.Cancel();bool cancelled=false;try{new BundleTransfer(new YandexBundleSource()).Download(file,root,hash,bytes=>{},cancel.Token);}catch(OperationCanceledException){cancelled=true;}Check(cancelled,"Cancelled before network");}
     using(var form=new BundleDownloadForm()){form.Show();System.Windows.Forms.Application.DoEvents();Check(form.Visible,"Window opens without network");}
+    BundleSession.Save(root,new[]{file,same});var saved=BundleSession.Load(root);Check(saved.Contains(file.Path+"|"+hash)&&saved.Count==2,"Queue persists content identity");
+    BundleSession.Save(root,new BundleRemoteFile[0]);Check(BundleSession.Load(root).Count==0,"Completed queue cleared atomically");
+    string owned=BundleTransfer.PartPath(root,new BundleRemoteFile {Path="/cleanup.bin",Sha256=hash});Directory.CreateDirectory(Path.GetDirectoryName(owned));File.WriteAllText(owned,"partial");
+    string unrelated=Path.Combine(root,".bars-download","keep.txt");File.WriteAllText(unrelated,"user");
+    Check(BundleMaintenance.Parts(root).Contains(owned),"Owned partial found");BundleMaintenance.CleanParts(root);
+    Check(!File.Exists(owned)&&File.Exists(unrelated),"Cleanup preserves unknown service files");
+    Check(receipts.CanReplace(file,hash),"Cleanup preserves receipts");
+    var msi=new BundleRemoteFile {Path="/fixture.msi",Sha256=hash};receipts.Record(msi);Check(receipts.CanReplace(msi,hash),"Managed MSI eligible for metadata validation");
+    bool unknownDenied=false;try{BundlePackageIdentity.ValidateUpgrade(local,local,file.Path);}catch(IOException){unknownDenied=true;}Check(unknownDenied,"Unknown installer identity cannot authorize replacement");
     Console.WriteLine("PASS: "+count+" bundle path/receipt/UI checks. Temporary fixtures only; no network/installers.");return 0;
    }
    catch(Exception ex){Console.Error.WriteLine(ex);return 1;}

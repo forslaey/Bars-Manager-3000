@@ -24,7 +24,7 @@ namespace ServiceTool
         {
             // Configuration and arbitrary documents are always conservative.
             string ext=Path.GetExtension(file.Path);
-            if(!String.Equals(ext,".exe",StringComparison.OrdinalIgnoreCase))return false;
+            if(!String.Equals(ext,".exe",StringComparison.OrdinalIgnoreCase)&&!String.Equals(ext,".msi",StringComparison.OrdinalIgnoreCase))return false;
             // Utilities can modify their own installation; preserve the whole tree.
             if(file.Group=="Утилиты")return false;
             lock(gate)

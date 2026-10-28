@@ -110,7 +110,7 @@ namespace ServiceTool
             BrandButton back = Button("В меню", false); ModuleNavigation.Configure(back); back.Click += delegate { MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
             windowsComponents = Button("Компоненты", false); ModuleNavigation.Configure(windowsComponents); windowsComponents.Margin=new Padding(0,0,10,0); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
             activity.Text="Скачать / сверить комплект…";activity.Cursor=Cursors.Hand;
-            activity.Click+=async delegate{if(installing||checking)return;timer.Stop();try{using(var dialog=new BundleDownloadForm(source)){dialog.ShowDialog(this);if(Directory.Exists(dialog.LibraryRoot)){source=dialog.LibraryRoot;UpdateSource();await RefreshAsync(true);}}}finally{timer.Enabled=Visible&&monitor.Checked&&!preview&&!installing&&!checking;}};
+            activity.Click+=async delegate{if(installing||checking)return;timer.Stop();try{using(var dialog=new BundleDownloadForm(source)){dialog.ShowDialog(this);if(dialog.RootAccepted){source=dialog.LibraryRoot;UpdateSource();await RefreshAsync(true);}}}finally{timer.Enabled=Visible&&monitor.Checked&&!preview&&!installing&&!checking;}};
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1); SetTheme(Colors.Dark, false); UpdateSource();
             VisibleChanged += delegate { timer.Enabled = Visible && monitor.Checked && !preview && !installing && !checking; };

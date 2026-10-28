@@ -53,6 +53,22 @@ namespace ServiceTool
         }
         Dictionary<string,object> Get(string suffix,string path,int offset,CancellationToken token)
         {
+            for(int attempt=0;;attempt++)
+            {
+                try{return GetOnce(suffix,path,offset,token);}
+                catch(WebException ex)
+                {
+                    token.ThrowIfCancellationRequested();var response=ex.Response as HttpWebResponse;int code=response==null?0:(int)response.StatusCode;
+                    bool transient=code==408||code==429||code>=500||ex.Status==WebExceptionStatus.Timeout||ex.Status==WebExceptionStatus.ConnectFailure||ex.Status==WebExceptionStatus.ReceiveFailure||ex.Status==WebExceptionStatus.ConnectionClosed||ex.Status==WebExceptionStatus.NameResolutionFailure;
+                    int delay=(1<<attempt)*1000,seconds;
+                    if(response!=null&&Int32.TryParse(response.Headers["Retry-After"],out seconds))delay=Math.Max(delay,Math.Min(60,Math.Max(0,seconds))*1000);
+                    if(response!=null)response.Dispose();if(!transient||attempt>=3)throw;
+                    if(token.WaitHandle.WaitOne(delay))token.ThrowIfCancellationRequested();
+                }
+            }
+        }
+        Dictionary<string,object> GetOnce(string suffix,string path,int offset,CancellationToken token)
+        {
             var uri=Api+suffix+"?public_key="+Uri.EscapeDataString(PublicLink)+"&path="+Uri.EscapeDataString(path)+"&limit=100&offset="+offset;
             var request=(HttpWebRequest)WebRequest.Create(uri);request.Timeout=30000;request.ReadWriteTimeout=30000;
             request.UserAgent="BARS-Manager-3000";
@@ -79,6 +95,7 @@ namespace ServiceTool
                     foreach(var value in (System.Collections.IEnumerable)embedded["items"])
                     {
                         var item=(Dictionary<string,object>)value;string path=(string)item["path"];
+                        if(path.Equals("/.bars-download",StringComparison.OrdinalIgnoreCase)||path.StartsWith("/.bars-download/",StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Источник использует служебную папку загрузчика");
                         // Validate metadata paths independently of the actual destination.
                         LocalPath(Path.Combine(Path.GetTempPath(),"bars-bundle-path-check"),path);
                         if(!path.StartsWith(directory=="/"?"/":directory+"/",StringComparison.Ordinal)||path.Substring(directory=="/"?1:directory.Length+1).Contains("/"))throw new InvalidDataException("Некорректная вложенность каталога");
