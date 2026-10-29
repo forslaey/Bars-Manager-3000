@@ -9,7 +9,7 @@ namespace ServiceTool
   internal BundleCloud Cloud {get;private set;}
   internal BundleCloudDialog(bool checking):base(checking?"Источник проверки":"Источник загрузки",new Size(420,262))
   {
-   MinimumSize=SizeFromClientSize(new Size(420,262));ClientSize=new Size(420,262);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=MinimizeBox=false;Root.RowStyles[0].Height=60;
+   MinimumSize=SizeFromClientSize(new Size(420,262));ClientSize=new Size(420,262);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=MinimizeBox=false;Root.RowStyles[0].Height=60;HideThemeSelector();
    var body=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=Padding.Empty};body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));body.RowStyles.Add(new RowStyle(SizeType.Absolute,76));body.RowStyles.Add(new RowStyle(SizeType.Absolute,52));body.RowStyles.Add(new RowStyle(SizeType.Absolute,40));
    var choices=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));choices.RowStyles.Add(new RowStyle(SizeType.Percent,50));choices.RowStyles.Add(new RowStyle(SizeType.Percent,50));
    var y=new BrandCheckBox {Text="Яндекс Диск",Checked=true,Width=350,Height=30,Palette=Colors};var g=new BrandCheckBox {Text="Google Диск",Width=350,Height=30,Palette=Colors};

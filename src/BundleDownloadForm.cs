@@ -92,7 +92,7 @@ namespace ServiceTool
                 var result=await Task.Run(()=>{
                     var files=cloudSource.Scan(cloud,token,Log);var list=new List<Entry>();
                     foreach(var file in files.Where(f=>f.Group=="Утилиты"?selectTools:f.Group!="Программы"&&selectLibraries)){token.ThrowIfCancellationRequested();string local=YandexBundleSource.LocalPath(root,file.Path);var entry=new Entry {File=file};
-                        if(!File.Exists(local)){entry.Allowed=entry.Selected=true;entry.State="Отсутствует — скачать";}
+                        if(!File.Exists(local)){entry.Allowed=entry.Selected=true;entry.State="Отсутствует - будет скачано";}
                         else{entry.OriginalHash=YandexBundleSource.Hash(local,token);entry.Done=entry.OriginalHash==file.Sha256;entry.Allowed=!entry.Done&&new BundleReceipts(root).CanReplace(file,entry.OriginalHash);entry.Selected=entry.Allowed;entry.State=entry.Done?"Обновление не требуется":entry.Allowed?"Изменён в источнике — обновить":"Отличается — сохранить локальный файл";}
                         list.Add(entry);
                     }return list;
