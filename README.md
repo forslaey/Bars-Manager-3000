@@ -1,11 +1,11 @@
-﻿<!-- Текущий выпуск: 2.3.62. История описаний: docs/history/releases/ -->
+﻿<!-- Текущий выпуск: 2.3.63. История описаний: docs/history/releases/ -->
 # BARS Manager 3000
 
 Инструменты обслуживания рабочего места BARS: службы, библиотеки, программы и системные компоненты.
 
 **[Скачать опубликованную программу](https://github.com/forslaey/Bars-Manager-3000/releases/latest)** · **[Руководство](docs/USER-GUIDE.md)** · **[История версий](CHANGELOG.md)**
 
-**Текущий выпуск: [2.3.62](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.62)** — без цифровой подписи. [Изменения и результаты проверок](docs/history/releases/RELEASE-2.3.62.md).
+**Текущий выпуск: [2.3.63](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.63)** — без цифровой подписи. [Изменения и результаты проверок](docs/history/releases/RELEASE-2.3.63.md).
 
 ## С чего начать
 

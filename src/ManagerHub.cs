@@ -120,9 +120,9 @@ namespace ServiceTool
             var launcherHeader=(TableLayoutPanel)Root.GetControlFromPosition(0,0);launcherHeader.Padding=new Padding(0,18,0,0);
             Root.AutoScroll=true;
             // Four modules in an even 2x2 grid, plus a full-width settings card.
-            var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty, MinimumSize=new Size(0,650) };
+            var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty, MinimumSize=new Size(0,670) };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 168)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 168)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
             var title = Label("Инструменты BARS", false); title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleCenter; title.Margin = new Padding(0, 0, 0, 20); body.Controls.Add(title, 0, 0);
             // Windows components are reached from the component manager.
             var modules = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
@@ -136,7 +136,7 @@ namespace ServiceTool
             modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nУстановка, удаление и удалённый доступ", "Установка программ", delegate { OpenModule(() => new SoftwareManagerForm(false)); }), 0, 1);
             modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { OpenModule(() => new ToolsDeploymentForm(false)); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
-            var footer=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=new Padding(5,0,5,0),Padding=new Padding(0,8,0,0)};
+            var footer=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=new Padding(5,0,5,0),Padding=new Padding(0,12,0,12)};
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,190));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,190));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var bundle=Button("Скачать комплект",false);bundle.Click+=delegate{OpenModule(()=>new BundleDownloadForm());};footer.Controls.Add(bundle,0,0);
             var guide=Button("Инструкция",false);guide.AccessibleName="Открыть инструкцию";guide.Click+=delegate{ModuleNavigation.ShowDialog(this,()=>new UserGuideForm());SetTheme(ThemePreference.LoadDark(),false);};footer.Controls.Add(guide,2,0);

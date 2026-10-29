@@ -29,8 +29,8 @@ namespace ServiceTool
             FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=true;preview=previewMode;MinimumSize=new Size(950,680);Root.AutoScroll=false;Root.RowStyles[0].Height=72;Body.MinimumSize=Size.Empty;
             Body.RowCount=5;Body.RowStyles.Clear();
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Body.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            Body.RowStyles.Add(new RowStyle(SizeType.Absolute,80));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,130));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,54));
-            var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Activity.AutoEllipsis=true;
+            Body.RowStyles.Add(new RowStyle(SizeType.Absolute,80));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,130));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,68));
+            var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);footer.Padding=new Padding(0,12,0,12);Activity.AutoEllipsis=true;Activity.Margin=Padding.Empty;Activity.TextAlign=ContentAlignment.MiddleLeft;Back.Anchor=AnchorStyles.Right;
             ConfigureGrid();
             var table=new Panel{Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
             var slot=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);slot.Controls.Add(grid);table.Controls.Add(slot);Body.Controls.Add(table,0,1);gridScroll.Dock=DockStyle.None;Controls.Add(gridScroll);Action alignScroll=()=>{if(!IsHandleCreated||table.IsDisposed)return;var point=PointToClient(table.PointToScreen(new Point(table.ClientSize.Width,0)));gridScroll.Bounds=new Rectangle(point.X,point.Y,Math.Max(1,(int)Math.Round(14F*Font.Height/16F)),grid.Height);gridScroll.BringToFront();};Layout+=delegate{alignScroll();};table.SizeChanged+=delegate{alignScroll();};table.LocationChanged+=delegate{alignScroll();};slot.LocationChanged+=delegate{alignScroll();};Root.Layout+=delegate{if(IsHandleCreated)BeginInvoke((MethodInvoker)delegate{if(!IsDisposed)alignScroll();});};grid.SizeChanged+=delegate{alignScroll();};Shown+=delegate{alignScroll();};
@@ -43,7 +43,7 @@ namespace ServiceTool
             var log=JournalPanel.Create(journal,"Журнал проверки и настройки",Colors);log.Margin=Padding.Empty;Body.Controls.Add(log,0,3);
             Body.Controls.Remove(log);Body.Controls.Remove(footer);Root.Controls.Remove(Body);
             Body.RowCount=3;while(Body.RowStyles.Count>3)Body.RowStyles.RemoveAt(Body.RowStyles.Count-1);
-            var compact=new CompactJournalLayout(Body,1,grid,log,footer,64,50){StableSettingsRows=true,IncludeStatusColumn=true};compact.RowCount=3;compact.RowStyles[1]=new RowStyle(SizeType.Percent,100);Root.Controls.Add(compact,0,1);Root.Layout+=delegate{using(var graphics=CreateGraphics())Back.Height=(int)Math.Round(40F*graphics.DpiY/96F);};
+            var compact=new CompactJournalLayout(Body,1,grid,log,footer,64,68){StableSettingsRows=true,IncludeStatusColumn=true};compact.RowCount=3;compact.RowStyles[1]=new RowStyle(SizeType.Percent,100);Root.Controls.Add(compact,0,1);Root.Layout+=delegate{using(var graphics=CreateGraphics())Back.Height=(int)Math.Round(40F*graphics.DpiY/96F);};
             Shown+=delegate{BeginInvoke((MethodInvoker)delegate{if(IsDisposed)return;int height=actions.Controls.Cast<Control>().Max(c=>c.Height);Body.RowStyles[2].Height=height+actions.Margin.Vertical;});};
             grid.SelectionChanged+=delegate{UpdateButtons();};grid.CurrentCellChanged+=delegate{UpdateButtons();};SetTheme(Colors.Dark,false);UpdateButtons();
             Shown+=async delegate{if(preview){foreach(DataGridViewRow row in grid.Rows)row.Cells[2].Value="Не проверено · демонстрация";}else await Check();};
