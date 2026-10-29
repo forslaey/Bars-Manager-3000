@@ -108,6 +108,7 @@ namespace ServiceTool
         }
         internal WindowsFeaturesForm(bool previewMode, bool returnToComponents = false) : base("Компоненты Windows", new Size(760, 590))
         {
+            HideThemeSelector();Root.RowStyles[0].Height=60;MinimumSize=new Size(0,0);ClientSize=new Size(650,500);MinimumSize=SizeFromClientSize(ClientSize);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;
             if(returnToComponents) Back.Text="Назад";
             preview = previewMode;
             // Telnet/TFTP first: they belong to the small fiLinn/piglet toolset and are checked
@@ -124,9 +125,9 @@ namespace ServiceTool
                 var caption = Label(group, true); caption.Font = new Font("Segoe UI", 9); content.Controls.Add(caption, 0, 0);
                 for (int i = 0; i < members.Length; i++)
                 {
-                    content.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / members.Length));
+                    content.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
                     var row = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-                    row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                    row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170)); row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
                     var choice = new BrandCheckBox { Text = members[i].Name, Font = new Font("Segoe UI", 12, FontStyle.Bold), Dock = DockStyle.Fill, Margin = Padding.Empty, Enabled = false, Palette = Colors };
                     choice.CheckedChanged += delegate { UpdateAction(); };
                     var status = Label("Не проверено", true); status.TextAlign = ContentAlignment.MiddleRight;
@@ -140,13 +141,13 @@ namespace ServiceTool
             // Two short rows (Telnet, TFTP) share the upper band; the single IIS row takes the rest.
             list.RowStyles.Clear();
             foreach (var group in WindowsComponents.GroupOrder)
-                list.RowStyles.Add(new RowStyle(SizeType.Percent, WindowsComponents.InGroup(group).Length > 1 ? 62F : 38F));
+                list.RowStyles.Add(new RowStyle(SizeType.Absolute, 54+42*WindowsComponents.InGroup(group).Length));
             Body.Controls.Add(list, 0, 1);
             var actions = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 6, 0, 0) };
             actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); actions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             check = Button("Проверить компоненты", false); check.Click += async delegate { await Check(); }; actions.Controls.Add(check, 0, 0);
             action = Button("Установить выбранные", true); action.Margin = Padding.Empty; action.Enabled = false; action.Click += async delegate { await Apply(); }; actions.Controls.Add(action, 1, 0);
-            Body.Controls.Add(actions, 0, 2); LimitContent(new Size(760,590)); SetTheme(Colors.Dark, false);
+            Body.Controls.Add(actions, 0, 2); LimitContent(new Size(650,500)); SetTheme(Colors.Dark, false);
             Shown += async delegate
             {
                 if (preview)
@@ -227,7 +228,7 @@ namespace ServiceTool
         private string source;
         internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(520,500))
         {
-            FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;preview=previewMode; MinimumSize=SizeFromClientSize(new Size(520,500));ClientSize=new Size(520,500);
+            HideThemeSelector();FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;preview=previewMode; MinimumSize=SizeFromClientSize(new Size(520,500));ClientSize=new Size(520,500);
             Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,12);
             Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
             Body.GetControlFromPosition(0,0).Margin=new Padding(0,8,0,12);

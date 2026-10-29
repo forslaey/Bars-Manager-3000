@@ -40,6 +40,7 @@ namespace ServiceTool
             theme.Size = new Size(86, 40); theme.Anchor = AnchorStyles.None; theme.AccessibleName = "Сменить тему";
             theme.Click += delegate { SetTheme(!Colors.Dark, true); }; header.Controls.Add(theme, 2, 0); Root.Controls.Add(header, 0, 0);
         }
+        protected void HideThemeSelector(){theme.Visible=false;theme.Enabled=false;}
         protected override void OnLoad(EventArgs e)
         {
             if(!initialScaleApplied)
