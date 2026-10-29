@@ -53,3 +53,7 @@ LibraryReports/
 
 # User-requested unsigned release 2.3.32
 !releases/v2.3.32/Bars Manager 3000 2.3.32.exe
+
+# UI previews stay local in work; never publish screenshots
+preview*.png
+**/preview*.png
