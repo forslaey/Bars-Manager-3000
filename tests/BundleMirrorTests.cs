@@ -16,6 +16,8 @@ namespace ServiceTool
    using(var download=new BundleCloudDialog(false)){var choices=Children(download).OfType<BrandCheckBox>().ToArray();choices[1].Checked=true;Check(!choices[0].Checked&&choices[1].Checked,"Download cloud exclusive");}
    var item=new BundleDifferenceItem {Path="missing.exe",State="Нет в папке",Allowed=true,Selected=true};using(var result=new BundleDifferencesForm(new[]{item})){result.Show();Application.DoEvents();var grid=Children(result).OfType<ServiceGrid>().Single();typeof(DataGridView).GetMethod("OnCellClick",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(grid,new object[]{new DataGridViewCellEventArgs(1,0)});Check(!item.Selected,"Whole row toggles saved selection");}
    var source=new BundleCloudSource();source.GoogleFiles=new System.Collections.Generic.List<BundleRemoteFile>{new BundleRemoteFile {Path="/a",Size=10,Sha256=new string('a',64)}};Check(!source.Contains(BundleCloud.Google,new BundleRemoteFile {Path="/a",Size=10,Sha256=new string('b',64)}),"Mirror mismatch cannot reuse part");
+   Check(BundleDownloadForm.AlternativeMessage(BundleCloud.Yandex,3).Contains("Google Диск")&&BundleDownloadForm.AlternativeMessage(BundleCloud.Google,3).Contains("Яндекс Диск"),"Both fallback directions named");
+   Check(BundleDownloadForm.AlternativeMessage(BundleCloud.Yandex,3).Contains("не будут скачиваться заново"),"Completed files explanation");
    Console.WriteLine("PASS: "+count+" mirror/parser/cloud choice/result selection checks. No network.");return 0;
   }catch(Exception ex){Console.Error.WriteLine(ex);return 1;}}
  }

@@ -113,17 +113,20 @@ namespace ServiceTool
             finally{busy=false;cancellation.Dispose();cancellation=null;UpdateState();if(closeAfter)Close();}
             if(suggestAlternative&&!closeAfter&&BrandMessageBox.Show(this,"Не удалось проверить выбранное облако. Попробовать альтернативное?","Проверка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)await Scan(cloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google);
         }
-        async Task Download(BundleCloud? forcedCloud=null)
+        internal static string CloudName(BundleCloud cloud){return cloud==BundleCloud.Google?"Google Диск":"Яндекс Диск";}
+        internal static string AlternativeMessage(BundleCloud cloud,int remaining){return "Не удалось скачать часть файлов из "+CloudName(cloud)+".\r\n\r\nДокачать оставшиеся файлы ("+remaining+") из "+CloudName(cloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google)+"?\r\n\r\nГотовые файлы сохранятся и не будут скачиваться заново. Недокачанные файлы продолжим с сохранённого места, если облако поддерживает докачку.";}
+        async Task Download(BundleCloud? forcedCloud=null, bool alternativeAttempt=false)
         {
             if(busy||scannedRoot==null)return;BundleCloud downloadCloud;if(forcedCloud.HasValue)downloadCloud=forcedCloud.Value;else using(var picker=new BundleCloudDialog(false)){if(picker.ShowDialog(this)!=DialogResult.OK)return;downloadCloud=picker.Cloud;}
             var selected=entries.Where(e=>e.Selected&&e.Allowed&&!e.Done).ToList();if(selected.Count==0)return;
             if(BrandMessageBox.Show(this,"Скачать "+selected.Count+" файлов ("+SizeText(selected.Sum(e=>e.File.Size))+")?\r\nУстановщики не будут запущены.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
+            Log("Начинаем загрузку из "+CloudName(downloadCloud)+". В очереди: "+selected.Count+" файлов. Уже готовые файлы повторно не скачиваем.");
             busy=true;downloading=true;cancelRequested=false;paused=false;batch=selected;previousBytes=0;receivedBytes=0;networkBytes=0;sampled=DateTime.UtcNow;started=DateTime.UtcNow;UpdateState();
             try
             {
                 int workers=3;workerLimit=workers;
                 cancellation=new CancellationTokenSource();
-                if(!cloudSource.Ready(downloadCloud))await Task.Run(()=>cloudSource.Scan(downloadCloud,cancellation.Token,Log));
+                if(alternativeAttempt||!cloudSource.Ready(downloadCloud))await Task.Run(()=>cloudSource.Scan(downloadCloud,cancellation.Token,Log,selected.Select(e=>e.File).ToList()));
                 cancellation.Token.ThrowIfCancellationRequested();
                 if(cancelRequested||paused)return;
                 Directory.CreateDirectory(scannedRoot);
@@ -150,7 +153,7 @@ namespace ServiceTool
                                 string warning=BundlePublication.Record(scannedRoot,entry.File,null);
                                 lock(sync){entry.Done=true;entry.Bytes=entry.File.Size;entry.Selected=false;entry.State=warning==null?"Готово":warning;}Log("Сохранён файл: "+entry.File.Path.TrimStart('/')+(warning==null?"":". "+warning));
                             }
-                            catch(Exception ex){Log("Не удалось загрузить "+entry.File.Path+": "+ex.Message);BundleSession.Log(scannedRoot,entry.File.Path+": "+(token.IsCancellationRequested?"Прервано":ex.Message));lock(sync)entry.State=token.IsCancellationRequested?"Приостановлено / прервано":"Ошибка: "+ex.Message;if(token.IsCancellationRequested)return;}
+                            catch(Exception ex){Log("Не удалось скачать файл из "+CloudName(downloadCloud)+": "+entry.File.Path.TrimStart('/')+". "+(token.IsCancellationRequested?"Передача остановлена; полученные данные сохранены.":"Готовые файлы не затронуты. Подробности: "+ex.Message));BundleSession.Log(scannedRoot,entry.File.Path+": "+(token.IsCancellationRequested?"Прервано":ex.Message));lock(sync)entry.State=token.IsCancellationRequested?"Приостановлено / прервано":"Ошибка: "+ex.Message;if(token.IsCancellationRequested)return;}
                         }
                     })).ToArray();
                     await Task.WhenAll(tasks);cancellation.Dispose();cancellation=null;
@@ -161,7 +164,19 @@ namespace ServiceTool
             }
             catch(Exception ex){summary.Text="Загрузка не завершена: "+ex.Message;Log(summary.Text);}
             finally{busy=false;downloading=false;paused=false;pause.Text="Пауза";if(cancellation!=null){cancellation.Dispose();cancellation=null;}UpdateState();if(closeAfter)Close();}
-            if(!cancelRequested&&!closeAfter&&selected.Any(e=>!e.Done)&&BrandMessageBox.Show(this,"Часть файлов не удалось получить из выбранного облака. Попробовать другое облако? Будут загружены только файлы с тем же размером и SHA-256.","Резервное облако",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)await Download(downloadCloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google);
+            int remaining=selected.Count(e=>!e.Done);
+            if(!cancelRequested&&!closeAfter&&remaining>0)
+            {
+                Log("Загрузка из "+CloudName(downloadCloud)+" завершена не полностью. Готово: "+selected.Count(e=>e.Done)+"; осталось: "+remaining+". Готовые файлы сохранены.");
+                if(!alternativeAttempt)
+                {
+                    var other=downloadCloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google;
+                    if(BrandMessageBox.Show(this,AlternativeMessage(downloadCloud,remaining),"Докачать из другого облака?",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)
+                    {Log("По вашему выбору переключаемся на "+CloudName(other)+". Проверим копии оставшихся файлов и докачаем только их.");await Download(other,true);}
+                    else Log("Вы оставили текущий источник. Остаток очереди сохранён; загрузку можно повторить позже.");
+                }
+                else Log("Резервное облако тоже не смогло выдать все файлы. Очередь сохранена. Проверьте интернет и повторите загрузку позже.");
+            }
         }
         void RefreshProgress()
         {

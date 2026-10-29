@@ -91,10 +91,10 @@ namespace ServiceTool
     }
    }
   }
-  internal List<BundleRemoteFile> Scan(BundleCloud cloud,CancellationToken token,Action<string> log)
+  internal List<BundleRemoteFile> Scan(BundleCloud cloud,CancellationToken token,Action<string> log,IEnumerable<BundleRemoteFile> expected=null)
   {
    if(cloud!=BundleCloud.Google)YandexFiles=yandex.Scan(token);
-   if(cloud!=BundleCloud.Yandex)GoogleFiles=google.Scan(cloud==BundleCloud.Both?YandexFiles:Baseline(),token,log);
+   if(cloud!=BundleCloud.Yandex)GoogleFiles=google.Scan(cloud==BundleCloud.Both?YandexFiles:expected??YandexFiles??Baseline(),token,log);
    if(cloud==BundleCloud.Both){var g=GoogleFiles.ToDictionary(f=>f.Path,StringComparer.OrdinalIgnoreCase);foreach(var file in YandexFiles.Where(f=>f.Group!="Программы"))if(!g.ContainsKey(file.Path))log("Нет подтверждённой копии на Google: "+file.Path);log("Каталоги зеркал сверены по путям и размерам. Содержимое Google проверяется по SHA-256 после скачивания.");}
    if(cloud==BundleCloud.Google)log("Google проверяется по встроенному каталогу SHA-256. Новые файлы требуют сверки с Яндексом; совпадение размера не подтверждает содержимое облака.");
    return cloud==BundleCloud.Google?GoogleFiles:YandexFiles;

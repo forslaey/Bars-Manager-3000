@@ -14,7 +14,7 @@ namespace ServiceTool
     Check(!controls.OfType<ServiceGrid>().Any(),"No per-file grid in primary module");Check(!controls.OfType<NumericUpDown>().Any(),"No concurrency selector");
     var choices=controls.OfType<BrandCheckBox>().ToArray();Check(choices.Length==2&&choices.Any(c=>c.Text=="Библиотеки и .NET")&&choices.Any(c=>c.Text=="Утилиты BARS"),"Exactly two requested sections");
     Check(form.FormBorderStyle==FormBorderStyle.FixedSingle&&!form.MaximizeBox,"Fixed compact main window");Check(controls.OfType<BrandButton>().Any(b=>b.Text=="Результаты"),"Reopen results button");Check(controls.OfType<JournalTextBox>().Count()==1,"Embedded journal");Check(controls.OfType<BundleProgressBar>().Count()==1&&!controls.OfType<ProgressBar>().Any(),"Branded progress only");
-    var buttons=controls.OfType<BrandButton>().Where(b=>!(b.Parent is PathPickerRow)).ToArray();Check(buttons.Select(b=>b.Height).Distinct().Count()==1,"Equal button heights");
+    var buttons=controls.OfType<BrandButton>().Where(b=>new[]{"Проверить","Скачать","Результаты","Пауза","Отменить","В меню"}.Contains(b.Text)).ToArray();Check(buttons.Length==6&&buttons.Max(b=>b.Height)-buttons.Min(b=>b.Height)<=1,"Equal lower action button heights (DPI rounding <=1px)");
     controls.OfType<BrandButton>().Single(b=>b.Text=="В меню").PerformClick();Check(form.MenuRequested,"Module menu request");
    }
    using(var hub=new ManagerHub()){
