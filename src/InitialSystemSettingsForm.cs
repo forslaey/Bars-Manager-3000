@@ -26,7 +26,7 @@ namespace ServiceTool
         };
         internal InitialSystemSettingsForm(bool previewMode=false):base("Первичные системные настройки",new Size(1080,840))
         {
-            preview=previewMode;MinimumSize=new Size(950,680);Root.AutoScroll=false;Root.RowStyles[0].Height=72;Body.MinimumSize=Size.Empty;
+            FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=true;preview=previewMode;MinimumSize=new Size(950,680);Root.AutoScroll=false;Root.RowStyles[0].Height=72;Body.MinimumSize=Size.Empty;
             Body.RowCount=5;Body.RowStyles.Clear();
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Body.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             Body.RowStyles.Add(new RowStyle(SizeType.Absolute,80));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,130));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,54));
@@ -43,7 +43,7 @@ namespace ServiceTool
             var log=JournalPanel.Create(journal,"Журнал проверки и настройки",Colors);log.Margin=Padding.Empty;Body.Controls.Add(log,0,3);
             Body.Controls.Remove(log);Body.Controls.Remove(footer);Root.Controls.Remove(Body);
             Body.RowCount=3;while(Body.RowStyles.Count>3)Body.RowStyles.RemoveAt(Body.RowStyles.Count-1);
-            var compact=new CompactJournalLayout(Body,1,grid,log,footer,64,50){StableSettingsRows=true,IncludeStatusColumn=true};compact.RowCount=3;compact.RowStyles[1]=new RowStyle(SizeType.Absolute,64);Root.Controls.Add(compact,0,1);Root.Layout+=delegate{using(var graphics=CreateGraphics())Back.Height=(int)Math.Round(40F*graphics.DpiY/96F);};
+            var compact=new CompactJournalLayout(Body,1,grid,log,footer,64,50){StableSettingsRows=true,IncludeStatusColumn=true};compact.RowCount=3;compact.RowStyles[1]=new RowStyle(SizeType.Percent,100);Root.Controls.Add(compact,0,1);Root.Layout+=delegate{using(var graphics=CreateGraphics())Back.Height=(int)Math.Round(40F*graphics.DpiY/96F);};
             Shown+=delegate{BeginInvoke((MethodInvoker)delegate{if(IsDisposed)return;int height=actions.Controls.Cast<Control>().Max(c=>c.Height);Body.RowStyles[2].Height=height+actions.Margin.Vertical;});};
             grid.SelectionChanged+=delegate{UpdateButtons();};grid.CurrentCellChanged+=delegate{UpdateButtons();};SetTheme(Colors.Dark,false);UpdateButtons();
             Shown+=async delegate{if(preview){foreach(DataGridViewRow row in grid.Rows)row.Cells[2].Value="Не проверено · демонстрация";}else await Check();};
