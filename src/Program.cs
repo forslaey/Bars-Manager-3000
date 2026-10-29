@@ -596,7 +596,7 @@ namespace ServiceTool
             servicesGrid.Margin = Padding.Empty;
             management.Margin = Padding.Empty;
             management.Dock = DockStyle.Fill;
-            var serviceSlot=new Panel {Dock=DockStyle.Fill,Margin=Padding.Empty};servicesGrid.ScrollBars=ScrollBars.None;serviceScroll.Dock=DockStyle.Right;serviceScroll.Width=14;serviceScroll.Bind(servicesGrid);serviceSlot.Controls.Add(servicesGrid);serviceSlot.Controls.Add(serviceScroll);serviceLayout.Controls.Add(serviceSlot,0,3);
+            var serviceSlot=new Panel {Dock=DockStyle.Fill,Margin=Padding.Empty};servicesGrid.ScrollBars=ScrollBars.None;serviceScroll.UseCardBackground=true;serviceScroll.MaximumThumbLength=80;serviceScroll.Dock=DockStyle.Right;serviceScroll.Width=14;serviceScroll.Bind(servicesGrid);serviceSlot.Controls.Add(servicesGrid);serviceSlot.Controls.Add(serviceScroll);serviceLayout.Controls.Add(serviceSlot,0,3);
             serviceLayout.Controls.Add(management, 0, 4);
             layout.Controls.Add(registered, 0, 2);
 
@@ -611,7 +611,7 @@ namespace ServiceTool
             log.Font = new Font("Consolas", 9F);
             Panel logViewport = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
             logScrollBar.Dock = DockStyle.Right;
-            logScrollBar.Width = 18;
+            logScrollBar.Width = 14;
             logViewport.Controls.Add(log);
             logViewport.Controls.Add(logScrollBar);
             logScrollBar.Bind((JournalTextBox)log);

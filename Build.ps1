@@ -14,7 +14,7 @@ $taskReferences = @('System.dll','System.Core.dll','System.Xml.dll','System.Draw
 $taskCommon = @('/nologo','/target:winexe','/optimize+','/utf8output','/codepage:65001', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/win32icon:$(Join-Path $taskAssets 'Bars.ico')")
 if ([String]::IsNullOrWhiteSpace($ReferenceAssemblies)) { $ReferenceAssemblies = & (Join-Path $PSScriptRoot 'tools\Prepare-References.ps1') }
 $taskReferenceRoot = [IO.Path]::GetFullPath($ReferenceAssemblies)
-if (-not (Test-Path -LiteralPath (Join-Path $taskReferenceRoot 'mscorlib.dll'))) { throw 'Нет reference assemblies .NET Framework 4.6.' }
+if (-not (Test-Path -LiteralPath (Join-Path $taskReferenceRoot 'mscorlib.dll'))) { throw 'Нет reference assemblies .NET Framework 4.8.' }
 $taskCommon += @('/noconfig','/nostdlib+',('/reference:' + (Join-Path $taskReferenceRoot 'mscorlib.dll')))
 $taskCommon += @($taskReferences | ForEach-Object { '/reference:' + (Join-Path $taskReferenceRoot $_) })
 try {

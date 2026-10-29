@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -6,6 +6,7 @@ namespace ServiceTool
 {
     internal static class GridViewportLayout
     {
+        internal static int FixedThumbLength(Control control,int track) {using(var graphics=control.CreateGraphics())return Math.Min(track,Math.Max(1,(int)Math.Round(28F*graphics.DpiY/96F)));}
         internal static void UniformRows(DataGridView grid)
         {
             int height=0;
@@ -28,6 +29,8 @@ namespace ServiceTool
         private bool correcting;
         private bool viewportPending,updatingViewport;
         internal bool UseCardBackground {get;set;}
+        internal int MaximumThumbLength {get;set;}
+        internal bool LimitTrackToWholeRows {get;set;}
         internal Color TrackBackground {get{return Palette==null?BackColor:UseCardBackground?Palette.Surface:Palette.Canvas;}}
         internal bool AutoHideWhenUnused {get;set;}
         private void QueueViewport()
@@ -91,18 +94,21 @@ namespace ServiceTool
             get
             {
                 int top=AlignToRows&&grid!=null&&grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0;
-                int inset=Math.Min(6,Math.Max(0,(Height-top)/4));
-                return new Rectangle(0,top+inset,Width,Math.Max(1,Height-top-2*inset));
+                int bottom=grid==null?Height:Math.Min(Height,grid.Bottom);
+                if(LimitTrackToWholeRows && grid!=null && grid.RowCount>0) { int used=grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0; for(int row=Maximum;row<grid.RowCount;row++) if(grid.Rows[row].Visible) used+=grid.Rows[row].Height; bottom=Math.Min(bottom,grid.Top+used); }
+                int inset=Math.Min(6,Math.Max(0,(bottom-top)/4));
+                return new Rectangle(0,top+inset,Width,Math.Max(1,bottom-top-2*inset));
             }
         }
+        internal DataGridView BoundGrid {get{return grid;}}
         internal Rectangle ThumbBounds { get { return Thumb; } }
         private Rectangle Thumb
         {
             get
             {
                 Rectangle bounds=Track;
-                int track = bounds.Height, visible = grid == null ? 1 : Math.Max(1, grid.DisplayedRowCount(false));
-                int length = grid == null ? track : Math.Min(track, Math.Max(28, (int)((double)track * visible / Math.Max(1, grid.RowCount))));
+                float scale;using(var graphics=CreateGraphics())scale=graphics.DpiY/96F;
+                int track=bounds.Height,length=Math.Min(track,Math.Max(1,(int)Math.Round(28F*scale)));
                 int y = bounds.Top + (Maximum == 0 ? 0 : (int)((double)(track - length) * First / Maximum));
                 return new Rectangle(Width / 2 - 3, y, 6, length);
             }

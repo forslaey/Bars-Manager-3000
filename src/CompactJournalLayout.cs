@@ -12,7 +12,7 @@ namespace ServiceTool
         private readonly ServiceGrid grid;
         private readonly int tableRow;
         private readonly float footerBase,journalBase;
-        private bool pending,arranging;
+        private bool pending,arranging; internal bool StableSettingsRows {get;set;} internal bool IncludeStatusColumn {get;set;}
         internal CompactJournalLayout(TableLayoutPanel content,int tableRow,ServiceGrid grid,Control journal,Control footer,float journalMinimum,float footerHeight)
         {
             this.content=content;this.grid=grid;this.tableRow=tableRow;journalBase=journalMinimum;footerBase=footerHeight;
@@ -36,7 +36,7 @@ namespace ServiceTool
             if(arranging||ClientSize.Height<=0)return;arranging=true;
             try
             {
-                GridViewportLayout.UniformRows(grid);
+                if(StableSettingsRows){float dpi;using(var g=grid.CreateGraphics())dpi=g.DpiY/96F;int height=(int)Math.Round(44F*dpi);foreach(DataGridViewRow row in grid.Rows)for(int c=0;c<Math.Min(IncludeStatusColumn?grid.ColumnCount:2,grid.ColumnCount);c++){var cell=row.Cells[c];int width=Math.Max(1,grid.Columns[c].Width-cell.InheritedStyle.Padding.Horizontal-4);height=Math.Max(height,TextRenderer.MeasureText(Convert.ToString(cell.Value),grid.Font,new Size(width,Int32.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix).Height+cell.InheritedStyle.Padding.Vertical+4);}foreach(DataGridViewRow row in grid.Rows)if(row.Height!=height)row.Height=height;}else GridViewportLayout.UniformRows(grid);
                 int fixedHeight=(int)Math.Ceiling(content.Padding.Vertical+Enumerable.Range(0,content.RowCount).Where(i=>i!=tableRow).Sum(i=>content.RowStyles[i].Height));
                 int header=grid.ColumnHeadersVisible?grid.ColumnHeadersHeight:0;
                 int firstRow=grid.RowCount>0?grid.Rows[0].Height:Math.Max(1,grid.RowTemplate.Height);

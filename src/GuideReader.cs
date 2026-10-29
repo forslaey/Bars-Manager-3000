@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
@@ -38,7 +38,7 @@ namespace ServiceTool
         internal void Bind(GuideReader target){reader=target;reader.ViewportChanged+=delegate{Invalidate();};}
         internal Rectangle ThumbBounds
         {
-            get{if(reader==null||reader.MaximumScroll==0||Height<=12)return Rectangle.Empty;int track=Height-12;int length=Math.Min(track,Math.Max(28,(int)((double)track*reader.ClientSize.Height/reader.ContentHeight)));int y=6+(int)((double)(track-length)*reader.ScrollPosition/reader.MaximumScroll);return new Rectangle(Width/2-3,y,6,length);}
+            get{if(reader==null||reader.MaximumScroll==0||Height<=12)return Rectangle.Empty;int track=Height-12;int length=GridViewportLayout.FixedThumbLength(this,track);int y=6+(int)((double)(track-length)*reader.ScrollPosition/reader.MaximumScroll);return new Rectangle(Width/2-3,y,6,length);}
         }
         protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);e.Graphics.Clear(BackColor);Rectangle thumb=ThumbBounds;if(thumb.IsEmpty)return;var p=Palette??ThemePalette.Create(false);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using(var path=BrandButton.RoundRect(thumb,3))using(var brush=new SolidBrush(dragging?p.Accent:p.Border))e.Graphics.FillPath(brush,path);}
         protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);if(e.Button!=MouseButtons.Left||reader==null)return;var thumb=ThumbBounds;if(thumb.IsEmpty)return;if(thumb.Contains(e.Location)){dragging=true;offset=e.Y-thumb.Y;Capture=true;}else reader.ScrollTo(reader.ScrollPosition+(e.Y<thumb.Top?-1:1)*reader.ClientSize.Height);Invalidate();}
@@ -55,7 +55,7 @@ namespace ServiceTool
         internal void Bind(GuideSectionListBox target){list=target;list.ViewportChanged+=delegate{Invalidate();};}
         private int VisibleItems {get{if(list==null)return 1;int count=0;for(int i=list.TopIndex;i<list.Items.Count;i++){if(list.GetItemRectangle(i).Bottom>list.ClientSize.Height)break;count++;}return Math.Max(1,count);}}
         private int Maximum {get{return list==null?0:Math.Max(0,list.Items.Count-VisibleItems);}}
-        private Rectangle Thumb {get{if(Maximum==0||Height<=12)return Rectangle.Empty;int track=Height-12;int length=Math.Min(track,Math.Max(28,track*VisibleItems/list.Items.Count));int top=6+(track-length)*Math.Min(Maximum,list.TopIndex)/Maximum;return new Rectangle(Width/2-3,top,6,length);}}
+        private Rectangle Thumb {get{if(Maximum==0||Height<=12)return Rectangle.Empty;int track=Height-12;int length=GridViewportLayout.FixedThumbLength(this,track);int top=6+(track-length)*Math.Min(Maximum,list.TopIndex)/Maximum;return new Rectangle(Width/2-3,top,6,length);}}
         protected override void OnPaint(PaintEventArgs e){base.OnPaint(e);e.Graphics.Clear(BackColor);var thumb=Thumb;if(thumb.IsEmpty)return;var p=Palette??ThemePalette.Create(false);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using(var path=BrandButton.RoundRect(thumb,3))using(var brush=new SolidBrush(dragging?p.Accent:p.Border))e.Graphics.FillPath(brush,path);}
         protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);if(e.Button!=MouseButtons.Left||list==null||Thumb.IsEmpty)return;var thumb=Thumb;if(thumb.Contains(e.Location)){dragging=true;offset=e.Y-thumb.Top;Capture=true;}else list.TopIndex=Math.Max(0,Math.Min(list.Items.Count-1,list.TopIndex+(e.Y<thumb.Top?-1:1)*VisibleItems));Invalidate();}
         protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(dragging&&list!=null){int travel=Math.Max(1,Height-12-Thumb.Height);list.TopIndex=Math.Max(0,Math.Min(Maximum,(e.Y-offset-6)*Maximum/travel));Invalidate();}}

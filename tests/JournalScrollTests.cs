@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Reflection;
 using System.Text;
@@ -64,14 +64,14 @@ namespace ServiceTool
             Assert(journal.ReadOnly && journal.Multiline && journal.WordWrap, "Journal retains selectable multiline text");
             journal.Text = String.Empty;
             Pump();
-            Assert(!bar.Visible, "No scrollbar for an empty journal");
+            Assert(bar.Visible && !bar.ThumbBounds.IsEmpty, "Empty journal keeps its fixed thumb"); int fixedHeight=bar.ThumbBounds.Height;
             journal.Text = ".exe службы BARS выбран.\r\nСлужба установлена.\r\nГотово.";
             Pump();
-            Assert(!bar.Visible, "No scrollbar when journal text fits");
+            Assert(bar.Visible, "Fitting journal keeps its scrollbar");
             journal.Text = LongLog();
             journal.ScrollToLine(0);
             Pump();
-            Assert(bar.Visible, "Long session history exposes the custom scrollbar");
+            Assert(bar.Visible, "Long session history exposes the custom scrollbar"); Assert(bar.ThumbBounds.Height==fixedHeight,"Thumb length is independent of log volume");
             Assert(journal.TotalLineCount >= 150, "All long-log entries are available");
             Assert(journal.VisibleLineCount > 0 && journal.VisibleLineCount < journal.TotalLineCount, "Visible capacity reflects a real text viewport");
             Assert(bar.ThumbBounds.Height > 0 && bar.TrackBounds.Contains(bar.ThumbBounds), "Thumb remains inside its track");
@@ -163,7 +163,7 @@ namespace ServiceTool
             journal.Height = 250;
             bar.Height = 250;
             Pump();
-            Assert(!bar.Visible && journal.FirstVisibleLine == 0, "Shorter content and a larger viewport remove stale scroll state");
+            Assert(bar.Visible && journal.FirstVisibleLine == 0, "Shorter content and a larger viewport remove stale scroll state");
             journal.Width = 420;
             journal.Height = 170;
             bar.Height = 170;

@@ -26,24 +26,25 @@ namespace ServiceTool
         };
         internal InitialSystemSettingsForm(bool previewMode=false):base("Первичные системные настройки",new Size(1080,840))
         {
-            preview=previewMode;MinimumSize=new Size(950,680);Root.AutoScroll=false;Body.MinimumSize=Size.Empty;
+            preview=previewMode;MinimumSize=new Size(950,680);Root.AutoScroll=false;Root.RowStyles[0].Height=72;Body.MinimumSize=Size.Empty;
             Body.RowCount=5;Body.RowStyles.Clear();
-            Body.RowStyles.Add(new RowStyle(SizeType.Absolute,52));Body.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            Body.RowStyles.Add(new RowStyle(SizeType.Absolute,62));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,130));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,54));
+            Body.RowStyles.Add(new RowStyle(SizeType.Absolute,42));Body.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            Body.RowStyles.Add(new RowStyle(SizeType.Absolute,80));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,130));Body.RowStyles.Add(new RowStyle(SizeType.Absolute,54));
             var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Activity.AutoEllipsis=true;
             ConfigureGrid();
             var table=new Panel{Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
-            var slot=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);slot.Controls.Add(grid);slot.Controls.Add(gridScroll);table.Controls.Add(slot);Body.Controls.Add(table,0,1);
-            var actions=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=new Padding(0,10,0,6)};
+            var slot=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);slot.Controls.Add(grid);table.Controls.Add(slot);Body.Controls.Add(table,0,1);gridScroll.Dock=DockStyle.None;Controls.Add(gridScroll);Action alignScroll=()=>{if(!IsHandleCreated||table.IsDisposed)return;var point=PointToClient(table.PointToScreen(new Point(table.ClientSize.Width,0)));gridScroll.Bounds=new Rectangle(point.X,point.Y,Math.Max(1,(int)Math.Round(14F*Font.Height/16F)),grid.Height);gridScroll.BringToFront();};Layout+=delegate{alignScroll();};table.SizeChanged+=delegate{alignScroll();};table.LocationChanged+=delegate{alignScroll();};slot.LocationChanged+=delegate{alignScroll();};Root.Layout+=delegate{if(IsHandleCreated)BeginInvoke((MethodInvoker)delegate{if(!IsDisposed)alignScroll();});};grid.SizeChanged+=delegate{alignScroll();};Shown+=delegate{alignScroll();};
+            var actions=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=new Padding(0,20,0,20)};
             foreach(int weight in new[]{34,33,33})actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,weight));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             applyButton=Button("Применить профиль",true);applyButton.Click+=async delegate{await Apply(SelectedGroup,false);};
             standardButton=Button("Стандарт Windows",false);standardButton.Click+=async delegate{if(SelectedGroup=="folders")await Check();else await Apply(SelectedGroup,true);};
             refresh=Button("Проверить настройки",false);refresh.Margin=Padding.Empty;refresh.Click+=async delegate{await Check();};
             actions.Controls.Add(applyButton,0,0);actions.Controls.Add(standardButton,1,0);actions.Controls.Add(refresh,2,0);Body.Controls.Add(actions,0,2);
-            var log=JournalPanel.Create(journal,"Журнал проверки и настройки",Colors);Body.Controls.Add(log,0,3);
+            var log=JournalPanel.Create(journal,"Журнал проверки и настройки",Colors);log.Margin=Padding.Empty;Body.Controls.Add(log,0,3);
             Body.Controls.Remove(log);Body.Controls.Remove(footer);Root.Controls.Remove(Body);
             Body.RowCount=3;while(Body.RowStyles.Count>3)Body.RowStyles.RemoveAt(Body.RowStyles.Count-1);
-            Root.Controls.Add(new CompactJournalLayout(Body,1,grid,log,footer,130,54),0,1);
+            var compact=new CompactJournalLayout(Body,1,grid,log,footer,64,50){StableSettingsRows=true,IncludeStatusColumn=true};compact.RowCount=3;compact.RowStyles[1]=new RowStyle(SizeType.Absolute,64);Root.Controls.Add(compact,0,1);Root.Layout+=delegate{using(var graphics=CreateGraphics())Back.Height=(int)Math.Round(40F*graphics.DpiY/96F);};
+            Shown+=delegate{BeginInvoke((MethodInvoker)delegate{if(IsDisposed)return;int height=actions.Controls.Cast<Control>().Max(c=>c.Height);Body.RowStyles[2].Height=height+actions.Margin.Vertical;});};
             grid.SelectionChanged+=delegate{UpdateButtons();};grid.CurrentCellChanged+=delegate{UpdateButtons();};SetTheme(Colors.Dark,false);UpdateButtons();
             Shown+=async delegate{if(preview){foreach(DataGridViewRow row in grid.Rows)row.Cells[2].Value="Не проверено · демонстрация";}else await Check();};
         }
@@ -53,13 +54,13 @@ namespace ServiceTool
             grid.Dock=DockStyle.Fill;grid.Margin=Padding.Empty;grid.BorderStyle=BorderStyle.None;grid.ReadOnly=true;grid.RowHeadersVisible=false;
             grid.AllowUserToAddRows=grid.AllowUserToDeleteRows=grid.AllowUserToResizeRows=grid.AllowUserToResizeColumns=grid.AllowUserToOrderColumns=false;
             grid.MultiSelect=false;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;
-            grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.None;grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=56;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.None;grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=44;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             grid.ColumnHeadersDefaultCellStyle.Font=headerFont;grid.ColumnHeadersDefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;
-            grid.DefaultCellStyle.Padding=new Padding(8);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
+            grid.Font=new Font("Segoe UI",9F);grid.DefaultCellStyle.Padding=new Padding(8,3,8,3);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
             grid.CellBorderStyle=DataGridViewCellBorderStyle.Single;grid.ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.Single;grid.ScrollBars=ScrollBars.None;grid.TouchScrollingEnabled=true;
             string[] names={"Настройка","Описание","Состояние"};int[] weights={29,42,29};
             for(int i=0;i<names.Length;i++){int index=grid.Columns.Add("c"+i,names[i]);grid.Columns[index].FillWeight=weights[i];grid.Columns[index].MinimumWidth=140;grid.Columns[index].SortMode=DataGridViewColumnSortMode.NotSortable;}
-            grid.RowTemplate.MinimumHeight=76;
+            grid.Columns[2].DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.RowTemplate.MinimumHeight=44;
             foreach(var setting in Settings){int index=grid.Rows.Add(setting[1],setting[2],"Не проверено");grid.Rows[index].Tag=setting[0];}
         }
         private void UpdateButtons()
@@ -71,7 +72,7 @@ namespace ServiceTool
         protected override void OnThemeChanged()
         {
             if(journal!=null){journal.BackColor=Colors.Surface;journal.ForeColor=Colors.Text;}
-            if(grid==null)return;grid.BackgroundColor=Colors.Surface;grid.GridColor=Colors.Border;gridScroll.Palette=Colors;gridScroll.BackColor=Colors.Surface;
+            if(grid==null)return;grid.BackgroundColor=Colors.Canvas;grid.GridColor=Colors.Border;gridScroll.MaximumThumbLength=80;gridScroll.Palette=Colors;gridScroll.BackColor=Colors.Surface;
             grid.DefaultCellStyle.BackColor=Colors.Surface;grid.DefaultCellStyle.ForeColor=Colors.Text;grid.DefaultCellStyle.SelectionBackColor=Colors.Selection;grid.DefaultCellStyle.SelectionForeColor=Colors.SelectionText;
             grid.ColumnHeadersDefaultCellStyle.BackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.ForeColor=Colors.Text;grid.ColumnHeadersDefaultCellStyle.SelectionBackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.SelectionForeColor=Colors.Text;grid.Invalidate();
         }
@@ -86,7 +87,7 @@ namespace ServiceTool
             {
                 string group=Convert.ToString(row.Tag),error,status;
                 status=SystemSettingsPresentation.Status(group,values);
-                row.Cells[2].Value=status;row.Cells[2].ToolTipText=status;
+                row.Cells[2].Value=status.Replace("\\r","").Replace("\\n","; ").Replace("\r\n","; ").Replace("\r","; ").Replace("\n","; ");row.Cells[2].ToolTipText=status;
                 Log(Settings.First(s=>s[0]==group)[1]+": "+status.Replace("\nПодробности в журнале","").Replace(Environment.NewLine,". ").Replace("\n",". "));
                 if(values.TryGetValue(group+".Error",out error))Log(SystemSettingsPresentation.Error(error));
                 foreach(string detail in SystemSettingsPresentation.Details(group,values))Log(detail);

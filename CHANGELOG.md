@@ -1,3 +1,6 @@
+﻿# Актуальный выпуск 2.3.61
+Framework4.8 уже переведён по поручению в другом клиенте; не возвращать4.6. Описания выпусков теперь docs/history/releases/RELEASE-*.md, не создавать их в корне. Первичные настройки: реальные CR/LF разделять, перенос состояния и расчёт по трём колонкам; НЕ менять высоты строк в ColumnWidthChanged/CellValueChanged синхронно и НЕ менять RowStyles из Layout (риск WinForms invalid operation). Отступы над/под действиями равны, тест SettingsSpacingTests. Проверки/ограничения: docs/history/releases/RELEASE-2.3.61.md.
+
 # История версий
 
 [Скачать последний опубликованный выпуск](https://github.com/forslaey/Bars-Manager-3000/releases/latest) · [Руководство](docs/USER-GUIDE.md)

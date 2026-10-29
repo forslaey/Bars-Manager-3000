@@ -206,12 +206,13 @@ namespace ServiceTool
         private ThemePalette palette;
         private bool hovered, dragging, updating, updatePending;
         private int dragOffset;
+        internal bool AlwaysVisible {get;set;}
 
         public JournalScrollBar()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
-            Width = 18;
+            Width = 14; AlwaysVisible = true;
             TabStop = true;
             AccessibleRole = AccessibleRole.ScrollBar;
             AccessibleName = "Прокрутка журнала сеанса";
@@ -242,16 +243,12 @@ namespace ServiceTool
             get
             {
                 Rectangle track = TrackBounds;
-                if (textBox == null || textBox.IsDisposed || textBox.MaximumFirstLine <= 0 || track.Height <= 0 || track.Width <= 0)
+                if (textBox == null || textBox.IsDisposed || (!AlwaysVisible && textBox.MaximumFirstLine <= 0) || track.Height <= 0 || track.Width <= 0)
                     return Rectangle.Empty;
-                // Keep enough travel even in the compact two-line journal.
-                int minimum = Math.Min((int)Math.Round(24F * DpiScale),
-                    Math.Max((int)Math.Round(10F * DpiScale), track.Height / 2));
-                int height = Math.Max(minimum, (int)Math.Round(track.Height * Math.Min(1D, (double)textBox.VisibleLineCount / textBox.TotalLineCount)));
-                height = Math.Min(track.Height, height);
+                int height = Math.Min(track.Height, Math.Max(1,(int)Math.Round(28F * DpiScale)));
                 int travel = track.Height - height;
-                int top = track.Top + (int)Math.Round(travel * Math.Min(1D, (double)textBox.FirstVisibleLine / textBox.MaximumFirstLine));
-                int width = Math.Min(track.Width, Math.Max(2, (int)Math.Round((hovered || dragging ? 8F : 6F) * DpiScale)));
+                int top = track.Top + (int)Math.Round(travel * Math.Min(1D, (double)textBox.FirstVisibleLine / Math.Max(1,textBox.MaximumFirstLine)));
+                int width = Math.Min(track.Width, Math.Max(2, (int)Math.Round(6F * DpiScale)));
                 return new Rectangle(track.Left + (track.Width - width) / 2, top, width, height);
             }
         }
@@ -287,7 +284,7 @@ namespace ServiceTool
                 {
                     updatePending = false;
                     bool needed = textBox != null && !textBox.IsDisposed && textBox.MaximumFirstLine > 0;
-                    if (Visible != needed) Visible = needed;
+                    if (Visible != (AlwaysVisible || needed)) Visible = AlwaysVisible || needed;
                     if (!needed && dragging) { dragging = false; Capture = false; }
                     Invalidate();
                     if (IsHandleCreated) AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);
@@ -322,7 +319,7 @@ namespace ServiceTool
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
-            if (e.Button != MouseButtons.Left || textBox == null || !Enabled) return;
+            if (e.Button != MouseButtons.Left || textBox == null || !Enabled || textBox.MaximumFirstLine <= 0) return;
             Focus();
             Rectangle thumb = ThumbBounds;
             if (thumb.IsEmpty) return;
