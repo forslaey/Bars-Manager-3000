@@ -127,10 +127,10 @@ namespace ServiceTool
             // Windows components are reached from the component manager.
             var modules = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
             modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            for (int i = 0; i < 2; i++) modules.RowStyles.Add(new RowStyle(SizeType.Absolute, ModuleRowHeight));
+            for (int i = 0; i < 2; i++) modules.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             // Percentages of an odd pixel count round to different heights, so the three rows are
             // sized explicitly to identical values whenever the panel is resized.
-            modules.SizeChanged += delegate { EqualRows(modules, 2); };
+            // Let TableLayoutPanel distribute the viewport once, including DPI rounding.
             modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер служб", delegate { OpenModule(() => new MainForm(null, false)); }), 0, 0);
             modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер библиотек", delegate { OpenModule(() => new LibraryManagerForm(false)); }), 1, 0);
             modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nУстановка, удаление и удалённый доступ", "Установка программ", delegate { OpenModule(() => new SoftwareManagerForm(false)); }), 0, 1);

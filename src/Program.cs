@@ -414,9 +414,9 @@ namespace ServiceTool
             serviceLayout.Controls.Add(statusLayout, 0, 2);
 
             Panel actions = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty, Padding = new Padding(0, 7, 0, 7) };
-            TableLayoutPanel actionButtons = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), ColumnCount = 5, RowCount = 1 };
+            TableLayoutPanel actionButtons = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = new Padding(0), ColumnCount = 6, RowCount = 1 };
             actionButtons.Padding=new Padding(0,0,14,0);actionButtons.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 5; i++) actionButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
+            for (int i = 0; i < 6; i++) actionButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F/6));
             installButton = MakeButton("Установить службу", true);
             removeButton = MakeButton("Удалить службу", false);
             ((BrandButton)removeButton).Destructive = true;
@@ -441,7 +441,7 @@ namespace ServiceTool
             actionButtons.Controls.Add(removeButton, 1, 0);
             actionButtons.Controls.Add(installProfileButton, 2, 0);
             actionButtons.Controls.Add(refreshButton, 3, 0);
-            actionButtons.Controls.Add(servicesButton, 4, 0);ModuleNavigation.EqualButtons(actionButtons,serviceScroll);
+            actionButtons.Controls.Add(servicesButton, 4, 0);var diagnostics=MakeButton("Диагностика",false);diagnostics.Dock=DockStyle.Fill;diagnostics.Margin=Padding.Empty;diagnostics.Click+=delegate{if(servicesGrid.CurrentRow==null||servicesGrid.CurrentRow.Index>=managedRows.Count){SetStatus("Выбери службу в списке","Для диагностики сначала выбери строку службы.",muted);return;}using(var dialog=new ServiceProbeForm(managedRows[servicesGrid.CurrentRow.Index].Name))dialog.ShowDialog(this);};actionButtons.Controls.Add(diagnostics,5,0);ModuleNavigation.EqualButtons(actionButtons,serviceScroll);
             // Match the right header slot to the actual last action column, including DPI rounding.
             EventHandler alignRefresh = delegate
             {
@@ -495,6 +495,7 @@ namespace ServiceTool
             servicesGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 236, 255);
             servicesGrid.DefaultCellStyle.SelectionForeColor = ink;
             servicesGrid.GridColor = Color.FromArgb(235, 239, 245);
+            
             servicesGrid.Columns.Add("DisplayName", "Название службы");
             servicesGrid.Columns.Add("Name", "Системное имя службы");
             servicesGrid.Columns.Add("State", "Состояние");
@@ -1596,6 +1597,7 @@ namespace ServiceTool
             if (failure != null) { HandleOperationError(failure); UpdateActions(); return; }
             if (result != 0)
             {
+                if(result==1053){string explanation="Windows не получила вовремя ответ от службы на команду запуска или управления. Это может быть связано с ошибкой конфигурации, отсутствующей зависимостью, недоступным оборудованием или долгим запуском. Проверь журнал службы за время этой попытки, её конфигурацию, требуемые .NET Runtime / ASP.NET Core Runtime нужной разрядности и подключение оборудования. Сначала обнови статус: после тайм-аута запуск мог продолжиться. Код Windows: 1053.";SetStatus("Служба не ответила вовремя на команду Windows",explanation,Color.Firebrick);AppendLog(serviceName+": "+explanation);return;}
                 string message = action == "startup" && result == 1003
                     ? "Изменение не завершено; восстановить прежние настройки тоже не удалось. Проверь режим запуска в оснастке Windows."
                     : new Win32Exception(result).Message;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -11,6 +11,7 @@ namespace ServiceTool
     public sealed class ServiceEntry
     {
         public string Name, DisplayName, BinaryPath, State, StartMode;
+        public uint ProcessId;
         public bool DelayedAutoStart;
         public bool CanStop;
         // Preserve synthetic/previous callers; live entries explicitly start unknown below.
@@ -110,6 +111,7 @@ namespace ServiceTool
                             Name = Marshal.PtrToStringUni(native.Name) ?? String.Empty,
                             DisplayName = Marshal.PtrToStringUni(native.DisplayName) ?? String.Empty,
                             State = StateName(native.Status.CurrentState),
+                            ProcessId = native.Status.ProcessId,
                             BinaryPath = String.Empty,
                             StartMode = "Unknown",
                             CanStop = (native.Status.ControlsAccepted & 0x0001) != 0,
