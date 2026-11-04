@@ -157,7 +157,7 @@ namespace ServiceTool
         internal bool WrapLines { get; set; }
         protected override void OnPaint(PaintEventArgs e)
         {
-            TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix |
+            TextFormatFlags flags = TextFormatFlags.PreserveGraphicsTranslateTransform | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix |
                 (SingleLine ? TextFormatFlags.SingleLine : TextFormatFlags.WordBreak);
             if (TextAlign == ContentAlignment.MiddleLeft && !WrapLines) flags |= TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine;
             if (AutoEllipsis) flags |= TextFormatFlags.EndEllipsis;
@@ -598,14 +598,19 @@ namespace ServiceTool
         protected override void OnDropDown(EventArgs e) {
             base.OnDropDown(e);
             var info=new ComboBoxInformation();info.Size=System.Runtime.InteropServices.Marshal.SizeOf(typeof(ComboBoxInformation));
-            if(GetComboBoxInfo(Handle,ref info)&&info.ListHandle!=IntPtr.Zero){SetWindowTheme(info.ListHandle,String.Empty,String.Empty);popupFrame.Bind(info.ListHandle);}
+            if(GetComboBoxInfo(Handle,ref info)&&info.ListHandle!=IntPtr.Zero){popupFrame.Bind(info.ListHandle);}
             Invalidate();
         }
         protected override void OnHandleDestroyed(EventArgs e){if(popupFrame!=null)popupFrame.Detach();base.OnHandleDestroyed(e);}
         protected override void OnDropDownClosed(EventArgs e) { Invalidate(); base.OnDropDownClosed(e); }
 
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct PaintInfo {public IntPtr Dc;public int Erase;public Rectangle Bounds;public int Restore,Update;[System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValArray,SizeConst=32)]public byte[] Reserved;}
+        [System.Runtime.InteropServices.DllImport("user32.dll")]private static extern IntPtr BeginPaint(IntPtr handle,out PaintInfo info);
+        [System.Runtime.InteropServices.DllImport("user32.dll")]private static extern bool EndPaint(IntPtr handle,ref PaintInfo info);
         protected override void WndProc(ref Message message)
         {
+            if(Palette!=null&&DropDownStyle==ComboBoxStyle.DropDownList&&message.Msg==WM_PAINT){PaintInfo paint;IntPtr dc=BeginPaint(Handle,out paint);try{using(var graphics=Graphics.FromHdc(dc))PaintChrome(graphics);}finally{EndPaint(Handle,ref paint);}return;}
+            if(Palette!=null&&DropDownStyle==ComboBoxStyle.DropDownList&&message.Msg==0x14){message.Result=(IntPtr)1;return;}
             base.WndProc(ref message);
             if (Palette == null || DropDownStyle == ComboBoxStyle.Simple || IsDisposed) return;
             if ((message.Msg == WM_PRINT || message.Msg == WM_PRINTCLIENT) && message.WParam != IntPtr.Zero)

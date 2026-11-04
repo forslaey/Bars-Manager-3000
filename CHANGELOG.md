@@ -1,4 +1,7 @@
-﻿# 2.3.76
+﻿# 2.3.77 — даты и списки
+Даты по содержимому, подсказка InkLeft=0; DropDownList единственный paint вместо двух проходов. ComboStability20/Log10/Theme647/Navigation167 прошли; TouchText падает Native wheel on instruction reader. См. docs/history/releases/RELEASE-2.3.77.md. Без подписи, Framework4.8.
+
+# 2.3.76
 Режимы и подсказки сбора логов, сохранение отметок без пересоздания, буферизация списков. docs/history/releases/RELEASE-2.3.76.md.
 
 # 2.3.66 — два режима диагностики

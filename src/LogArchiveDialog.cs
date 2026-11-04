@@ -14,7 +14,7 @@ namespace ServiceTool
         private readonly HashSet<string> selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly ComboBox scope = new BrandComboBox();
         private readonly TableLayoutPanel dates = new BufferedLayoutPanel();
-        private readonly Label summary = new FlushLabel();
+        private readonly FlushLabel summary = new FlushLabel {InkLeft=g=>0};
         private readonly Label pageLabel = new Label();
         private readonly Button previous, next;
         private readonly DateTime today;
@@ -77,8 +77,8 @@ namespace ServiceTool
             dates.ColumnCount = 2;
             dates.RowCount = 6;
             dates.Margin = Padding.Empty;
-            dates.Padding = new Padding(6);dates.Anchor=AnchorStyles.None;dates.Dock=DockStyle.None;dates.Size=new Size(500,192);
-            for (int i = 0; i < 2; i++) dates.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            dates.Padding = new Padding(6,6,0,6);dates.Anchor=AnchorStyles.None;dates.Dock=DockStyle.None;dates.Size=new Size(360,192);
+            for (int i = 0; i < 2; i++) dates.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
             for (int i = 0; i < 6; i++) dates.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 6));
             content.Controls.Add(dates, 0, 3);
             TableLayoutPanel paging = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
@@ -147,6 +147,7 @@ namespace ServiceTool
                 int index = i - page * PageSize;
                 dates.Controls.Add(item, index % 2, index / 2);
             }
+            using(var graphics=dates.CreateGraphics()){int text=0;foreach(Control item in dates.Controls)text=Math.Max(text,TextRenderer.MeasureText(graphics,item.Text,item.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width);int prefix=(int)Math.Round(32*graphics.DpiX/96F);int gap=(int)Math.Round(36*graphics.DpiX/96F);int itemWidth=Math.Max(text+prefix,(int)Math.Round(148*graphics.DpiX/96F));int column=itemWidth+gap/2;dates.Width=column+itemWidth+dates.Padding.Horizontal;dates.ColumnStyles[0].Width=column;dates.ColumnStyles[1].Width=itemWidth;dates.Height=(int)Math.Round(32*6*graphics.DpiY/96F);foreach(Control item in dates.Controls){item.Dock=DockStyle.None;item.Anchor=AnchorStyles.Left;item.Width=itemWidth;item.Height=(int)Math.Round(30*graphics.DpiY/96F);}}
             dates.ResumeLayout(true);
             previous.Enabled = page > 0;
             next.Enabled = (page + 1) * PageSize < folders.Count;
