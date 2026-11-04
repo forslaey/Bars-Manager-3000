@@ -1,4 +1,7 @@
-﻿# 2.3.77 — даты и списки
+﻿# Публикация и очистка 04.11.2026
+Актуальные исходники и 2.3.77 опубликованы; три asset SHA256 сверены. Удалены35 предыдущих GitHub Releases, оставлен только2.3.77; теги/история сохранены. work244,32→3,83МиБ без перехода по двум тестовым ссылкам. Удалены старый releases/v2.3.76 и корневой EXE2.3.15, компактные доказательства сохранены. Правило единственного Release в AGENTS.md. TouchText Native wheel on instruction reader остаётся известным падением, не скрывать.
+
+# 2.3.77 — даты и списки
 Даты по содержимому, подсказка InkLeft=0; DropDownList единственный paint вместо двух проходов. ComboStability20/Log10/Theme647/Navigation167 прошли; TouchText падает Native wheel on instruction reader. См. docs/history/releases/RELEASE-2.3.77.md. Без подписи, Framework4.8.
 
 # 2.3.76 — сбор логов
