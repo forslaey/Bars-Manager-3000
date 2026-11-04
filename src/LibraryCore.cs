@@ -111,11 +111,11 @@ namespace ServiceTool
             return "";
         }
         internal static RegistryView[] Views() { return Environment.Is64BitOperatingSystem ? new[] { RegistryView.Registry64, RegistryView.Registry32 } : new[] { RegistryView.Registry32 }; }
-        public static List<LibraryCheck> Scan()
+        public static List<LibraryCheck> Scan(Action<int,int,string> progress=null)
         {
             List<LibraryRegisteredProduct> inventory = null;
             try { inventory = LibraryMaintenance.Inventory(); } catch { }
-            return LibraryCatalog.All().Select(p => Check(p, inventory)).ToList();
+            var packages=LibraryCatalog.All().ToList();var result=new List<LibraryCheck>();foreach(var package in packages){result.Add(Check(package,inventory));if(progress!=null)progress(result.Count,packages.Count,package.Name);}return result;
         }
         public static LibraryCheck Check(LibraryPackage package) { return Check(package, null); }
         private static LibraryCheck Check(LibraryPackage package, List<LibraryRegisteredProduct> inventory)

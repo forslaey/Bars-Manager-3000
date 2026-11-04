@@ -1,0 +1,21 @@
+using System;using System.Drawing;using System.Linq;using System.Reflection;using System.Runtime.InteropServices;using System.Collections.Generic;using System.Windows.Forms;
+namespace ServiceTool{static class ScrollAuditTests{
+[DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr h,int m,IntPtr wp,IntPtr lp);
+static int count;static void Check(bool ok,string text){count++;if(!ok)throw new Exception(text);}
+static IEnumerable<Control> Walk(Control p){foreach(Control c in p.Controls){yield return c;foreach(var x in Walk(c))yield return x;}}
+static void Wheel(Control c,int delta){SendMessage(c.Handle,0x20A,new IntPtr(delta<<16),IntPtr.Zero);}
+static void Pump(){for(int i=0;i<12;i++)Application.DoEvents();}
+[STAThread]static int Main(){try{Application.EnableVisualStyles();foreach(bool dark in new[]{true,false}){
+var forms=new Form[]{new MainForm(null,true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new DotNetUpdatesForm(()=>null),new InitialSystemSettingsForm(true),new ToolsDeploymentForm(true),new BundleDownloadForm(null),new ServiceProbeForm("Preview",true),new UserGuideForm(),new BundleDifferencesForm(Enumerable.Range(0,40).Select(i=>new[]{"Microsoft Visual C++ Runtime Package "+i+".exe","Отсутствует - будет скачано"}).ToArray()),new LibraryActionDialog(ThemePalette.Create(dark),null,new LibraryCheck[0])};
+foreach(var form in forms)using(form){var module=form as ManagerModuleForm;if(module!=null)module.SetTheme(dark,false);form.Show();Pump();
+foreach(var grid in Walk(form).OfType<ServiceGrid>()){Check(grid.TouchScrollingEnabled,"Touch enabled "+form.Text);if(grid.Rows.Count<4)continue;
+grid.Dock=DockStyle.None;grid.MaximumSize=new Size(0,grid.ColumnHeadersHeight+grid.Rows[0].Height*2);grid.Height=grid.MaximumSize.Height;grid.FirstDisplayedScrollingRowIndex=0;
+string chosen=String.Join("|",grid.Rows.Cast<DataGridViewRow>().Select(r=>Convert.ToString(r.Cells[0].Value)));Wheel(grid,-120);Check(grid.FirstDisplayedScrollingRowIndex>0,"Native wheel on grid "+form.Text);Check(chosen==String.Join("|",grid.Rows.Cast<DataGridViewRow>().Select(r=>Convert.ToString(r.Cells[0].Value))),"Wheel does not toggle rows "+form.Text);grid.FirstDisplayedScrollingRowIndex=0;grid.TouchPan(new Point(20,120),true,false);grid.TouchPan(new Point(20,0),false,true);Check(grid.FirstDisplayedScrollingRowIndex>0,"Pan scrolls module grid "+form.Text);Check(chosen==String.Join("|",grid.Rows.Cast<DataGridViewRow>().Select(r=>Convert.ToString(r.Cells[0].Value))),"Pan preserves row values "+form.Text);}
+foreach(var journal in Walk(form).OfType<JournalTextBox>()){journal.Text=String.Join(Environment.NewLine,Enumerable.Range(0,200).Select(i=>"Строка журнала "+i));journal.ScrollToLine(0);Wheel(journal,-120);Check(journal.FirstVisibleLine>0,"Native wheel journal "+form.Text);}
+form.Close();}
+using(var form=new Form{ClientSize=new Size(400,180)}){var content=new Panel{MinimumSize=new Size(350,900)};var button=new Button{Text="Действие",Bounds=new Rectangle(10,80,120,40)};content.Controls.Add(button);var scroll=new FillContentPanel(content);form.Controls.Add(scroll);form.Show();Pump();
+Wheel(scroll,-120);Check(scroll.AutoScrollPosition.Y<0,"Overflow panel mouse wheel");scroll.AutoScrollPosition=Point.Empty;
+var handlers=(Dictionary<Control,TouchScrollSupport>)typeof(FillContentPanel).GetField("touchHandlers",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(scroll);var pan=handlers[button];int clicks=0;button.Click+=delegate{clicks++;};
+pan.TouchMouse(0x201,new Point(5,100),true);pan.Pan(new Point(5,100),true,false);pan.Pan(new Point(5,20),false,true);pan.TouchMouse(0x200,new Point(5,20),true);Check(pan.TouchMouse(0x202,new Point(5,20),true),"Overflow swipe consumes release");Check(scroll.AutoScrollPosition.Y<0&&clicks==0,"Overflow child swipe scrolls without action");form.Close();}
+}Console.WriteLine("PASS: "+count+" scroll audit checks: real wheel messages on module grids/journals, touch flags, overflow pan without accidental actions; both themes. Synthetic gestures, no physical touch.");return 0;}catch(Exception e){Console.Error.WriteLine(e);return 1;}}
+}}

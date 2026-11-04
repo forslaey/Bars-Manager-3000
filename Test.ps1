@@ -46,7 +46,7 @@ $taskUiSources += Join-Path $taskSource 'EmbeddedHelpers.cs'
 $taskUiSources += Join-Path $taskSource 'AssemblyInfo.cs'
 $taskUiSources += Join-Path $taskSource 'ApplicationStorage.cs'
 $taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
-$taskUiSources += Join-Path $taskSource 'SoftwarePackageStorage.cs'
+$taskUiSources += @('DownloadTransfer.cs','DownloadProgressView.cs','SoftwarePackageStorage.cs') | ForEach-Object { Join-Path $taskSource $_ }
 $taskUiSources += Join-Path $taskSource 'GuideSectionListBox.cs'
 $taskUiSources += Join-Path $taskSource 'TouchGrid.cs'
 $taskUiSources += @('BundleDownloadForm.cs','BundleReceipts.cs','BundleTransfer.cs','YandexBundleSource.cs') | ForEach-Object { Join-Path $taskSource $_ }
@@ -89,6 +89,7 @@ Invoke-TaskTests 'UiTests' 'ServiceTool.UiTests' ($taskUiSources + (Join-Path $t
 Invoke-TaskTests 'ThemeTests' 'ServiceTool.ThemeTests' ($taskUiSources + (Join-Path $taskTests 'ThemeTests.cs'))
 Invoke-TaskTests 'BrandInteractionTests' 'ServiceTool.BrandInteractionTests' ($taskUiSources + (Join-Path $taskTests 'BrandInteractionTests.cs'))
 Invoke-TaskTests 'LibraryManagerTests' 'ServiceTool.LibraryManagerTests' ($taskUiSources + (Join-Path $taskTests 'LibraryManagerTests.cs'))
+Invoke-TaskTests 'ProgressUiPolishTests' 'ServiceTool.ProgressUiPolishTests' ($taskUiSources + (Join-Path $taskTests 'ProgressUiPolishTests.cs'))
 Invoke-TaskTests 'UiPolishTests' 'ServiceTool.UiPolishTests' ($taskUiSources + (Join-Path $taskTests 'UiPolishTests.cs'))
 Invoke-TaskTests 'LibraryMaintenanceTests' 'ServiceTool.LibraryMaintenanceTests' ($taskUiSources + (Join-Path $taskTests 'LibraryMaintenanceTests.cs'))
 Invoke-TaskTests 'LibraryCancellationTests' 'ServiceTool.LibraryCancellationTests' ($taskUiSources + (Join-Path $taskTests 'LibraryCancellationTests.cs'))
@@ -102,7 +103,10 @@ Invoke-TaskTests 'RegressionTests' 'ServiceTool.RegressionTests' ($taskUiSources
 
 Invoke-TaskTests 'TouchGridTests' 'ServiceTool.TouchGridTests' ($taskUiSources + (Join-Path $taskTests 'TouchGridTests.cs'))
 Invoke-TaskTests 'BundleTests' 'ServiceTool.BundleTests' ($taskUiSources + (Join-Path $taskTests 'BundleTests.cs'))
+Invoke-TaskTests 'OpeningProgressTests' 'ServiceTool.OpeningProgressTests' ($taskUiSources + (Join-Path $taskTests 'OpeningProgressTests.cs'))
+Invoke-TaskTests 'DownloadProgressTests' 'ServiceTool.DownloadProgressTests' ($taskUiSources + (Join-Path $taskTests 'DownloadProgressTests.cs'))
 Invoke-TaskTests 'BundleTransportTests' 'ServiceTool.BundleTransportTests' ($taskUiSources + (Join-Path $taskTests 'BundleTransportTests.cs'))
+Invoke-TaskTests 'ScrollAuditTests' 'ServiceTool.ScrollAuditTests' ($taskUiSources + (Join-Path $taskTests 'ScrollAuditTests.cs'))
 Invoke-TaskTests 'TouchTextTests' 'ServiceTool.TouchTextTests' ($taskUiSources + (Join-Path $taskTests 'TouchTextTests.cs'))
 Invoke-TaskTests 'LibraryJournalTests' 'ServiceTool.LibraryJournalTests' ($taskUiSources + (Join-Path $taskTests 'LibraryJournalTests.cs'))
 

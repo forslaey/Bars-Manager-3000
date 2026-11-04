@@ -467,7 +467,7 @@ namespace ServiceTool
             servicesGrid.Dock = DockStyle.Fill;
             servicesGrid.BackgroundColor = Color.White;
             servicesGrid.BorderStyle = BorderStyle.None;
-            servicesGrid.ReadOnly = true;
+            servicesGrid.ReadOnly = true;((ServiceGrid)servicesGrid).TouchScrollingEnabled=true;
             servicesGrid.AllowUserToAddRows = false;
             servicesGrid.AllowUserToDeleteRows = false;
             servicesGrid.AllowUserToResizeRows = false;
@@ -869,7 +869,7 @@ namespace ServiceTool
             TextRenderer.DrawText(e.Graphics, Convert.ToString(startupCombo.Items[e.Index]), startupCombo.Font,
                 new Rectangle(e.Bounds.X + 7, e.Bounds.Y, Math.Max(1, e.Bounds.Width - 12), e.Bounds.Height), foreground,
                 TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
-            if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();
+
         }
 
         private ServiceEntry SelectedService()

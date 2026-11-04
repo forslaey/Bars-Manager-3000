@@ -13,6 +13,7 @@ namespace ServiceTool
         protected readonly BufferedLayoutPanel Body;
         protected readonly Label Activity;
         protected readonly BrandButton Back;
+        protected DownloadProgressView OperationView;
         protected bool Busy;
         protected bool Scanning;
         protected LibrarySession Session;
@@ -47,17 +48,18 @@ namespace ServiceTool
         protected virtual void Progress(string text)
         {
             if (IsDisposed || !IsHandleCreated) return;
-            try { BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) Activity.Text = text; }); } catch (InvalidOperationException) { }
+            long revision=OperationView==null?0:OperationView.OperationRevision;
+            try { BeginInvoke((MethodInvoker)delegate { if (!IsDisposed&&Busy&&(OperationView==null||OperationView.OperationRevision==revision)) Activity.Text = text; }); } catch (InvalidOperationException) { }
         }
         protected async Task<LibraryInstallResult> Execute(string action, string data, string path)
         {
             using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => CancelRequested)))
-            { Session = session; try { return await Task.Run(() => session.ExecuteSystem(action, data, path, Progress)); } finally { Session = null; } }
+            { Session = session; try { return await Task.Run(() => session.ExecuteSystem(action, data, path, CaptureProgress())); } finally { Session = null; } }
         }
         // Runs several privileged actions inside one elevation prompt.
         protected async Task<List<LibraryInstallResult>> ExecuteAll(IList<string[]> steps, Action<LibraryInstallResult> completed = null)
         {
-            var results = new List<LibraryInstallResult>();
+            var results = new List<LibraryInstallResult>();if(OperationView!=null)OperationView.SetWork(steps.Count);
             using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => CancelRequested)))
             {
                 Session = session;
@@ -65,8 +67,8 @@ namespace ServiceTool
                 {
                     foreach (var step in steps)
                     {
-                        var result = await Task.Run(() => session.ExecuteSystem(step[0], step[1], step[2], Progress));
-                        results.Add(result);
+                        var result = await Task.Run(() => session.ExecuteSystem(step[0], step[1], step[2], CaptureProgress()));
+                        results.Add(result);if(OperationView!=null&&LibraryPlan.Success(result.ExitCode))OperationView.CompleteStep();
                         if (completed != null) completed(result);
                     }
                 }
@@ -74,7 +76,9 @@ namespace ServiceTool
             }
             return results;
         }
-        protected void Failure(Exception ex) { Activity.Text = "Не выполнено"; BrandMessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        Action<string> CaptureProgress(){long revision=OperationView==null?0:OperationView.OperationRevision;var report=OperationView==null?(Action<string>)(text=>{}):OperationView.OperationReporter;return text=>{if(OperationView!=null&&OperationView.OperationRevision!=revision)return;report(text);Progress(OperationView==null?text:OperationView.Snapshot.Stage);};}
+        protected override void OnThemeChanged(){base.OnThemeChanged();if(OperationView!=null){OperationView.Palette=Colors;OperationView.Invalidate();}}
+        protected void Failure(Exception ex) { Activity.Text = "Не выполнено"; if(OperationView!=null)OperationView.FinishOperation("Не выполнено: "+ex.Message,failed:true);BrandMessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         protected async Task Restart()
         {
             await RestartOffer.Show(this);
@@ -249,12 +253,16 @@ namespace ServiceTool
             deploy=Button("Установить",true);deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
             remove=Button("Удалить",false);remove.Destructive=false;remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,1,0);actions.Layout+=delegate{int gap=(int)Math.Round(10F*actions.Font.Height/16F);int width=Math.Max(1,(actions.ClientSize.Width-gap)/2);foreach(var button in new[]{deploy,remove}){button.Dock=DockStyle.None;button.Anchor=AnchorStyles.Top|AnchorStyles.Left;button.Margin=Padding.Empty;button.Size=new Size(width,actions.ClientSize.Height);}deploy.Location=Point.Empty;actions.ColumnStyles[0].SizeType=SizeType.Absolute;actions.ColumnStyles[0].Width=actions.ClientSize.Width-width;actions.ColumnStyles[1].SizeType=SizeType.Absolute;actions.ColumnStyles[1].Width=width;remove.Location=new Point(actions.ClientSize.Width-width,0);};Body.Controls.Add(actions,0,2);
             if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=ex.Message;}
-            LimitContent(new Size(520, 500));
+            OperationView=new DownloadProgressView();
+            var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Body.SetRow(actions,3);Body.RowCount=5;Body.RowStyles.Insert(2,new RowStyle(SizeType.Absolute,112));
+            OperationView.Dock=DockStyle.Fill;OperationView.Margin=new Padding(0,8,0,8);Body.Controls.Add(OperationView,0,2);
+            MinimumSize=SizeFromClientSize(new Size(520,612));ClientSize=new Size(520,612);
+            LimitContent(new Size(520, 612));
             SetTheme(Colors.Dark,false);
         }
-        protected override void OnThemeChanged(){shortcuts.Palette=Colors;}
+        protected override void OnThemeChanged(){base.OnThemeChanged();shortcuts.Palette=Colors;}
         private void Lock(bool busy)
-        {Busy=busy;chooseSource.Enabled=chooseTarget.Enabled=deploy.Enabled=remove.Enabled=destination.Enabled=shortcuts.Enabled=Back.Enabled=!busy;}
+        {if(busy)OperationView.BeginOperation("Подготавливаем распаковку или удаление…",true,3);else if(OperationView.Snapshot.Active)OperationView.FinishOperation(Activity.Text,success:true);Busy=busy;chooseSource.Enabled=chooseTarget.Enabled=deploy.Enabled=remove.Enabled=destination.Enabled=shortcuts.Enabled=Back.Enabled=!busy;}
         private bool Choose()
         {
             using(var dialog=new FolderBrowserDialog {Description="Выбери папку _tools или папку Библиотеки",ShowNewFolderButton=false})
@@ -277,9 +285,9 @@ namespace ServiceTool
             try
             {
                 var result=await Execute("tools-deploy",source,target);if(result.ExitCode!=0)throw new IOException(result.Message);
-                ToolsDeployment.EnableAdministratorLaunch(source,target);
+                OperationView.CompleteStep();ToolsDeployment.EnableAdministratorLaunch(source,target);OperationView.CompleteStep();
                 ToolsDeployment.ShortcutsAt(source,target,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),shortcuts.Checked);
-                Activity.Text=shortcuts.Checked?"Утилиты установлены, ярлыки созданы":"Утилиты установлены без создания ярлыков";
+                OperationView.CompleteStep();Activity.Text=shortcuts.Checked?"Утилиты установлены, ярлыки созданы":"Утилиты установлены без создания ярлыков";
             }
             catch(Exception ex){Failure(ex);}finally{Lock(false);}
         }
@@ -298,7 +306,7 @@ namespace ServiceTool
             try
             {
                 var result=await Execute("tools-remove",String.Join("\n",tools.Select(t=>t.Directory)),target);if(result.ExitCode!=0)throw new IOException(result.Message);
-                ToolsDeployment.RemoveReferences(target,tools,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));Activity.Text="Утилиты и их ярлыки удалены";
+                OperationView.CompleteStep();ToolsDeployment.RemoveReferences(target,tools,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));OperationView.CompleteStep();OperationView.CompleteStep();Activity.Text="Утилиты и их ярлыки удалены";
             }
             catch(Exception ex){Failure(ex);}finally{Lock(false);}
         }

@@ -12,6 +12,7 @@ namespace ServiceTool
     {
         readonly Control target;
         readonly Action<int> scroll;
+        readonly bool panInScreenCoordinates;
         bool down, moved, panning, replaying;
         Point start, last;
         IntPtr downPosition;
@@ -27,9 +28,9 @@ namespace ServiceTool
         [DllImport("user32.dll")] static extern IntPtr GetMessageExtraInfo();
         [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wParam,IntPtr lParam);
 
-        internal TouchScrollSupport(Control target, Action<int> scroll)
+        internal TouchScrollSupport(Control target, Action<int> scroll,bool panInScreenCoordinates=false)
         {
-            this.target=target;this.scroll=scroll;
+            this.target=target;this.scroll=scroll;this.panInScreenCoordinates=panInScreenCoordinates;
             target.HandleCreated+=delegate { Attach(); };
             target.HandleDestroyed+=delegate { Reset(); if(Handle!=IntPtr.Zero)ReleaseHandle(); };
             target.SizeChanged+=delegate { Reset(); };
@@ -84,7 +85,7 @@ namespace ServiceTool
                     var info=new Info {Size=(uint)Marshal.SizeOf(typeof(Info))};
                     if(GetGestureInfo(message.LParam,ref info)&&(info.Id==1||info.Id==2||info.Id==4))
                     {
-                        try { if(info.Id==4)Pan(target.PointToClient(new Point(info.X,info.Y)),(info.Flags&1)!=0,(info.Flags&4)!=0);if(info.Id==2)panning=false; }
+                        try { if(info.Id==4)Pan(panInScreenCoordinates?new Point(info.X,info.Y):target.PointToClient(new Point(info.X,info.Y)),(info.Flags&1)!=0,(info.Flags&4)!=0);if(info.Id==2)panning=false; }
                         finally { CloseGestureInfoHandle(message.LParam); }
                         message.Result=IntPtr.Zero;return;
                     }

@@ -553,8 +553,9 @@ namespace ServiceTool
     // Keep the native popup and keyboard behavior with a palette-aware border.
     internal sealed class BrandComboBox : ComboBox
     {
+        private readonly PopupFrame popupFrame;
         public ThemePalette Palette;
-        public bool HoverHighlight = true;
+        public bool HoverHighlight = false;
         private bool hovered;
         private const int WM_PAINT = 0x000F;
         private const int WM_PRINT = 0x0317;
@@ -584,16 +585,23 @@ namespace ServiceTool
 
         public BrandComboBox()
         {
-            SetStyle(ControlStyles.ResizeRedraw, true);
+            popupFrame=new PopupFrame(this);
+            SetStyle(ControlStyles.ResizeRedraw|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer, true);FlatStyle=FlatStyle.Flat;
         }
 
-        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e);if(!HoverHighlight)SetWindowTheme(Handle,String.Empty,String.Empty); }
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e);SetWindowTheme(Handle,String.Empty,String.Empty); }
         protected override void OnMouseEnter(EventArgs e) { hovered = true;if(HoverHighlight)Invalidate();base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hovered = false;if(HoverHighlight)Invalidate();base.OnMouseLeave(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
         protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
         protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
-        protected override void OnDropDown(EventArgs e) { Invalidate(); base.OnDropDown(e); }
+        protected override void OnDropDown(EventArgs e) {
+            base.OnDropDown(e);
+            var info=new ComboBoxInformation();info.Size=System.Runtime.InteropServices.Marshal.SizeOf(typeof(ComboBoxInformation));
+            if(GetComboBoxInfo(Handle,ref info)&&info.ListHandle!=IntPtr.Zero){SetWindowTheme(info.ListHandle,String.Empty,String.Empty);popupFrame.Bind(info.ListHandle);}
+            Invalidate();
+        }
+        protected override void OnHandleDestroyed(EventArgs e){if(popupFrame!=null)popupFrame.Detach();base.OnHandleDestroyed(e);}
         protected override void OnDropDownClosed(EventArgs e) { Invalidate(); base.OnDropDownClosed(e); }
 
         protected override void WndProc(ref Message message)
@@ -615,16 +623,16 @@ namespace ServiceTool
             if (ClientSize.Width < 4 || ClientSize.Height < 4) return;
             ThemePalette p = Palette;
             Rectangle button = DropDownButtonRectangle();
-              if(!HoverHighlight)
+              if(DropDownStyle==ComboBoxStyle.DropDownList)
               {
                   Color surface=Enabled?p.SurfaceAlt:p.DisabledSurface;
                   using(Brush brush=new SolidBrush(surface))graphics.FillRectangle(brush,ClientRectangle);
                   TextRenderer.DrawText(graphics,Text,Font,new Rectangle(7,1,Math.Max(1,button.Left-12),ClientSize.Height-2),Enabled?p.Text:p.DisabledText,
-                      TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix|TextFormatFlags.EndEllipsis);
+                      TextFormatFlags.VerticalCenter|TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix|TextFormatFlags.EndEllipsis|TextFormatFlags.PreserveGraphicsTranslateTransform);
               }
             Rectangle inner = new Rectangle(1, 1, ClientSize.Width - 2, ClientSize.Height - 2);
             Rectangle fill = Rectangle.Intersect(inner, Rectangle.FromLTRB(button.Left - 1, 1, button.Right + 1, ClientSize.Height - 1));
-            bool highlighted=(HoverHighlight&&hovered)||DroppedDown;
+            bool highlighted=HoverHighlight&&hovered;
             Color background = !Enabled ? p.DisabledSurface : (highlighted ? p.Selection : p.SurfaceAlt);
             Color foreground = !Enabled ? p.DisabledText : (highlighted ? p.SelectionText : p.Text);
             using (Brush brush = new SolidBrush(background)) graphics.FillRectangle(brush, fill);
@@ -642,10 +650,28 @@ namespace ServiceTool
             graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             using (Brush brush = new SolidBrush(foreground)) graphics.FillPolygon(brush, arrow);
             graphics.SmoothingMode = previous;
-            using (Pen pen = new Pen(Enabled && Focused ? p.Accent : p.Border))
+            using (Pen pen = new Pen(p.Border))
                 graphics.DrawRectangle(pen, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
         }
 
+        // Native popup borders do not inherit owner-drawn item colours. Paint the
+        // popup's non-client frame in the same palette as the closed field.
+        private sealed class PopupFrame:NativeWindow
+        {
+            readonly BrandComboBox owner;
+            [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr GetWindowDC(IntPtr h);
+            [System.Runtime.InteropServices.DllImport("user32.dll")]static extern int ReleaseDC(IntPtr h,IntPtr dc);
+            [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool GetWindowRect(IntPtr h,out NativeRectangle rect);
+            internal PopupFrame(BrandComboBox owner){this.owner=owner;}
+            internal void Bind(IntPtr handle){if(Handle==handle)return;Detach();AssignHandle(handle);}
+            internal void Detach(){if(Handle!=IntPtr.Zero)ReleaseHandle();}
+            protected override void WndProc(ref Message m){base.WndProc(ref m);if((m.Msg==0x85||m.Msg==0xF||m.Msg==0x86)&&owner.Palette!=null&&Handle!=IntPtr.Zero){
+                NativeRectangle rect;if(!GetWindowRect(Handle,out rect))return;int width=rect.Right-rect.Left,height=rect.Bottom-rect.Top;if(width<6||height<6)return;
+                IntPtr dc=GetWindowDC(Handle);if(dc==IntPtr.Zero)return;try{using(var graphics=Graphics.FromHdc(dc))using(var brush=new SolidBrush(owner.Palette.SurfaceAlt))using(var pen=new Pen(owner.Palette.Border)){
+                    graphics.FillRectangle(brush,0,0,width,2);graphics.FillRectangle(brush,0,height-2,width,2);graphics.FillRectangle(brush,0,0,2,height);graphics.FillRectangle(brush,width-2,0,2,height);graphics.DrawRectangle(pen,0,0,width-1,height-1);
+                }}finally{ReleaseDC(Handle,dc);}
+            }}
+        }
         private Rectangle DropDownButtonRectangle()
         {
             ComboBoxInformation information = new ComboBoxInformation();

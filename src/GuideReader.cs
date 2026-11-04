@@ -60,6 +60,6 @@ namespace ServiceTool
         protected override void OnMouseDown(MouseEventArgs e){base.OnMouseDown(e);if(e.Button!=MouseButtons.Left||list==null||Thumb.IsEmpty)return;var thumb=Thumb;if(thumb.Contains(e.Location)){dragging=true;offset=e.Y-thumb.Top;Capture=true;}else list.TopIndex=Math.Max(0,Math.Min(list.Items.Count-1,list.TopIndex+(e.Y<thumb.Top?-1:1)*VisibleItems));Invalidate();}
         protected override void OnMouseMove(MouseEventArgs e){base.OnMouseMove(e);if(dragging&&list!=null){int travel=Math.Max(1,Height-12-Thumb.Height);list.TopIndex=Math.Max(0,Math.Min(Maximum,(e.Y-offset-6)*Maximum/travel));Invalidate();}}
         protected override void OnMouseUp(MouseEventArgs e){base.OnMouseUp(e);dragging=false;Capture=false;Invalidate();}
-        protected override void OnMouseWheel(MouseEventArgs e){base.OnMouseWheel(e);if(list!=null){list.TopIndex=Math.Max(0,Math.Min(Maximum,list.TopIndex-Math.Sign(e.Delta)*3));Invalidate();}}
+        protected override void OnMouseWheel(MouseEventArgs e){base.OnMouseWheel(e);if(list!=null){list.ScrollWheel(e.Delta);Invalidate();}}
     }
 }

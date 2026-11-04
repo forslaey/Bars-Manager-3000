@@ -72,7 +72,7 @@ namespace ServiceTool
         {
             var items = selected.ToList();
             if (items.Any(c => c.Relation == LibraryRelation.Older)) return "Обновить выбранные";
-            if (items.Any(CanRemove)) return "Переустановить/удалить выбранные";
+            if (items.Any(CanRemove)) return "Действия с выбранными";
             if (items.Count > 0 && items.All(c => c.State == LibraryState.Unknown || c.State == LibraryState.NotApplicable)) return "Проверить выбранные";
             return "Установить выбранные";
         }

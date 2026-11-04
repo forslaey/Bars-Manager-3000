@@ -93,11 +93,12 @@ namespace ServiceTool
             try
             {
                 Directory.CreateDirectory(stage);
+                long[] work=new long[]{0,1+(Directory.Exists(target)?CountWork(target):0)+tools.Sum(tool=>CountWork(Path.Combine(source,tool.Directory)))};
                 // Existing settings and other tools remain intact; save the whole old tree on replacement.
-                if (Directory.Exists(target)) CopyTree(target, stage, false, progress, cancelled);
+                if (Directory.Exists(target)) CopyTree(target, stage, false, progress, cancelled,work);
                 foreach (var tool in tools)
                 {
-                    CopyTree(Path.Combine(source, tool.Directory), Path.Combine(stage, tool.Directory), true, progress, cancelled);
+                    CopyTree(Path.Combine(source, tool.Directory), Path.Combine(stage, tool.Directory), true, progress, cancelled,work);
                     string ini = Path.Combine(stage, tool.Directory, "desktop.ini");
                     if (File.Exists(ini)) File.SetAttributes(ini, FileAttributes.Normal);
                     File.WriteAllText(ini, "[.ShellClassInfo]\r\nIconResource=" + Path.Combine(target, tool.Directory, tool.Executable) + ",0\r\n", Encoding.Unicode);
@@ -108,6 +109,7 @@ namespace ServiceTool
                 if (Directory.Exists(target)) { Directory.Move(target, backup); moved = true; }
                 try { Directory.Move(stage, target); published = true; }
                 catch { if (moved && !Directory.Exists(target)) Directory.Move(backup, target); throw; }
+                progress("BARS_FRACTION|"+work[1]+"|"+work[1]+"|Файлы скопированы и сохранены");
                 progress("Скопировано: " + target + (moved ? ". Предыдущая версия: " + backup : ""));
             }
             finally
@@ -118,13 +120,15 @@ namespace ServiceTool
         }
         private static bool IsSetting(string file)
         { return new[] { ".ini", ".config", ".json", ".xml", ".settings", ".cst" }.Contains(Path.GetExtension(file).ToLowerInvariant()) && !Path.GetFileName(file).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase); }
-        private static void CopyTree(string source, string target, bool preserveSettings, Action<string> progress, Func<bool> cancelled)
+        private static long CountWork(string source){SafePath(source);long count=Directory.GetFiles(source).Length;foreach(string child in Directory.GetDirectories(source))count+=CountWork(child);return count;}
+        private static void FileProcessed(long[] work,string file,Action<string> progress){if(work!=null)progress("BARS_FRACTION|"+(++work[0])+"|"+work[1]+"|Обработан файл: "+Path.GetFileName(file));}
+        private static void CopyTree(string source, string target, bool preserveSettings, Action<string> progress, Func<bool> cancelled,long[] work=null)
         {
             LibraryCancellation.Check(cancelled); SafePath(source); Directory.CreateDirectory(target);
             foreach (string file in Directory.GetFiles(source))
             {
                 LibraryCancellation.Check(cancelled); SafePath(file); string destination = Path.Combine(target, Path.GetFileName(file));
-                if (preserveSettings && IsSetting(file) && File.Exists(destination)) continue;
+                if (preserveSettings && IsSetting(file) && File.Exists(destination)){FileProcessed(work,file,progress);continue;}
                 progress("Копируем: " + Path.GetFileName(file));
                 if (File.Exists(destination)) File.SetAttributes(destination, FileAttributes.Normal);
                 using (var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -134,8 +138,9 @@ namespace ServiceTool
                     while ((count = input.Read(buffer, 0, buffer.Length)) > 0) { LibraryCancellation.Check(cancelled); output.Write(buffer, 0, count); }
                     output.Flush(true);
                 }
+                FileProcessed(work,file,progress);
             }
-            foreach (string directory in Directory.GetDirectories(source)) CopyTree(directory, Path.Combine(target, Path.GetFileName(directory)), preserveSettings, progress, cancelled);
+            foreach (string directory in Directory.GetDirectories(source)) CopyTree(directory, Path.Combine(target, Path.GetFileName(directory)), preserveSettings, progress, cancelled,work);
         }
         private static void DeleteStage(string directory)
         {

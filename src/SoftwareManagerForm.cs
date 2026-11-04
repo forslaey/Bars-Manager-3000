@@ -21,6 +21,7 @@ namespace ServiceTool
         private readonly BrandTextBox sourceLabel;
         private readonly Label activity;
         private readonly BrandButton refresh,install,cancel,folderButton,back,associations,remove,access;
+        private readonly DownloadProgressView transfer=new DownloadProgressView{Dock=DockStyle.Fill,Margin=new Padding(0,8,0,8)};
         private readonly JournalTextBox journal=new JournalTextBox();
         private readonly bool preview;
         private readonly Func<string,SoftwarePackage> latestSource;
@@ -31,7 +32,7 @@ namespace ServiceTool
         internal bool MenuRequested {get;private set;}
         internal override void ResumeSession() { MenuRequested=false; closeAfter=false; base.ResumeSession(); }
         internal SoftwareManagerForm(bool previewMode) : this(previewMode,SoftwareSources.Latest) {}
-        internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,780))
+        internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,880))
         {
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
             FormBorderStyle=FormBorderStyle.FixedSingle;preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
@@ -82,8 +83,9 @@ namespace ServiceTool
             // Navigation and the journal stay outside the scrolling work area.
             // Only unusually short screens or large text require scrolling it.
             body.RowCount=4;while(body.RowStyles.Count>4)body.RowStyles.RemoveAt(body.RowStyles.Count-1);body.MinimumSize=new Size(0,440);
-            var outer=new CompactJournalLayout(body,1,grid,logCard,footer,64,54);Root.Controls.Add(outer,0,1);
-            try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){Log(ex.Message);}
+            var journalArea=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};journalArea.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));journalArea.RowStyles.Add(new RowStyle(SizeType.Absolute,112));journalArea.RowStyles.Add(new RowStyle(SizeType.Percent,100));journalArea.Controls.Add(transfer,0,0);journalArea.Controls.Add(logCard,0,1);
+            var outer=new CompactJournalLayout(body,1,grid,journalArea,footer,176,54);Root.Controls.Add(outer,0,1);
+            try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){transfer.Stage("Не выполнено: "+ex.Message,failed:true);Log(ex.Message);}
             SetTheme(Colors.Dark,false);
             UpdateRows();
             Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else {if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){string root=BundleDownloadForm.Offer(this,null);if(!String.IsNullOrEmpty(root))source=SoftwarePackageStorage.Folder(root);}await RefreshPackages();}grid.PerformLayout();body.PerformLayout();};
@@ -159,14 +161,14 @@ namespace ServiceTool
         }
         protected override void OnThemeChanged()
         {
-            remote.Palette=Colors;journal.BackColor=Colors.Surface;journal.ForeColor=Colors.Text;
+            transfer.Palette=Colors;transfer.Invalidate();remote.Palette=Colors;journal.BackColor=Colors.Surface;journal.ForeColor=Colors.Text;
             gridScroll.Palette=Colors;gridScroll.BackColor=Colors.Canvas;grid.BackgroundColor=Colors.Canvas;grid.GridColor=Colors.Border;
             grid.DefaultCellStyle.BackColor=Colors.Surface;grid.DefaultCellStyle.ForeColor=Colors.Text;grid.DefaultCellStyle.SelectionBackColor=Colors.Selection;grid.DefaultCellStyle.SelectionForeColor=Colors.SelectionText;
             grid.ColumnHeadersDefaultCellStyle.BackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.ForeColor=Colors.Text;grid.ColumnHeadersDefaultCellStyle.SelectionBackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.SelectionForeColor=Colors.Text;
             grid.Invalidate();
         }
         private void Log(string text){if(IsDisposed)return;journal.AppendText(DateTime.Now.ToString("HH:mm:ss")+"  "+text+Environment.NewLine);}
-        private void Progress(string text){if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((MethodInvoker)delegate{if(!IsDisposed)activity.Text=text;});}catch(InvalidOperationException){}}
+        private void Progress(string text){if(busy&&!checking&&!transfer.Snapshot.Complete&&!transfer.Snapshot.Failed)transfer.Stage(text);if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((MethodInvoker)delegate{if(!IsDisposed&&busy&&!transfer.Snapshot.Complete&&!transfer.Snapshot.Failed)activity.Text=text;});}catch(InvalidOperationException){}}
         private void LogProgress(string text){Progress(text);if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((MethodInvoker)delegate{Log(text);});}catch(InvalidOperationException){}}
         private bool ChooseSource()
         {
@@ -180,18 +182,19 @@ namespace ServiceTool
         private void RequestCancel(bool close){closeAfter|=close;cancelled=true;cancel.Enabled=false;if(session!=null)session.Cancel();activity.Text="Отменяем операцию…";}
         private void Lock(bool value)
         {
+            if(value){if(checking)transfer.BeginOperation("Проверяем список программ…",false);else transfer.BeginOperation("Подготавливаем операцию…");}
             busy=value;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=remote.Enabled=!value;cancel.Enabled=value;
 
             back.Enabled=!value||checking;
-            if(!value&&!IsDisposed){UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
+            if(!value&&!IsDisposed){if(transfer.Snapshot.Active)transfer.FinishOperation(cancelled?"Операция отменена":"Операция остановлена. Результат — в журнале.");if(transfer.Snapshot.Complete||transfer.Snapshot.Failed)activity.Text=transfer.Snapshot.Stage;UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
         }
         private async Task RefreshPackages(bool resolveUnknownVersion=false)
         {
-            if(busy||preview)return;bool allowAny=true;checking=true;cancelled=false;Lock(true);sourceLabel.Text=source??"Папка не выбрана";
+            if(busy||preview)return;bool allowAny=true;checking=true;cancelled=false;Lock(true);if(resolveUnknownVersion)transfer.BeginOperation("Проверяем программы и версии…",true,SoftwareCatalog.Apps.Length*2+1);bool scanSucceeded=false;sourceLabel.Text=source??"Папка не выбрана";
             try
             {
                 offline.Clear();packages.Clear();checks.Clear();selection.Clear();UpdateRows();
-                var installed=await Task.Run(()=>SoftwareCatalog.Apps.Select(app=>SoftwareDetection.Check(app.Id,allowAny)).ToArray());
+                var installed=await Task.Run(()=>SoftwareCatalog.Apps.Select(app=>{var found=SoftwareDetection.Check(app.Id,allowAny);if(resolveUnknownVersion)transfer.CompleteStep();return found;}).ToArray());
                 if(cancelled||IsDisposed)return;foreach(var check in installed)checks[check.Id]=check;
                 UpdateRows();
                 if(checks.Values.Any(c=>c.State==LibraryState.Unknown && c.Detail.Contains("доступ")))
@@ -200,20 +203,20 @@ namespace ServiceTool
                     using(var elevated=await Task.Run(()=>LibrarySession.Start(()=>cancelled))){session=elevated;var snapshot=await Task.Run(()=>elevated.ExecuteSystem("software-query",allowAny?"allow-anydesk32":"x64-only","",Progress));if(snapshot.ExitCode!=0)throw new InvalidOperationException(snapshot.Message);if(cancelled||IsDisposed)return;foreach(var check in SoftwareDetection.ParseQuery(snapshot.Message))checks[check.Id]=check;session=null;}
                 }
                 var local=await Task.Run(()=>{LibraryCancellation.Current=()=>cancelled; try {var list=SoftwareCatalog.Local(source,Progress,"Локальный _soft",resolveUnknownVersion);if(Directory.Exists(SoftwareSources.CacheFolder))foreach(string folder in Directory.GetDirectories(SoftwareSources.CacheFolder))list.AddRange(SoftwareCatalog.Local(folder,Progress,"Кэш менеджера",resolveUnknownVersion));return list;} finally {LibraryCancellation.Current=null;}});
-                if(cancelled||IsDisposed)return;foreach(var app in SoftwareCatalog.Apps){var candidate=SoftwareSources.Best(local,app.Id);if(candidate!=null){offline[app.Id]=candidate;packages[app.Id]=candidate;}}
+                if(resolveUnknownVersion)transfer.CompleteStep();if(cancelled||IsDisposed)return;foreach(var app in SoftwareCatalog.Apps){var candidate=SoftwareSources.Best(local,app.Id);if(candidate!=null){offline[app.Id]=candidate;packages[app.Id]=candidate;}}
                 UpdateRows();
                 var updates=resolveUnknownVersion ? await Task.WhenAll(SoftwareCatalog.Apps.Select(app=>Task.Run(()=>
                 {
                     LibraryCancellation.Current=()=>cancelled;
-                    try{return latestSource(app.Id);}catch(Exception ex){Progress(app.Name+": официальный источник недоступен. "+ex.Message);return null;}finally{LibraryCancellation.Current=null;}
+                    try{var found=latestSource(app.Id);if(found!=null)transfer.CompleteStep();return found;}catch(Exception ex){Progress(app.Name+": официальный источник недоступен. "+ex.Message);return null;}finally{LibraryCancellation.Current=null;}
                 }))) : new SoftwarePackage[0];
                 if(cancelled||IsDisposed)return;foreach(var candidate in updates.Where(p=>p!=null)){SoftwarePackage old;if(!packages.TryGetValue(candidate.Id,out old)||SoftwareCatalog.Compare(candidate.Version,old.Version)>=0)packages[candidate.Id]=candidate;}
                 if(cancelled)throw new OperationCanceledException();
                 selection.Clear();foreach(var app in SoftwareCatalog.Apps){if(packages.ContainsKey(app.Id)&&(checks[app.Id].State==LibraryState.Missing || checks[app.Id].State==LibraryState.Installed && packages[app.Id].Version!="0.0" && SoftwareCatalog.Compare(packages[app.Id].Version,checks[app.Id].Version)>0))selection.Add(app.Id);}
-                Log(resolveUnknownVersion&&updates.Any(u=>u==null)?"Проверка завершена. Официальный источник в сети недоступен, предлагается установка проверенных локальных копий программ.":"Проверка завершена.");activity.Text="Выбери программы и проверь источник установщиков";
+                scanSucceeded=true;Log(resolveUnknownVersion&&updates.Any(u=>u==null)?"Проверка завершена. Официальный источник в сети недоступен, предлагается установка проверенных локальных копий программ.":"Проверка завершена.");activity.Text="Выбери программы и проверь источник установщиков";
             }
             catch(OperationCanceledException){if(!IsDisposed)Log("Проверка отменена");}catch(Exception ex){if(!IsDisposed)Log("Проверка не завершена: "+ex.Message);}
-            finally{checking=false;if(!IsDisposed)Lock(false);}
+            finally{transfer.FinishOperation(cancelled?"Проверка отменена":scanSucceeded?"Проверка списка завершена. Выбери действие.":"Проверка не завершена — прочитай журнал",success:resolveUnknownVersion&&scanSucceeded&&transfer.WorkFinished,failed:!scanSucceeded&&!cancelled);checking=false;if(!IsDisposed)Lock(false);}
         }
         private void UpdateRows()
         {
@@ -242,20 +245,20 @@ namespace ServiceTool
         {
             if(busy||preview)return;string[] ids=ChosenInstalled(true);if(ids.Length==0)return;var secrets=new Dictionary<string,string>();
             foreach(string id in ids)using(var dialog=new SoftwareRemoteDialog(Colors,Icon,id)){if(dialog.ShowDialog(this)!=DialogResult.OK)return;secrets[id]=dialog.Password;}
-            cancelled=false;Lock(true);
+            cancelled=false;Lock(true);int completed=0;transfer.SetWork(ids.Length);
             try
             {
                 using(var active=await Task.Run(()=>LibrarySession.Start(()=>cancelled)))
                 {
-                    session=active;foreach(string id in ids){if(cancelled)throw new OperationCanceledException();var request=new SoftwareInstallRequest {Id=id,Version=checks[id].Version,Sha256="",AllowAnyDesk32=true,ConfigureRemote=true,Password=secrets[id]};var result=await Task.Run(()=>active.ExecuteSystem("software-access",request.Serialize(),"",Progress));Log(SoftwareCatalog.Find(id).Name+": "+result.Message);if(result.ExitCode!=0)break;}
+                    session=active;foreach(string id in ids){if(cancelled)throw new OperationCanceledException();var request=new SoftwareInstallRequest {Id=id,Version=checks[id].Version,Sha256="",AllowAnyDesk32=true,ConfigureRemote=true,Password=secrets[id]};var result=await Task.Run(()=>active.ExecuteSystem("software-access",request.Serialize(),"",Progress));Log(SoftwareCatalog.Find(id).Name+": "+result.Message);if(result.ExitCode!=0){transfer.FinishOperation(result.Message,failed:true);break;}completed++;transfer.CompleteStep();}
                 }
-            }catch(OperationCanceledException){Log("Настройка отменена");}catch(Exception ex){Log("Настройка прервана: "+ex.Message);}finally{session=null;secrets.Clear();Lock(false);}
+            }catch(OperationCanceledException){transfer.FinishOperation("Настройка отменена");Log("Настройка отменена");}catch(Exception ex){transfer.FinishOperation("Настройка прервана: "+ex.Message,failed:true);Log("Настройка прервана: "+ex.Message);}finally{if(!cancelled&&!transfer.Snapshot.Failed&&completed==ids.Length)transfer.FinishOperation("Настройка доступа завершена.",success:true);session=null;secrets.Clear();Lock(false);}
         }
         private async Task RemoveSelected()
         {
             if(busy||preview)return;string[] ids=ChosenInstalled();if(ids.Length==0)return;
             if(BrandMessageBox.Show(this,"Удалить программы и их настройки?\r\n"+String.Join("\r\n",ids.Select(id=>SoftwareCatalog.Find(id).Name))+"\r\n\r\nНастройки текущего пользователя и общие настройки будут очищены. Параметры удалённого доступа и ID могут сброситься. Текущий удалённый сеанс может прерваться. Документы не удаляются.","Удаление программ",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-            cancelled=false;Lock(true);bool reboot=false;
+            cancelled=false;Lock(true);transfer.Report(new TransferProgress{Stage="Подготавливаем очередь…"});bool reboot=false;int completed=0;transfer.SetWork(ids.Length);
             try
             {
                 using(var active=await Task.Run(()=>LibrarySession.Start(()=>cancelled)))
@@ -264,11 +267,11 @@ namespace ServiceTool
                     foreach(string id in ids)
                     {
                         if(cancelled)throw new OperationCanceledException();SoftwareMaintenance.PreserveUserDocuments(id,Log);var result=await Task.Run(()=>active.ExecuteSystem("software-remove",id,"",Progress));Log(SoftwareCatalog.Find(id).Name+": "+result.Message);
-                        if(result.Reboot){reboot=true;break;}if(result.ExitCode!=0||result.State!=LibraryState.Missing)break;
-                        try{SoftwareMaintenance.CleanupUser(id,Log);}finally{checks[id]=new SoftwareCheck {Id=id,Version="",Executable="",State=LibraryState.Missing,Detail="Не установлена"};selection.Remove(id);UpdateRows();}
+                        if(result.Reboot){transfer.FinishOperation("Для продолжения нужна перезагрузка.");reboot=true;break;}if(result.ExitCode!=0||result.State!=LibraryState.Missing){transfer.FinishOperation(result.Message,failed:true);break;}
+                        try{SoftwareMaintenance.CleanupUser(id,Log);}finally{checks[id]=new SoftwareCheck {Id=id,Version="",Executable="",State=LibraryState.Missing,Detail="Не установлена"};selection.Remove(id);UpdateRows();}completed++;transfer.CompleteStep();
                     }
                 }
-            }catch(OperationCanceledException){Log("Удаление отменено. Проверь состояние программ");}catch(Exception ex){Log("Удаление или очистка настроек не завершены: "+ex.Message);}finally{session=null;Lock(false);}
+            }catch(OperationCanceledException){transfer.FinishOperation("Удаление отменено. Проверь состояние программ");Log("Удаление отменено. Проверь состояние программ");}catch(Exception ex){transfer.FinishOperation("Удаление не завершено: "+ex.Message,failed:true);Log("Удаление или очистка настроек не завершены: "+ex.Message);}finally{if(!cancelled&&completed==ids.Length)transfer.FinishOperation("Удаление подтверждено.",success:true);session=null;Lock(false);}
             if(reboot&&!closeAfter)await RestartOffer.Show(this);
         }
         internal string InstallConfirmation(string[] ids)
@@ -287,19 +290,19 @@ namespace ServiceTool
             if(remote.Checked)foreach(string id in ids.Where(id=>SoftwareCatalog.Find(id).Remote))using(var dialog=new SoftwareRemoteDialog(Colors,Icon,id)) {if(dialog.ShowDialog(this)!=DialogResult.OK)return;secrets[id]=dialog.Password;}
             if(BrandMessageBox.Show(this,InstallConfirmation(ids),Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             cancelled=false;Lock(true);bool reboot=false;
-            var ready=new List<SoftwarePackage>();
+            transfer.SetWork(ids.Length*2);var ready=new List<SoftwarePackage>();
             try
             {
                 foreach(string id in ids)
                 {
                     if(cancelled)break;var package=packages[id];
                     var current=await Task.Run(()=>SoftwareDetection.Check(id,true));checks[id]=current;
-                    if(!SoftwareMaintenance.CanInstall(current,package)){Log(SoftwareCatalog.Find(id).Name+": установка не требуется или состояние требует проверки");UpdateRows();continue;}
+                    if(!SoftwareMaintenance.CanInstall(current,package)){if(current.State!=LibraryState.Installed)throw new IOException(SoftwareCatalog.Find(id).Name+": состояние требует проверки");Log(SoftwareCatalog.Find(id).Name+": установка не требуется или состояние требует проверки");UpdateRows();transfer.CompleteStep();transfer.CompleteStep();continue;}
                     SoftwarePackage cached;
                     if((!Path.IsPathRooted(package.File)||!File.Exists(package.File))&&offline.TryGetValue(id,out cached)&&SoftwareCatalog.Compare(cached.Version,package.Version)==0&&(String.IsNullOrEmpty(package.Sha256)||String.Equals(cached.Sha256,package.Sha256,StringComparison.OrdinalIgnoreCase)))package=cached;
                     if(!Path.IsPathRooted(package.File)||!File.Exists(package.File))
                     {
-                        try{package=await Task.Run(()=>SoftwarePackageStorage.Download(package,source,LogProgress,()=>cancelled));packages[id]=package;offline[id]=package;}
+                        try{package=await Task.Run(()=>SoftwarePackageStorage.Download(package,source,LogProgress,()=>cancelled,p=>{p.Stage+=" · файл "+(Array.IndexOf(ids,id)+1)+" из "+ids.Length;transfer.Report(p);}));packages[id]=package;offline[id]=package;}
                         catch(OperationCanceledException){throw;}
                         catch(Exception ex)
                         {
@@ -309,7 +312,7 @@ namespace ServiceTool
                         }
                     }
                     SoftwareCatalog.Validate(package,true);
-                    ready.Add(package);
+                    ready.Add(package);transfer.CompleteStep();
                 }
                 if(cancelled)throw new OperationCanceledException();
                 using(var active=await Task.Run(()=>LibrarySession.Start(()=>cancelled)))
@@ -319,14 +322,15 @@ namespace ServiceTool
                     {
                         if(cancelled){break;}string id=package.Id;
                         var request=new SoftwareInstallRequest {Id=id,Version=package.Version,Sha256=package.Sha256,AllowAnyDesk32=true,ConfigureRemote=secrets.ContainsKey(id),Password=secrets.ContainsKey(id)?secrets[id]:""};
+                        transfer.Report(new TransferProgress{Stage="Устанавливаем "+SoftwareCatalog.Find(id).Name,File=Path.GetFileName(package.File)});
                         var result=await Task.Run(()=>active.ExecuteSystem("software-install",request.Serialize(),package.File,Progress));
-                        Log(SoftwareCatalog.Find(id).Name+": "+result.Message);bool allow=true;checks[id]=await Task.Run(()=>SoftwareDetection.Check(id,allow));UpdateRows();
+                        if(LibraryPlan.Success(result.ExitCode)&&result.State==LibraryState.Installed)transfer.CompleteStep();else transfer.FinishOperation(result.Message,failed:true);Log(SoftwareCatalog.Find(id).Name+": "+result.Message);bool allow=true;checks[id]=await Task.Run(()=>SoftwareDetection.Check(id,allow));UpdateRows();
                         if(result.Reboot){reboot=true;break;}if(!LibraryPlan.Success(result.ExitCode)||result.State!=LibraryState.Installed){break;}
                     }
                 }
             }
-            catch(OperationCanceledException){Log("Отменено. Проверь программы перед повтором");}catch(Exception ex){Log("Очередь остановлена: "+ex.Message);}
-            finally{session=null;Lock(false);secrets.Clear();}
+            catch(OperationCanceledException){transfer.Stage("Операция отменена");Log("Отменено. Проверь программы перед повтором");}catch(Exception ex){transfer.Stage("Очередь остановлена: "+ex.Message,failed:true);Log("Очередь остановлена: "+ex.Message);}
+            finally{session=null;if(!cancelled&&transfer.WorkFinished&&!transfer.Snapshot.Failed)transfer.FinishOperation("Очередь выполнена. Установка подтверждена.",success:true);var state=transfer.Snapshot;if(state.Active&&!state.Complete&&!state.Failed)transfer.Report(new TransferProgress{Stage="Очередь завершена. Результат — в журнале.",Active=false});Lock(false);secrets.Clear();}
             if(reboot&&!closeAfter)await RestartOffer.Show(this);
         }
         private void OpenDefaultApps()

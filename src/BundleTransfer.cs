@@ -30,7 +30,7 @@ namespace ServiceTool
                 {
                     if(attempt>=3)throw;
                     if(stage!=null)stage("Ожидание повтора");
-                    if(token.WaitHandle.WaitOne((1<<attempt)*1000))token.ThrowIfCancellationRequested();
+                    WaitRetry((1<<attempt)*1000,token,stage,"Соединение прервано");
                 }
                 catch(WebException ex)
                 {
@@ -44,8 +44,17 @@ namespace ServiceTool
                     if(response!=null)response.Dispose();
                     if(!transient||attempt>=3)throw;
                     if(stage!=null)stage("Ожидание повтора");
-                    if(token.WaitHandle.WaitOne(delay))token.ThrowIfCancellationRequested();
+                    WaitRetry(delay,token,stage,code==0?"Источник не отвечает":"HTTP "+code);
                 }
+            }
+        }
+        static void WaitRetry(int delay,CancellationToken token,Action<string> stage,string reason)
+        {
+            var watch=System.Diagnostics.Stopwatch.StartNew();
+            while(watch.ElapsedMilliseconds<delay){
+                int remaining=Math.Max(1,delay-(int)watch.ElapsedMilliseconds);
+                if(stage!=null)stage("Повтор через "+((remaining+999)/1000)+" с · "+reason);
+                if(token.WaitHandle.WaitOne(Math.Min(1000,remaining)))token.ThrowIfCancellationRequested();
             }
         }
         void DownloadOnce(BundleRemoteFile file,string root,string originalHash,Action<long> progress,CancellationToken token,Action<long> received,Action<string> stage)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -13,6 +14,20 @@ namespace ServiceTool
         protected override Point ScrollToControl(Control activeControl)
         { return PreserveScrollOnFocus ? AutoScrollPosition : base.ScrollToControl(activeControl); }
         private readonly Control content;
+        private readonly HashSet<Control> touchTargets=new HashSet<Control>();
+        private readonly Dictionary<Control,TouchScrollSupport> touchHandlers=new Dictionary<Control,TouchScrollSupport>();
+        private void AttachTouch(Control target)
+        {
+            if(!touchTargets.Add(target))return;
+            if(target is ServiceGrid||target is TextBoxBase||target is ComboBox||target is GuideSectionListBox)return;
+            touchHandlers[target]=new TouchScrollSupport(target,delta=>{
+                if(!VerticalScroll.Visible)return;
+                int position=-AutoScrollPosition.Y;
+                AutoScrollPosition=new Point(-AutoScrollPosition.X,Math.Max(0,Math.Min(VerticalScroll.Maximum-VerticalScroll.LargeChange+1,position+delta)));
+            });
+            target.ControlAdded+=delegate(object sender,ControlEventArgs e){AttachTouch(e.Control);};
+            foreach(Control child in target.Controls)AttachTouch(child);
+        }
         private bool arranging,ready,pending,loadHooked;
         [DllImport("uxtheme.dll",CharSet=CharSet.Unicode)] private static extern int SetWindowTheme(IntPtr handle,string app,string identifiers);
         private void UpdateScrollTheme(){if(IsHandleCreated)SetWindowTheme(Handle,BackColor.GetBrightness()<0.5F?"DarkMode_Explorer":"Explorer",null);}
@@ -22,6 +37,7 @@ namespace ServiceTool
         {
             this.content=content;Dock=DockStyle.Fill;AutoScroll=true;DoubleBuffered=true;
             content.Dock=DockStyle.None;content.Anchor=AnchorStyles.Top|AnchorStyles.Left;Controls.Add(content);
+            AttachTouch(this);
         }
         protected override void OnParentChanged(EventArgs e)
         {

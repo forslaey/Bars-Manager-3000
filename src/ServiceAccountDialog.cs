@@ -135,7 +135,7 @@ namespace ServiceTool
                 string item = args.Index >= 0 ? Convert.ToString(combo.Items[args.Index]) : combo.Text;
                 TextRenderer.DrawText(args.Graphics, item, combo.Font, new Rectangle(args.Bounds.X + 5, args.Bounds.Y,
                     Math.Max(1, args.Bounds.Width - 8), args.Bounds.Height), foreground, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
-                if ((args.State & DrawItemState.Focus) != 0) args.DrawFocusRectangle();
+
             };
         }
 

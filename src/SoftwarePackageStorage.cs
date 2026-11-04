@@ -18,7 +18,7 @@ namespace ServiceTool
             string child=Path.Combine(full,"Библиотеки");if(Directory.Exists(child))full=child;
             return Path.Combine(full,"_soft");
         }
-        internal static SoftwarePackage Download(SoftwarePackage remote,string selected,Action<string> progress,Func<bool> cancelled)
+        internal static SoftwarePackage Download(SoftwarePackage remote,string selected,Action<string> progress,Func<bool> cancelled,Action<TransferProgress> transfer=null)
         {
             SoftwareCatalog.Find(remote.Id);
             string folder=Folder(selected);ToolsDeployment.SafePath(folder);
@@ -27,8 +27,11 @@ namespace ServiceTool
             string stage=Path.Combine(folder,".bars-download-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(stage);
             try
             {
-                var package=SoftwareSources.Download(remote,stage,progress,cancelled);
-                return Publish(package,folder,progress,cancelled);
+                var package=SoftwareSources.Download(remote,stage,progress,cancelled,transfer);
+                if(transfer!=null)transfer(new TransferProgress{Stage="Сохраняем проверенный файл…",File=remote.File});
+                var published=Publish(package,folder,progress,cancelled);
+                if(transfer!=null)transfer(new TransferProgress{Stage="Готово",File=remote.File,Complete=true});
+                return published;
             }
             finally
             {

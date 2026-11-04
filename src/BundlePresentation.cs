@@ -5,13 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 namespace ServiceTool
 {
- internal sealed class BundleProgressBar:Control
- {
-  internal ThemePalette Palette;double value;
-  internal double Fraction {get{return value;}set{this.value=Math.Max(0,Math.Min(1,value));Invalidate();}}
-  internal BundleProgressBar(){DoubleBuffered=true;SetStyle(ControlStyles.ResizeRedraw,true);Height=24;}
-  protected override void OnPaint(PaintEventArgs e){var p=Palette??ThemePalette.Create(false);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;var rect=new Rectangle(0,0,Math.Max(1,Width-1),Math.Max(1,Height-1));using(var shape=BrandButton.RoundRect(rect,Math.Min(12,Height/2)))using(var track=new SolidBrush(p.SurfaceAlt)){e.Graphics.FillPath(track,shape);var state=e.Graphics.Save();e.Graphics.SetClip(shape);int w=(int)(Width*value);if(w>0)using(var brush=new LinearGradientBrush(rect,p.Accent,ControlPaint.Light(p.Accent),0F))e.Graphics.FillRectangle(brush,0,0,w,Height);e.Graphics.Restore(state);}TextRenderer.DrawText(e.Graphics,(value>=1?100:Math.Floor(value*100)).ToString("0")+"%",Font,rect,p.Text,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.PreserveGraphicsTranslateTransform);}
- }
+ internal sealed class BundleProgressBar:DownloadProgressView {}
  internal sealed class BundleDifferencesForm:ManagerModuleForm
  {
   readonly ServiceGrid grid=new ServiceGrid();

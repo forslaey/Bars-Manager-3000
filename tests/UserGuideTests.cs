@@ -65,6 +65,11 @@ namespace ServiceTool
                     list.Focus(); Application.DoEvents();
                     Check(list.BorderStyle == BorderStyle.None && list.TabStop, "Focus keeps border absent without disabling keyboard access");
                     Check(list.Items.Count == UserGuide.Sections.Length, "Empty search lists all sections");
+                    using(var menu=new Bitmap(list.Width,list.Height)){
+                        list.DrawToBitmap(menu,list.ClientRectangle);var item=list.GetItemRectangle(list.SelectedIndex);
+                        var actual=menu.GetPixel(4,item.Top+item.Height/2);var palette=ThemePalette.Create(dark);
+                        Check(actual.ToArgb()==(dark?palette.Selection:palette.Accent).ToArgb(),"Selected section uses strong brand background in light theme");
+                    }
                     Check(reader.ReadOnly && reader.WordWrap, "Guide is read-only and wraps text");
                     foreach (var button in All(guide).OfType<BrandButton>()) Check(button.Parent.ClientRectangle.Contains(button.Bounds), "Guide button fits at scale " + scale);
                     search.Text = "служб"; Application.DoEvents();

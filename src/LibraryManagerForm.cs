@@ -16,6 +16,7 @@ namespace ServiceTool
     {
         private readonly LibraryGridScrollBar gridScroll = new LibraryGridScrollBar();
         private readonly ServiceGrid grid = new ServiceGrid();
+        private readonly DownloadProgressView transfer=new DownloadProgressView();
         private readonly Label summary, sourceLabel, activity;
         private readonly BrandButton refresh, install, stop, report, selectAll;
         private readonly RefreshToggle monitor = new RefreshToggle();
@@ -45,7 +46,7 @@ namespace ServiceTool
         internal override void ResumeSession() { MenuRequested=false; base.ResumeSession(); }
         internal bool IsInstalling { get { return installing; } }
         internal string SourceDirectory { get { return source; } }
-        public LibraryManagerForm(bool previewMode) : base("Bars Component Manager 3000", new Size(1120, 800))
+        public LibraryManagerForm(bool previewMode) : base("Bars Component Manager 3000", new Size(1120, 912))
         {
             preview = previewMode; MinimumSize = new Size(1020, 760);
             if (!preview)
@@ -59,7 +60,7 @@ namespace ServiceTool
             }
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 128)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 240)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
             var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(ModuleHeadingStyle.Left,ModuleHeadingStyle.Top,12,12), Margin = new Padding(0, 0, 0, 12) };
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
@@ -101,7 +102,7 @@ namespace ServiceTool
             var logCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(12, 8, 12, 8), Margin = Padding.Empty };
             var logTitle = Label("Журнал проверки и установки", true); logTitle.Dock = DockStyle.Top; logTitle.Height = 24; logTitle.Font = new Font("Segoe UI", 9);
             journal.Dock = DockStyle.Fill; journal.Font = new Font("Consolas", 9); journalScroll.Dock = DockStyle.Right; journalScroll.Width = 14; journalScroll.Bind(journal);
-            logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(logCard, 0, 2);
+            logCard.Controls.Add(journal); logCard.Controls.Add(journalScroll); logCard.Controls.Add(logTitle); body.Controls.Add(transfer.WithJournal(logCard), 0, 2);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 2, Padding = new Padding(0, 10, 0, 0), Margin = Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140)); footer.RowStyles.Add(new RowStyle(SizeType.Absolute, 0)); footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             restart = Button("Перезагрузка", false); ModuleNavigation.Configure(restart); restart.Margin = new Padding(0, 0, 10, 0); restart.Click += async delegate { if (!installing && !checking) await RestartOffer.Show(this); }; footer.Controls.Add(restart, 3, 1);
@@ -225,8 +226,8 @@ namespace ServiceTool
             useFocusedRow = false; row.Cells[0].Value = !Convert.ToBoolean(row.Cells[0].Value);
             grid.InvalidateCell(0, rowIndex);
         }
-        protected override void OnThemeChanged()
-        {
+        protected override void OnThemeChanged(){
+            transfer.Palette=Colors;transfer.Invalidate();
             if (grid == null) return;
             grid.BackgroundColor = Colors.Surface; grid.GridColor = Colors.Border;
             grid.DefaultCellStyle.BackColor = Colors.Surface; grid.DefaultCellStyle.ForeColor = Colors.Text;
@@ -313,7 +314,7 @@ namespace ServiceTool
         internal async Task RefreshAsync(bool refreshSource)
         {
             if (checking || installing || IsDisposed) return;
-            checking = true; windowsComponents.Enabled = false; refresh.Enabled = install.Enabled = restart.Enabled = false; activity.Text = "Проверяем систему…";
+            bool showProgress=refreshSource&&!firstScan;if(showProgress)transfer.BeginOperation("Проверяем компоненты…",true,LibraryCatalog.All().Count());checking = true; windowsComponents.Enabled = false; refresh.Enabled = install.Enabled = restart.Enabled = false; activity.Text = "Проверяем систему…";
             try
             {
                 if (refreshSource && !String.IsNullOrEmpty(source) && Directory.Exists(source))
@@ -321,7 +322,7 @@ namespace ServiceTool
                     try { await ReadSourceAsync(); }
                     catch (Exception ex) { Log("Источник не обновлён; проверяем систему по сохранённому каталогу: " + ex.Message); }
                 }
-                List<LibraryCheck> found = await Task.Run(() => LibraryDetection.Scan());
+                List<LibraryCheck> found = await Task.Run(() => LibraryDetection.Scan((done,total,name)=>{if(showProgress){transfer.SetWork(total);transfer.OperationReporter("Проверен компонент: "+name);transfer.CompleteStep();}}));
                 if (IsDisposed || Disposing) return;
                 checks.Clear(); foreach (LibraryCheck check in found) checks[check.Package.Id] = check;
                 if (firstScan) {
@@ -330,9 +331,9 @@ namespace ServiceTool
                 }
                 UpdateRestartAvailability();
                 RenderRows(); Log("Проверка завершена. Подходящих компонентов: " + checks.Values.Count(c => c.State == LibraryState.Installed) + " из " + checks.Count + "; нужно обновить: " + checks.Values.Count(c => c.Relation == LibraryRelation.Older) + "; нужна проверка: " + checks.Values.Count(c => c.State == LibraryState.Unknown) + ".");
-                activity.Text = "Проверка работает без папки установщиков";
+                activity.Text = "Проверка работает без папки установщиков";if(showProgress)transfer.FinishOperation("Проверка компонентов завершена.",success:true);
             }
-            catch (Exception ex) { Log("Ошибка проверки: " + ex.Message); activity.Text = "Не удалось завершить проверку"; }
+            catch (Exception ex) { if(showProgress)transfer.FinishOperation("Проверка не завершена",failed:true);Log("Ошибка проверки: " + ex.Message); activity.Text = "Не удалось завершить проверку"; }
             finally { checking = false; if (!IsDisposed) { windowsComponents.Enabled = !installing; refresh.Enabled = install.Enabled = true; UpdateRestartAvailability(); UpdateAction(); } }
         }
         private async Task ReadSourceAsync()
@@ -351,7 +352,8 @@ namespace ServiceTool
         }
         private void SafeActivity(string text)
         {
-            if (!IsDisposed && IsHandleCreated) try { BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) activity.Text = text; }); } catch (InvalidOperationException) { }
+            if(installing)transfer.OperationReporter(text);
+            if (!IsDisposed && IsHandleCreated) try { BeginInvoke((MethodInvoker)delegate { if (!IsDisposed&&installing) activity.Text = text; }); } catch (InvalidOperationException) { }
         }
         private async Task InstallAsync()
         {
@@ -381,7 +383,7 @@ namespace ServiceTool
                     catch (Exception ex) { Log("Не удалось выбрать папку: " + ex.Message); return; } }
             }
             }
-            UpdateSource(); installing = true; windowsComponents.Enabled = false; stopRequested = cancelRequested = closeAfterCancel = false; timer.Stop(); install.Enabled = refresh.Enabled = selectAll.Enabled = restart.Enabled = false; stop.Enabled = true;
+            UpdateSource(); transfer.BeginOperation("Подготавливаем выбранные компоненты…"); bool queueComplete=false; installing = true; windowsComponents.Enabled = false; stopRequested = cancelRequested = closeAfterCancel = false; timer.Stop(); install.Enabled = refresh.Enabled = selectAll.Enabled = restart.Enabled = false; stop.Enabled = true;
             foreach (DataGridViewRow row in grid.Rows) row.Cells[0].ReadOnly = true;
             try
             {
@@ -426,8 +428,8 @@ namespace ServiceTool
                         await Task.Run(() => LibrarySource.VerifyFile(LibrarySource.PackagePath(source, package), package, () => cancelRequested));
                     }
                 }
-                if (stopRequested || needed.Count == 0) { Log(needed.Count == 0 ? "Для выбранных компонентов нет действий в этой очереди." : "Очередь остановлена до запуска установщиков"); return; }
-                PausedLibraryQueue.Save(new string[0], operation);
+                if (stopRequested || needed.Count == 0) { transfer.FinishOperation(needed.Count==0?"Для выбранных компонентов нет действий.":"Очередь остановлена до запуска установщиков.");Log(needed.Count == 0 ? "Для выбранных компонентов нет действий в этой очереди." : "Очередь остановлена до запуска установщиков"); return; }
+                transfer.SetWork(needed.Count);PausedLibraryQueue.Save(new string[0], operation);
                 using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => cancelRequested)))
                 {
                     activeSession = session; if (cancelRequested) session.Cancel();
@@ -437,23 +439,26 @@ namespace ServiceTool
                         LibraryOperation step = operation == LibraryOperation.Reinstall && !targetIds.Contains(package.Id) ? LibraryOperation.Install : operation;
                         if ((step == LibraryOperation.Install || step == LibraryOperation.Update) && checks[package.Id].Relation == LibraryRelation.Older) step = LibraryOperation.Update;
                         Log(prefix + (step == LibraryOperation.Remove ? ": удаление" : step == LibraryOperation.Reinstall ? ": переустановка" : step == LibraryOperation.Update ? ": обновление" : ": установка"));
-                        LibraryInstallResult result = await Task.Run(() => session.Execute(package, source, step, text => SafeActivity(prefix + ": " + text)));
+                        var progress=transfer.OperationReporter;
+                        LibraryInstallResult result = await Task.Run(() => session.Execute(package, source, step, text => {progress(prefix+": "+text);}));
                         Log(prefix + ": " + result.Message + ". Код завершения: " + result.ExitCode + (String.IsNullOrEmpty(result.LogPath) ? "" : ". Подробный журнал установщика: " + result.LogPath));
                         if (closeAfterCancel && cancelRequested) break;
                         List<LibraryCheck> updated = await Task.Run(() => LibraryDetection.Scan()); checks.Clear(); foreach (var check in updated) checks[check.Package.Id] = check; RenderRows();
                         if (checks.ContainsKey(package.Id)) Log(prefix + ": после проверки — " + checks[package.Id].Caption + "; версия в системе: " + (String.IsNullOrEmpty(checks[package.Id].ActualVersion) ? "не обнаружена" : checks[package.Id].ActualVersion) + ". " + LibraryVersions.Advice(checks[package.Id]));
                         if (result.Reboot) {
+                            transfer.FinishOperation("Нужна перезагрузка. Остаток очереди сохранён.");
                             rebootRequired = pendingRestart = true;
                             PausedLibraryQueue.Save(needed.Skip(i).Select(p => p.Id), operation);
                             Log("Нужна перезагрузка. Выбор оставшихся компонентов сохранён; после запуска проверь рекомендацию и подтверди действие заново."); break;
                         }
                         if (!LibraryPlan.Success(result.ExitCode) || result.State != (operation == LibraryOperation.Remove ? LibraryState.Missing : LibraryState.Installed))
-                        { Log("Очередь приостановлена: результат текущего компонента требует проверки. Уже выполненные шаги сохранены в журнале."); break; }
+                        { transfer.FinishOperation("Результат требует проверки — прочитай журнал",failed:true);Log("Очередь приостановлена: результат текущего компонента требует проверки. Уже выполненные шаги сохранены в журнале."); break; }
+                        transfer.CompleteStep();if(i==needed.Count-1)queueComplete=true;
                     }
                 }
             }
-            catch (OperationCanceledException) { Log("Операция отменена. Запусти проверку системы перед повторной установкой."); }
-            catch (Win32Exception ex) { Log(ex.NativeErrorCode == 1223 ? "Запрос прав администратора отменён; новые пакеты не запускались" : "Ошибка установки: " + ex.Message); }
+            catch (OperationCanceledException) { transfer.FinishOperation("Операция отменена. Проверь состояние компонентов.");Log("Операция отменена. Запусти проверку системы перед повторной установкой."); }
+            catch (Win32Exception ex) { transfer.FinishOperation(ex.NativeErrorCode==1223?"Запрос прав администратора отменён":"Ошибка установки: "+ex.Message,failed:ex.NativeErrorCode!=1223);Log(ex.NativeErrorCode == 1223 ? "Запрос прав администратора отменён; новые пакеты не запускались" : "Ошибка установки: " + ex.Message); }
             catch (Exception ex) { Log("Очередь остановлена: " + ex.Message + ". Если внешний установщик ещё работает, дождись его завершения перед повтором."); }
             finally
             {
@@ -467,6 +472,7 @@ namespace ServiceTool
                     operationJournal = null;
                     Log(journalWriteFailed ? "Внимание: журнал не сохранён на диск." : "Журнал сохранён: " + savedPath);
                 }
+                if(cancelRequested)transfer.FinishOperation("Операция отменена. Проверь состояние компонентов.");else if(queueComplete)transfer.FinishOperation("Очередь выполнена. Результаты подтверждены.",success:true);else if(transfer.Snapshot.Active)transfer.FinishOperation("Очередь не завершена — прочитай журнал",failed:true);
                 activeSession = null; installing = false;
                 if (!IsDisposed)
                 {

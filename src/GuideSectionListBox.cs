@@ -10,6 +10,16 @@ namespace ServiceTool
         private bool measuring;
         private readonly TouchScrollSupport touchScroll;
         private int touchPixels;
+        private int wheelRemainder;
+        internal void ScrollWheel(int delta)
+        {
+            if(!Enabled)return;wheelRemainder+=delta;int steps=wheelRemainder/120;wheelRemainder%=120;
+            if(steps==0||Items.Count==0)return;
+            int lines=SystemInformation.MouseWheelScrollLines;if(lines==0)return;
+            if(lines<0){ScrollTouch(-steps*ClientSize.Height);return;}
+            touchPixels=0;TopIndex=Math.Max(0,Math.Min(Items.Count-1,TopIndex-steps*lines));
+            if(ViewportChanged!=null)ViewportChanged(this,EventArgs.Empty);
+        }
         private void ScrollTouch(int delta)
         {
             touchPixels+=delta;
@@ -17,7 +27,7 @@ namespace ServiceTool
             if(index<0||Items.Count==0){touchPixels=0;return;}
             while(touchPixels>0&&index<Items.Count-1){int height=Math.Max(1,GetItemHeight(index));if(touchPixels<height)break;touchPixels-=height;index++;}
             while(touchPixels<0&&index>0){int height=Math.Max(1,GetItemHeight(index-1));if(-touchPixels<height)break;touchPixels+=height;index--;}
-            if(index==0||index==Items.Count-1)touchPixels=0;
+            if((index==0&&touchPixels<0)||(index==Items.Count-1&&touchPixels>0))touchPixels=0;
             TopIndex=index;
             if(ViewportChanged!=null)ViewportChanged(this,EventArgs.Empty);
         }
@@ -26,6 +36,10 @@ namespace ServiceTool
         [DllImport("user32.dll")] private static extern bool ShowScrollBar(IntPtr handle,int bar,bool show);
         protected override void WndProc(ref Message message)
         {
+            if(message.Msg==0x184){touchPixels=wheelRemainder=0;if(touchScroll!=null)touchScroll.Reset();}
+            // Hiding the native scrollbar can disable ListBox's native wheel handling.
+            // Route wheel input explicitly instead of relying on WS_VSCROLL.
+            if(message.Msg==0x20A){ScrollWheel((short)(message.WParam.ToInt64()>>16));message.Result=IntPtr.Zero;return;}
             base.WndProc(ref message);
             if(message.Msg==0x02E0||message.Msg==0x02E3)RefreshHeights();
             if(IsHandleCreated&&!hidingScroll&&(message.Msg==0xF||message.Msg==5||message.Msg==0x20A||message.Msg==0x115||message.Msg==0x180||message.Msg==0x186))

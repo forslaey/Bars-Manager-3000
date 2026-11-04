@@ -380,7 +380,7 @@ namespace ServiceTool
             Assert(grid.ColumnHeadersDefaultCellStyle.WrapMode == DataGridViewTriState.True, "Column-header text wraps");
             Assert(!grid.EnableHeadersVisualStyles, "Both themes control header colors");
             Assert(grid.Columns.Count == 4, "Expected four service columns");
-            string[] expectedHeaders = { "Название", "Системное имя", "Состояние", "Запуск" };
+            string[] expectedHeaders = { "Название службы", "Системное имя службы", "Состояние", "Режим запуска" };
             for (int i = 0; i < grid.Columns.Count; i++)
             {
                 DataGridViewColumn column = grid.Columns[i];

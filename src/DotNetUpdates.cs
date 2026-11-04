@@ -40,24 +40,24 @@ namespace ServiceTool
   }
   static string Support(Dictionary<string,object> root){Func<string,string> get=k=>root.ContainsKey(k)?Convert.ToString(root[k]):"Нет сведений";string type=get("release-type");string phase=get("support-phase");return "Тип выпуска: "+(type=="lts"?"Долгосрочная поддержка (LTS)":type=="sts"?"Стандартная поддержка (STS)":type)+"\r\nПоследняя дата выпуска: "+get("latest-release-date")+"\r\nЭтап поддержки: "+(phase=="active"?"Активный":phase=="maintenance"?"Обслуживание":phase=="eol"?"Поддержка завершена":phase=="go-live"?"Go-live":phase)+"\r\nОкончание поддержки: "+get("eol-date");}
   internal static void ValidateUrl(string value){Uri u;if(!Uri.TryCreate(value,UriKind.Absolute,out u)||u.Scheme!="https"||u.Port!=443||u.UserInfo.Length!=0||!(u.Host=="builds.dotnet.microsoft.com"||u.Host=="download.visualstudio.microsoft.com"||u.Host=="dotnetcli.azureedge.net"))throw new InvalidDataException("Неожиданный адрес загрузки Microsoft");}
-  static byte[] Receive(string url,int limit,CancellationToken cancel,Action<long> progress)
+  static byte[] Receive(string url,int limit,CancellationToken cancel,Action<long> progress,Action<TransferProgress> transfer=null)
   {
    ValidateUrl(url);ServicePointManager.SecurityProtocol|=SecurityProtocolType.Tls12;
    var request=(HttpWebRequest)WebRequest.Create(url);request.Timeout=20000;request.ReadWriteTimeout=20000;
    using(cancel.Register(()=>request.Abort()))using(var response=(HttpWebResponse)request.GetResponse()){
     ValidateUrl(response.ResponseUri.AbsoluteUri);using(var stream=response.GetResponseStream())using(var output=new MemoryStream()){
-     byte[] buffer=new byte[65536];int n;while((n=stream.Read(buffer,0,buffer.Length))>0){cancel.ThrowIfCancellationRequested();if(output.Length+n>limit)throw new InvalidDataException("Превышен допустимый размер загрузки");output.Write(buffer,0,n);if(progress!=null)progress(output.Length);}return output.ToArray();
+     DownloadTransfer.Copy(stream,output,response.ContentLength,limit,cancel.ThrowIfCancellationRequested,p=>{if(progress!=null)progress(p.Bytes);if(transfer!=null)transfer(p);},Path.GetFileName(new Uri(url).AbsolutePath));return output.ToArray();
     }
    }
   }
-  internal static List<DotNetUpdate> Check(IEnumerable<LibraryPackage> packages,CancellationToken cancel)
+  internal static List<DotNetUpdate> Check(IEnumerable<LibraryPackage> packages,CancellationToken cancel,Action completed=null)
   {
    var all=packages.Where(Supported).ToList();var result=new List<DotNetUpdate>();
    foreach(var channel in all.GroupBy(p=>{var v=new Version(p.Version.Split('-')[0]);return v.Major+"."+v.Minor;})){
-    cancel.ThrowIfCancellationRequested();if(channel.All(p=>p.Version=="6.0.36"||p.Version=="7.0.20")){foreach(var p in channel)result.Add(new DotNetUpdate {Local=p,Version=p.Version});continue;}string json=Encoding.UTF8.GetString(Receive("https://builds.dotnet.microsoft.com/dotnet/release-metadata/"+channel.Key+"/releases.json",32*1024*1024,cancel,null));result.AddRange(Parse(json,channel));
+    cancel.ThrowIfCancellationRequested();if(channel.All(p=>p.Version=="6.0.36"||p.Version=="7.0.20")){foreach(var p in channel)result.Add(new DotNetUpdate {Local=p,Version=p.Version});if(completed!=null)completed();continue;}string json=Encoding.UTF8.GetString(Receive("https://builds.dotnet.microsoft.com/dotnet/release-metadata/"+channel.Key+"/releases.json",32*1024*1024,cancel,null));result.AddRange(Parse(json,channel));if(completed!=null)completed();
    }return result;
   }
-  internal static bool Download(DotNetUpdate update,string root,CancellationToken cancel,Action<long> progress)
+  internal static bool Download(DotNetUpdate update,string root,CancellationToken cancel,Action<long> progress,Action<TransferProgress> transfer=null)
   {
    if(!update.Newer)throw new InvalidOperationException("Обновление не требуется");
    cancel.ThrowIfCancellationRequested();
@@ -68,7 +68,8 @@ namespace ServiceTool
    string destination=Path.Combine(folder,update.FileName),temporary=Path.Combine(folder,".bars-"+Guid.NewGuid().ToString("N")+".exe");
    bool retained=false;
    try{
-    byte[] bytes=Receive(update.Url,256*1024*1024,cancel,progress);
+    byte[] bytes=Receive(update.Url,256*1024*1024,cancel,progress,transfer);
+    if(transfer!=null)transfer(new TransferProgress{Stage="Проверяем файл и подпись…",File=update.FileName});
     using(var sha=SHA512.Create())if(!String.Equals(BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-",""),update.Hash,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Контрольная сумма SHA-512 не совпадает");
     File.WriteAllBytes(temporary,bytes);using(var certificate=new System.Security.Cryptography.X509Certificates.X509Certificate2(System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(temporary))){
      string publisher=certificate.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName,false);
@@ -79,9 +80,11 @@ namespace ServiceTool
     if(described.Kind!=LibraryKind.DotNet||described.RuntimeFamily!=update.Local.RuntimeFamily||described.Architecture!=update.Local.Architecture||described.Version!=update.Version)throw new InvalidDataException("Метаданные установщика не совпадают с выбранным компонентом");
     cancel.ThrowIfCancellationRequested();
     if(File.Exists(destination))throw new IOException("Файл новой версии уже существует: "+destination);
+    if(transfer!=null)transfer(new TransferProgress{Stage="Сохраняем проверенный файл…",File=update.FileName});
     File.Move(temporary,destination);
     // Publication is committed first; cancellation never deletes the old installer.
     try{if(File.Exists(old)&&!String.Equals(old,destination,StringComparison.OrdinalIgnoreCase)){using(var original=new FileStream(old,FileMode.Open,FileAccess.Read,FileShare.Read)){if(!String.Equals(LibraryCancellation.Hash(original,null),update.Local.Sha256,StringComparison.OrdinalIgnoreCase))retained=true;}if(!retained)File.Delete(old);}}catch(IOException){retained=true;}catch(UnauthorizedAccessException){retained=true;}
+    if(transfer!=null)transfer(new TransferProgress{Stage="Готово",File=update.FileName,Complete=true});
     return !retained;
    }finally{if(File.Exists(temporary))try{File.Delete(temporary);}catch(IOException){}}
   }

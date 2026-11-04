@@ -23,8 +23,8 @@ namespace ServiceTool
         readonly BundleCloudSource cloudSource=new BundleCloudSource();
         readonly BrandCheckBox libraries=new BrandCheckBox {Text="Библиотеки и .NET",Checked=true},tools=new BrandCheckBox {Text="Утилиты BARS",Checked=true};
         List<Entry> batch;
-        long previousBytes,networkBytes,receivedBytes;
-        DateTime sampled;
+        long receivedBytes;
+
         bool cancelRequested;
         int workerLimit;
         readonly List<Entry> entries=new List<Entry>();
@@ -42,11 +42,11 @@ namespace ServiceTool
         }
         internal bool MenuRequested {get;private set;}
         internal override void ResumeSession(){MenuRequested=false;base.ResumeSession();}
-        internal BundleDownloadForm(string libraryRoot=null):base("Загрузка комплекта",new Size(650,530))
+        internal BundleDownloadForm(string libraryRoot=null):base("Загрузка комплекта",new Size(650,680))
         {
-            MinimumSize=SizeFromClientSize(new Size(650,530));ClientSize=new Size(650,530);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;Root.RowStyles[0].Height=60;
+            MinimumSize=SizeFromClientSize(new Size(650,680));ClientSize=new Size(650,680);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;Root.RowStyles[0].Height=60;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=7,Margin=Padding.Empty};body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{50F,40F,104F,0F,60F,38F,100F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
+            foreach(float height in new[]{50F,40F,104F,0F,40F,112F,100F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
             body.Controls.Add(ModuleHeading("Загрузка комплекта"),0,0);
             var path=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,168));path.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var caption=Caption("Папка комплекта",false);path.Controls.Add(caption,0,0);folder.ReadOnly=true;folder.AutoSize=false;folder.Text=libraryRoot??BundlePreferences.Load();folder.Dock=DockStyle.None;folder.Anchor=AnchorStyles.Left|AnchorStyles.Right;folder.Margin=Padding.Empty;
@@ -62,12 +62,13 @@ namespace ServiceTool
             };body.Controls.Add(path,0,1);
             var groups=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty,Padding=new Padding(0,16,0,16)};groups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));groups.RowStyles.Add(new RowStyle(SizeType.Percent,50));groups.RowStyles.Add(new RowStyle(SizeType.Percent,50));int row=0;foreach(var option in new[]{libraries,tools}){option.Dock=DockStyle.Fill;option.Margin=Padding.Empty;option.Palette=Colors;option.CheckedChanged+=delegate{if(!busy){foreach(var entry in entries)entry.Selected=entry.Allowed&&!entry.Done&&GroupSelected(entry.File.Group);UpdateState();}};groups.Controls.Add(option,0,row++);}body.Controls.Add(groups,0,2);
             body.Controls.Add(JournalPanel.Create(journal,"Журнал загрузки комплекта",Colors),0,3);
-            summary=Label("Проверка сверяет файлы; установка в Windows не выполняется.",true);summary.Margin=new Padding(0,12,0,12);body.Controls.Add(summary,0,4);total.Margin=new Padding(0,4,0,14);body.Controls.Add(total,0,5);
+            summary=Label("Проверка сверяет файлы; установка в Windows не выполняется.",true);summary.Margin=new Padding(0,4,0,4);body.Controls.Add(summary,0,4);total.Margin=new Padding(0,8,0,8);body.Controls.Add(total,0,5);
             var actions=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=Padding.Empty};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
             scan=Button("Проверить",false);start=Button("Скачать",true);pause=Button("Пауза",false);stop=Button("Отменить",false);back=Button("В меню",false);results=Button("Результаты",false);results.Click+=delegate{ShowResults();};
-            scan.Click+=async delegate{await Scan();};start.Click+=async delegate{await Download();};pause.Click+=delegate{if(!downloading)return;if(paused){paused=false;pause.Text="Пауза";previousBytes=Interlocked.Read(ref receivedBytes);sampled=DateTime.UtcNow;networkBytes=0;}else{paused=true;pause.Enabled=false;pause.Text="Пауза…";if(cancellation!=null)cancellation.Cancel();}};
+            scan.Click+=async delegate{await Scan();};start.Click+=async delegate{await Download();};pause.Click+=delegate{if(!downloading)return;if(paused){paused=false;pause.Text="Пауза";}else{paused=true;pause.Enabled=false;pause.Text="Пауза…";if(cancellation!=null)cancellation.Cancel();}};
             stop.Click+=delegate{if(busy&&BrandMessageBox.ConfirmStop(this,"Остановить загрузку? Готовые файлы и данные для продолжения сохранятся.")==DialogResult.Yes){cancelRequested=true;paused=false;if(cancellation!=null)cancellation.Cancel();}};
-            back.Click+=delegate{MenuRequested=true;Close();};int index=0;foreach(var button in new[]{scan,start,results,pause,stop,back}){ModuleNavigation.Configure(button);button.Dock=DockStyle.Fill;button.Margin=new Padding(0,5,index%3==2?0:10,5);actions.Controls.Add(button,index%3,index/3);index++;}body.Controls.Add(actions,0,6);Root.Controls.Add(body,0,1);
+            back.Click+=delegate{MenuRequested=true;Close();};int index=0;foreach(var button in new[]{scan,start,results,pause,stop,back}){ModuleNavigation.Configure(button);button.Dock=DockStyle.Fill;button.Margin=new Padding(0,5,index%3==2?0:10,5);actions.Controls.Add(button,index%3,index/3);index++;}body.RowCount=6;body.RowStyles.RemoveAt(6);body.MinimumSize=new Size(0,480);
+            var content=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.RowStyles.Add(new RowStyle(SizeType.Percent,100));content.RowStyles.Add(new RowStyle(SizeType.Absolute,100));content.Controls.Add(new FillContentPanel(body){Margin=Padding.Empty,PreserveScrollOnFocus=true},0,0);content.Controls.Add(actions,0,1);Root.Controls.Add(content,0,1);
             timer.Tick+=delegate{RefreshProgress();};VisibleChanged+=delegate{timer.Enabled=Visible;};
             FormClosing+=delegate(object sender,FormClosingEventArgs e){if(busy){e.Cancel=true;if(BrandMessageBox.Show(this,"Остановить загрузку и закрыть окно? Готовые файлы сохранятся.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)==DialogResult.Yes){closeAfter=true;cancelRequested=true;paused=false;if(cancellation!=null)cancellation.Cancel();}}};
             SetTheme(Colors.Dark,false);UpdateState();
@@ -84,17 +85,17 @@ namespace ServiceTool
         }
         async Task Scan(BundleCloud? forcedCloud=null)
         {
-            if(busy)return;bool suggestAlternative=false;BundleCloud cloud;if(forcedCloud.HasValue)cloud=forcedCloud.Value;else using(var picker=new BundleCloudDialog(true)){if(picker.ShowDialog(this)!=DialogResult.OK)return;cloud=picker.Cloud;}busy=true;cancelRequested=false;paused=false;batch=null;cancellation=new CancellationTokenSource();UpdateState();string root=Path.GetFullPath(folder.Text);Log("Проверяем выбранные разделы: читаем каталог облака и сверяем локальные файлы.");summary.Text="Читаем выбранное облако и проверяем локальные файлы…";
+            if(busy)return;bool suggestAlternative=false;BundleCloud cloud;if(forcedCloud.HasValue)cloud=forcedCloud.Value;else using(var picker=new BundleCloudDialog(true)){if(picker.ShowDialog(this)!=DialogResult.OK)return;cloud=picker.Cloud;}busy=true;cancelRequested=false;paused=false;batch=null;cancellation=new CancellationTokenSource();UpdateState();string root=Path.GetFullPath(folder.Text);Log("Проверяем выбранные разделы: читаем каталог облака и сверяем локальные файлы.");summary.Text="Читаем выбранное облако и проверяем локальные файлы…";total.BeginOperation(summary.Text);
             try
             {
                 var token=cancellation.Token;
                 bool selectLibraries=libraries.Checked,selectTools=tools.Checked;
                 var result=await Task.Run(()=>{
-                    var files=cloudSource.Scan(cloud,token,Log);var list=new List<Entry>();
+                    var files=cloudSource.Scan(cloud,token,Log);var list=new List<Entry>();total.SetWork(files.Count(f=>f.Group=="Утилиты"?selectTools:f.Group!="Программы"&&selectLibraries));
                     foreach(var file in files.Where(f=>f.Group=="Утилиты"?selectTools:f.Group!="Программы"&&selectLibraries)){token.ThrowIfCancellationRequested();string local=YandexBundleSource.LocalPath(root,file.Path);var entry=new Entry {File=file};
                         if(!File.Exists(local)){entry.Allowed=entry.Selected=true;entry.State="Отсутствует - будет скачано";}
                         else{entry.OriginalHash=YandexBundleSource.Hash(local,token);entry.Done=entry.OriginalHash==file.Sha256;entry.Allowed=!entry.Done&&new BundleReceipts(root).CanReplace(file,entry.OriginalHash);entry.Selected=entry.Allowed;entry.State=entry.Done?"Обновление не требуется":entry.Allowed?"Изменён в источнике — обновить":"Отличается — сохранить локальный файл";}
-                        list.Add(entry);
+                        list.Add(entry);total.OperationReporter("Проверен файл: "+file.Path.TrimStart('/'));total.CompleteStep();
                     }return list;
                 });
                 var saved=BundleSession.Load(root);
@@ -106,10 +107,10 @@ namespace ServiceTool
                 var differences=entries.Where(e=>!e.Done).Select(e=>new[]{e.File.Path.TrimStart('/'),e.State}).ToArray();
                 Log("Проверка завершена. Требуют внимания: "+differences.Length+"; актуальных файлов: "+entries.Count(e=>e.Done)+".");
                 ShowResults();
-                summary.Text="Проверено: "+entries.Count+" файлов. Недостающие и ранее загруженные неизменённые установщики выбраны; остальные локальные файлы защищены.";
+                total.FinishOperation("Сверка завершена",success:true);summary.Text="Проверено: "+entries.Count+" файлов. Недостающие и ранее загруженные неизменённые установщики выбраны; остальные локальные файлы защищены.";
                 RootAccepted=true;BundlePreferences.Save(root);
             }
-            catch(Exception ex){summary.Text=cancellation.IsCancellationRequested?"Проверка отменена":"Не удалось проверить: "+ex.Message;Log(summary.Text);suggestAlternative=!cancellation.IsCancellationRequested;}
+            catch(Exception ex){summary.Text=cancellation.IsCancellationRequested?"Проверка отменена":"Не удалось проверить: "+ex.Message;total.Stage(summary.Text,failed:true);Log(summary.Text);suggestAlternative=!cancellation.IsCancellationRequested;}
             finally{busy=false;cancellation.Dispose();cancellation=null;UpdateState();if(closeAfter)Close();}
             if(suggestAlternative&&!closeAfter&&BrandMessageBox.Show(this,"Не удалось проверить выбранное облако. Попробовать альтернативное?","Проверка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)await Scan(cloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google);
         }
@@ -121,7 +122,7 @@ namespace ServiceTool
             var selected=entries.Where(e=>e.Selected&&e.Allowed&&!e.Done).ToList();if(selected.Count==0)return;
             if(BrandMessageBox.Show(this,"Скачать "+selected.Count+" файлов ("+SizeText(selected.Sum(e=>e.File.Size))+")?\r\nУстановщики не будут запущены.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
             Log("Начинаем загрузку из "+CloudName(downloadCloud)+". В очереди: "+selected.Count+" файлов. Уже готовые файлы повторно не скачиваем.");
-            busy=true;downloading=true;cancelRequested=false;paused=false;batch=selected;previousBytes=0;receivedBytes=0;networkBytes=0;sampled=DateTime.UtcNow;started=DateTime.UtcNow;UpdateState();
+            busy=true;downloading=true;cancelRequested=false;paused=false;batch=selected;receivedBytes=0;started=DateTime.UtcNow;UpdateState();
             try
             {
                 int workers=3;workerLimit=workers;
@@ -162,7 +163,7 @@ namespace ServiceTool
                 }while(!closeAfter&&!cancelRequested);
                 RefreshProgress();BundleSession.Save(scannedRoot,selected.Where(e=>!e.Done).Select(e=>e.File));summary.Text="Готово: "+selected.Count(e=>e.Done)+" из "+selected.Count+". Компоненты Windows не устанавливались. Остальные выбранные файлы можно повторить.";
             }
-            catch(Exception ex){summary.Text="Загрузка не завершена: "+ex.Message;Log(summary.Text);}
+            catch(Exception ex){summary.Text="Загрузка не завершена: "+ex.Message;total.Stage(summary.Text,failed:true);Log(summary.Text);}
             finally{busy=false;downloading=false;paused=false;pause.Text="Пауза";if(cancellation!=null){cancellation.Dispose();cancellation=null;}UpdateState();if(closeAfter)Close();}
             int remaining=selected.Count(e=>!e.Done);
             if(!cancelRequested&&!closeAfter&&remaining>0)
@@ -184,8 +185,14 @@ namespace ServiceTool
             lock(sync)
             {
                 long size=(batch??entries.Where(e=>e.Selected).ToList()).Sum(e=>e.File.Size),bytes=(batch??entries.Where(e=>e.Selected).ToList()).Sum(e=>e.Bytes);
-                total.Fraction=size<=0?(batch!=null&&batch.Count>0&&batch.All(e=>e.Done)?1:0):bytes/(double)size;if(batch!=null&&batch.Any(e=>!e.Done))total.Fraction=Math.Min(.999,total.Fraction);
-                if(downloading&&!paused&&cancellation!=null){double interval=(DateTime.UtcNow-sampled).TotalSeconds;if(interval>=1){networkBytes=(long)(Math.Max(0,Interlocked.Read(ref receivedBytes)-previousBytes)/interval);previousBytes=Interlocked.Read(ref receivedBytes);sampled=DateTime.UtcNow;}double speed=networkBytes;summary.Text="Получено "+SizeText(bytes)+" / "+SizeText(size)+" · "+(size==0?0:Math.Min(batch!=null&&batch.Any(e=>!e.Done)?99.9:100,bytes*100.0/size)).ToString("0.0")+"% · "+SizeText((long)speed)+"/с"+(speed>0?" · осталось примерно "+TimeSpan.FromSeconds(Math.Min(864000,(size-bytes)/speed)).ToString(@"hh\:mm\:ss"):"");}
+                if(downloading && batch!=null){
+                    bool complete=batch.Count>0&&batch.All(e=>e.Done);
+                    var active=batch.FirstOrDefault(e=>!e.Done&&e.State!=null);
+                    bool failed=batch.Any(e=>e.State!=null&&e.State.StartsWith("Ошибка"));
+                    string stage=paused?"Пауза":cancelRequested?"Загрузка отменена":complete?"Готово":active==null?"Подготовка…":active.State;
+                    if(stage=="Скачивание")stage="Скачивание · готово "+batch.Count(e=>e.Done)+" из "+batch.Count;
+                    total.Report(new TransferProgress{Key="Комплект",NetworkBytes=Interlocked.Read(ref receivedBytes),Stage=stage,File=active==null?"":active.File.Path.TrimStart('/'),Bytes=bytes,Total=size,Complete=complete,Paused=paused||cancelRequested,Failed=failed&&!complete});
+                }
             }
         }
         protected override void OnThemeChanged(){if(total!=null){total.Palette=Colors;total.Invalidate();}if(libraries!=null)libraries.Palette=Colors;if(tools!=null)tools.Palette=Colors;}

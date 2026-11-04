@@ -120,7 +120,7 @@ namespace ServiceTool
             if (id=="anydesk") return ParseAnyDesk(Text(id,"https://download.anydesk.com/changelog.txt"));
             throw new InvalidDataException("Неизвестный источник");
         }
-        internal static SoftwarePackage Download(SoftwarePackage remote, string cache, Action<string> progress, Func<bool> cancelled)
+        internal static SoftwarePackage Download(SoftwarePackage remote, string cache, Action<string> progress, Func<bool> cancelled, Action<TransferProgress> transfer = null)
         {
             SoftwareCatalog.Find(remote.Id); string folder=Path.Combine(cache,remote.Id); Directory.CreateDirectory(folder); ToolsDeployment.SafePath(folder);
             string name=Path.GetFileName(remote.File); if (name!=remote.File || name.IndexOfAny(Path.GetInvalidFileNameChars())>=0) throw new InvalidDataException("Неверное имя установщика");
@@ -130,15 +130,10 @@ namespace ServiceTool
                 using (var response=Open(remote.Id,remote.Url)) using (var input=response.GetResponseStream()) using (var output=new FileStream(temporary,FileMode.CreateNew,FileAccess.Write,FileShare.None))
                 {
                     if (response.ContentLength>300L*1024*1024) throw new InvalidDataException("Установщик слишком большой");
-                    var buffer=new byte[65536]; int n; long total=0,last=-1;
-                    while ((n=input.Read(buffer,0,buffer.Length))>0)
-                    {
-                        LibraryCancellation.Check(cancelled); total+=n; if (total>300L*1024*1024) throw new InvalidDataException("Установщик слишком большой"); output.Write(buffer,0,n);
-                        if (total/1048576!=last) { last=total/1048576; progress("Скачано "+last+" МБ"+(response.ContentLength>0 ? " из "+response.ContentLength/1048576 : "")); }
-                    }
-                    if (response.ContentLength>=0 && total!=response.ContentLength) throw new IOException("Загрузка не завершена"); output.Flush(true);
+                    DownloadTransfer.Copy(input,output,response.ContentLength,300L*1024*1024,()=>LibraryCancellation.Check(cancelled),transfer,name); output.Flush(true);
                 }
                 LibraryCancellation.Check(cancelled);
+                if(transfer!=null)transfer(new TransferProgress{Stage="Проверяем файл и подпись…",File=name});
                 // Metadata readers use the vendor filename (NSIS version/architecture convention).
                 string validation=Path.Combine(folder,"verify-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(validation);
                 SoftwarePackage package;
