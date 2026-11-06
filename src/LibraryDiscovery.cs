@@ -54,6 +54,7 @@ namespace ServiceTool
                 string extension = Path.GetExtension(file);
                 if (!extension.Equals(".exe", StringComparison.OrdinalIgnoreCase) && !extension.Equals(".msi", StringComparison.OrdinalIgnoreCase)) continue;
                 string name = Path.GetFileName(file);
+                if (SoftwareCatalog.PackageId(name) != null) continue;
                 if (name == "Microsoft .NET Runtime 1.0.31.exe" || name == "Исправлятор .NET Famework.exe" || name == "Удалятор .NET Framework.exe" || name.IndexOf("RuntimePack", StringComparison.OrdinalIgnoreCase) >= 0) continue;
                 progress("Читаем пакет: " + name);
                 string relative = file.Substring(root.TrimEnd(Path.DirectorySeparatorChar).Length + 1);
@@ -76,7 +77,10 @@ namespace ServiceTool
                 try { files = Directory.GetFiles(directory); children = Directory.GetDirectories(directory); }
                 catch (UnauthorizedAccessException) { progress("Каталог недоступен: " + directory); continue; }
                 catch (IOException) { progress("Каталог недоступен: " + directory); continue; }
-                foreach (string child in children) if (!Path.GetFileName(child).Equals("_tools", StringComparison.OrdinalIgnoreCase) && !Path.GetFileName(child).Equals("_soft", StringComparison.OrdinalIgnoreCase) && (File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) pending.Push(child);
+                foreach (string child in children)
+                    if ((!String.Equals(directory, root, StringComparison.OrdinalIgnoreCase) ||
+                        String.Equals(Path.GetFileName(child), "Microsoft .NET", StringComparison.OrdinalIgnoreCase)) &&
+                        (File.GetAttributes(child) & FileAttributes.ReparsePoint) == 0) pending.Push(child);
                 foreach (string file in files)
                 {
                     if (++count > 4096) throw new InvalidDataException("В папке больше 4096 файлов. Выбери непосредственно папку библиотек.");

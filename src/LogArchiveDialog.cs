@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -12,19 +12,24 @@ namespace ServiceTool
         private readonly ThemePalette palette;
         private readonly List<LogDateFolder> folders;
         private readonly HashSet<string> selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private readonly ComboBox scope = new BrandComboBox();
+        private readonly ComboBox scope = new BrandComboBox { UseManagedPopup = true };
         private readonly TableLayoutPanel dates = new BufferedLayoutPanel();
         private readonly FlushLabel summary = new FlushLabel {InkLeft=g=>0};
         private readonly Label pageLabel = new Label();
         private readonly Button previous, next;
         private readonly DateTime today;
         private int page;
+        private readonly bool applicationLogs;
         internal LogArchiveSelection Selection { get; private set; }
 
         internal LogArchiveDialog(ThemePalette colors, string serviceName, List<LogDateFolder> available, DateTime localToday)
+            : this(colors, serviceName, available, localToday, false) { }
+
+        internal LogArchiveDialog(ThemePalette colors, string serviceName, List<LogDateFolder> available, DateTime localToday, bool applicationLogs)
         {
             SuspendLayout();
             palette = colors;
+            this.applicationLogs = applicationLogs;
             NativeWindowTheme.Bind(this,()=>palette.Dark);
             folders = available ?? new List<LogDateFolder>();
             today = localToday.Date;
@@ -33,7 +38,7 @@ namespace ServiceTool
             AutoScaleDimensions = new SizeF(96, 96);
             AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(560, 440);
-            FormBorderStyle = FormBorderStyle.FixedDialog;
+            FormBorderStyle = FormBorderStyle.FixedSingle; Icon = BrandAssets.LoadIcon();
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = MinimizeBox = MaximizeBox = false;
             BackColor = palette.Canvas;
@@ -75,11 +80,13 @@ namespace ServiceTool
             dates.Dock = DockStyle.Fill;
             dates.BackColor = palette.Canvas;
             dates.ColumnCount = 2;
-            dates.RowCount = 6;
+            dates.RowCount = 8;
             dates.Margin = Padding.Empty;
-            dates.Padding = new Padding(6,6,0,6);dates.Anchor=AnchorStyles.None;dates.Dock=DockStyle.None;dates.Size=new Size(360,192);
-            for (int i = 0; i < 2; i++) dates.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
-            for (int i = 0; i < 6; i++) dates.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 6));
+            dates.Padding = new Padding(76, 4, 76, 4);
+            for (int i = 0; i < 2; i++) dates.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            dates.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            for (int i = 0; i < 6; i++) dates.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
+            dates.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             content.Controls.Add(dates, 0, 3);
             TableLayoutPanel paging = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
             paging.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 40));
@@ -111,7 +118,8 @@ namespace ServiceTool
             Controls.Add(content);
             AcceptButton = save;
             CancelButton = cancel;
-            scope.SelectedIndex = 0;
+            scope.SelectedIndex = folders.Any(folder => folder.Date.HasValue && folder.Date.Value.Date == today) ? 0 : 2;
+            UpdateScope();
             ResumeLayout(true);
         }
 
@@ -123,7 +131,7 @@ namespace ServiceTool
         private void UpdateScope()
         {
             summary.ForeColor = palette.Muted;
-            if (scope.SelectedIndex == 2) summary.Text = "Все log-файлы из папки с логами службы, включая вложенные папки.";
+            if (scope.SelectedIndex == 2) summary.Text = applicationLogs ? "Все логи программы, включая вложенные папки." : "Все log-файлы из папки с логами службы, включая вложенные папки.";
             else if (scope.SelectedIndex == 0) summary.Text = "Логи из папок с сегодняшней датой. Дата определяется по имени папки.";
             else summary.Text = "Отметь одну или несколько дат. Выбор сохраняется при переходе между страницами.";
             if(dates.Controls.Count==0)RenderDates();else UpdateDateChecks();
@@ -135,6 +143,8 @@ namespace ServiceTool
         {
             dates.SuspendLayout();
             while (dates.Controls.Count > 0) { Control old = dates.Controls[0]; dates.Controls.Remove(old); old.Dispose(); }
+            int count = Math.Min(PageSize, folders.Count - page * PageSize);
+            for (int row = 1; row <= 6; row++) dates.RowStyles[row].Height = row <= (count + 1) / 2 ? (float)Math.Round(29 * dates.DeviceDpi / 96F) : 0;
             for (int i = page * PageSize; i < Math.Min(folders.Count, (page + 1) * PageSize); i++)
             {
                 string name = folders[i].Name;
@@ -145,9 +155,11 @@ namespace ServiceTool
                     Enabled = scope.SelectedIndex == 1, TextAlign = ContentAlignment.MiddleLeft, UseMnemonic = false };
                 item.CheckedChanged += delegate { if(updatingDates||scope.SelectedIndex!=1)return; if (item.Checked) selected.Add(name); else selected.Remove(name); UpdatePageLabel(); };
                 int index = i - page * PageSize;
-                dates.Controls.Add(item, index % 2, index / 2);
+                item.Dock = DockStyle.None; item.Anchor = AnchorStyles.None;
+                item.Size = new Size(TextRenderer.MeasureText(name, dates.Font, Size.Empty, TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix).Width + (int)Math.Ceiling(34 * dates.DeviceDpi / 96F), (int)Math.Round(26 * dates.DeviceDpi / 96F));
+                dates.Controls.Add(item, index % 2, 1 + index / 2);
+                if (index == count - 1 && count % 2 == 1) dates.SetColumnSpan(item, 2);
             }
-            using(var graphics=dates.CreateGraphics()){int text=0;foreach(Control item in dates.Controls)text=Math.Max(text,TextRenderer.MeasureText(graphics,item.Text,item.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width);int prefix=(int)Math.Round(32*graphics.DpiX/96F);int gap=(int)Math.Round(36*graphics.DpiX/96F);int itemWidth=Math.Max(text+prefix,(int)Math.Round(148*graphics.DpiX/96F));int column=itemWidth+gap/2;dates.Width=column+itemWidth+dates.Padding.Horizontal;dates.ColumnStyles[0].Width=column;dates.ColumnStyles[1].Width=itemWidth;dates.Height=(int)Math.Round(32*6*graphics.DpiY/96F);foreach(Control item in dates.Controls){item.Dock=DockStyle.None;item.Anchor=AnchorStyles.Left;item.Width=itemWidth;item.Height=(int)Math.Round(30*graphics.DpiY/96F);}}
             dates.ResumeLayout(true);
             previous.Enabled = page > 0;
             next.Enabled = (page + 1) * PageSize < folders.Count;

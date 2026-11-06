@@ -30,7 +30,7 @@ namespace ServiceTool
             var recommended = new BrandButton { Text = "По рекомендации", Primary = true, Palette = colors, Dock = DockStyle.Fill, Margin = Padding.Empty, Font = Font, Enabled = items.Any(c => LibraryVersions.NeedsInstall(c)) };
             recommended.Click += delegate { Operation = items.Any(c => c.Relation == LibraryRelation.Older) ? LibraryOperation.Update : LibraryOperation.Install; DialogResult = DialogResult.OK; };
             var reinstall = new BrandButton { Text = "Переустановить", Enabled = items.Any(LibraryVersions.CanRemove) && !items.Any(c => c.Relation == LibraryRelation.Newer || c.HasNewerParts), Palette = colors, Dock = DockStyle.Fill, Margin = Padding.Empty, Font = Font };
-            var remove = new BrandButton { Text = "Удалить", Enabled = items.Any(LibraryVersions.CanRemove), Destructive = true, Palette = colors, Dock = DockStyle.Fill, Margin = Padding.Empty, Font = Font };
+            var remove = new BrandButton { Text = "Удалить", Enabled = items.Any(LibraryVersions.CanRemove), Palette = colors, Dock = DockStyle.Fill, Margin = Padding.Empty, Font = Font };
             var cancel = new BrandButton { Text = "Отмена", Palette = colors, Dock = DockStyle.Fill, Margin = Padding.Empty, DialogResult = DialogResult.Cancel, Font = Font };
             reinstall.Click += delegate { Operation = LibraryOperation.Reinstall; DialogResult = DialogResult.OK; };
             remove.Click += delegate { Operation = LibraryOperation.Remove; DialogResult = DialogResult.OK; };

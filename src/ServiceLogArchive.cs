@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -211,16 +211,17 @@ namespace ServiceTool
             if (String.IsNullOrWhiteSpace(executablePath))
                 throw new ArgumentException("Не удалось определить .exe выбранной службы.", "executablePath");
             string executable = Path.GetFullPath(executablePath);
-            string parent = Path.GetDirectoryName(executable);
+            string parent = executable.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal) || Directory.Exists(executable)
+                ? executable : Path.GetDirectoryName(executable);
             if (String.IsNullOrEmpty(parent))
                 throw new ArgumentException("Не удалось определить папку .exe службы.", "executablePath");
             string directory = Path.Combine(parent, "Logs");
             FileAttributes attributes;
             try { attributes = File.GetAttributes(directory); }
-            catch (DirectoryNotFoundException) { throw new InvalidOperationException("Рядом с .exe выбранной службы нет папки Logs."); }
-            catch (FileNotFoundException) { throw new InvalidOperationException("Рядом с .exe выбранной службы нет папки Logs."); }
+            catch (DirectoryNotFoundException) { throw new InvalidOperationException("В папке приложения нет папки Logs: " + directory + "."); }
+            catch (FileNotFoundException) { throw new InvalidOperationException("В папке приложения нет папки Logs: " + directory + "."); }
             if ((attributes & FileAttributes.Directory) == 0)
-                throw new InvalidOperationException("Рядом с .exe службы Logs не является папкой.");
+                throw new InvalidOperationException("Logs не является папкой: " + directory + ".");
             if ((attributes & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidOperationException("Папка Logs является ссылкой. Для сбора нужна обычная папка с логами службы.");
             return directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);

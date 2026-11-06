@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -31,16 +31,14 @@ namespace ServiceTool
    bool rejected=false;try{DotNetUpdates.Parse(json.Replace("https://builds.dotnet.microsoft.com","https://example.org"),new[]{local});}catch(InvalidDataException){rejected=true;}Check(rejected,"Unofficial URL rejected");
    Application.EnableVisualStyles();
    foreach(bool dark in new[]{false,true})using(var form=new DotNetUpdatesForm(()=>null)){
-    form.SetTheme(dark,false);form.Show();Application.DoEvents();Check(Children(form).OfType<DataGridView>().Single().Rows.Count==0,"No automatic query/download");
+    form.SetTheme(dark,false);form.Show();Application.DoEvents();var table=Children(form).OfType<DataGridView>().Single();Check(table.Rows.Count>0&&table.Rows.Cast<DataGridViewRow>().All(r=>Convert.ToString(r.Cells[4].Value)=="Нажми проверку версий"),"Local catalog is shown without an automatic network check");
     foreach(var b in Children(form).OfType<BrandButton>())Check(b.Parent.ClientRectangle.Contains(b.Bounds),"Update button fits: "+b.Text);
-    var table=Children(form).OfType<DataGridView>().Single();table.Rows.Add(false,".NET Runtime 8.0, x64","8.0.31","8.0.33","Доступно обновление");
-    string proof=@"C:\ServiceManager3000\work\runtime-updates";Directory.CreateDirectory(proof);using(var image=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,form.Size));image.Save(Path.Combine(proof,"updates-"+dark+".png"));}
+    string proof=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"runtime-updates");Directory.CreateDirectory(proof);using(var image=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,form.Size));image.Save(Path.Combine(proof,"updates-"+dark+".png"));}
    }
    foreach(bool dark in new[]{false,true})using(var form=new LibraryManagerForm(true)){
-    form.SetTheme(dark,false);form.Show();Application.DoEvents();var filter=Children(form).OfType<BrandComboBox>().Single(c=>c.Items.Contains("Microsoft .NET"));filter.SelectedIndex=1;Application.DoEvents();
-    var table=Children(form).OfType<ServiceGrid>().Single();Check(table.Rows.Count>0&&table.Rows.Cast<DataGridViewRow>().All(row=>((LibraryPackage)row.Tag).Kind==LibraryKind.DotNet||((LibraryPackage)row.Tag).Kind==LibraryKind.Framework),".NET filter isolates families");
-    Check(table.Rows.Cast<DataGridViewRow>().All(row=>!Convert.ToBoolean(row.Cells[0].Value)),"Filter clears previous selection");
-    using(var image=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,form.Size));image.Save(@"C:\ServiceManager3000\work\runtime-updates\library-"+dark+".png");}
+    form.SetTheme(dark,false);form.Show();Application.DoEvents();Check(!Children(form).OfType<BrandComboBox>().Any(c=>c.Items.Contains("Microsoft .NET")),"No obsolete runtime filter");
+    var table=Children(form).OfType<ServiceGrid>().Single();Check(table.Rows.Count>0&&table.Rows.Cast<DataGridViewRow>().Any(row=>((LibraryPackage)row.Tag).Kind==LibraryKind.DotNet)&&table.Rows.Cast<DataGridViewRow>().Any(row=>((LibraryPackage)row.Tag).Kind!=LibraryKind.DotNet),"Runtime and other families share the catalog");
+    using(var image=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,new System.Drawing.Rectangle(System.Drawing.Point.Empty,form.Size));image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"runtime-updates","library-"+dark+".png"));}
    }
    Console.WriteLine("PASS: "+count+" architecture, metadata isolation and update-dialog checks. No downloads or installations.");return 0;
   }catch(Exception ex){Console.Error.WriteLine(ex);return 1;}}

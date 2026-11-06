@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -21,7 +21,7 @@ namespace ServiceTool
         private readonly BrandTextBox sourceLabel;
         private readonly Label activity;
         private readonly BrandButton refresh,install,cancel,folderButton,back,associations,remove,access;
-        private readonly DownloadProgressView transfer=new DownloadProgressView{Dock=DockStyle.Fill,Margin=new Padding(0,8,0,8)};
+        private readonly DownloadProgressView transfer=new DownloadProgressView{Dock=DockStyle.Fill,Margin=new Padding(0,4,0,8)};
         private readonly JournalTextBox journal=new JournalTextBox();
         private readonly bool preview;
         private readonly Func<string,SoftwarePackage> latestSource;
@@ -35,9 +35,9 @@ namespace ServiceTool
         internal SoftwareManagerForm(bool previewMode,Func<string,SoftwarePackage> versions) : base("Установка программ BARS",new Size(1120,880))
         {
             if(versions==null)throw new ArgumentNullException("versions");latestSource=versions;
-            FormBorderStyle=FormBorderStyle.FixedSingle;preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=96;
-            var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Margin=Padding.Empty,MinimumSize=Size.Empty}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{100F,0F,56F,100F,78F,50F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
+            FormBorderStyle=FormBorderStyle.FixedSingle;preview=previewMode; MinimumSize=new Size(1000,700); Root.AutoScroll=false; Root.RowStyles[0].Height=76;
+            var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Margin=Padding.Empty,MinimumSize=Size.Empty}; body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            foreach(float height in new[]{96F,0F,44F,80F}) body.RowStyles.Add(new RowStyle(height==0 ? SizeType.Percent : SizeType.Absolute,height==0 ? 100 : height));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=3,Margin=new Padding(0,0,0,12),Padding=new Padding(0,8,0,0)};
             heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,520));
             heading.RowStyles.Add(new RowStyle(SizeType.Absolute,8));heading.RowStyles.Add(new RowStyle(SizeType.Absolute,32));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
@@ -64,10 +64,10 @@ namespace ServiceTool
             tableCard.SizeChanged+=delegate{QueueFitRows();};
             body.Controls.Add(tableCard,0,1);
             grid.ColumnWidthChanged+=delegate{QueueFitRows();};
-            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,10)};
+            var options=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,8,0,8)};
             options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));options.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             remote.Dock=DockStyle.Fill;remote.Margin=Padding.Empty;remote.Palette=Colors;
-            remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop — пароль перед установкой";remote.Checked=false;
+            remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop";remote.Checked=false;
             options.Controls.Add(remote,0,0);body.Controls.Add(options,0,2);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=new Padding(0,0,0,10)};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
             install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=false;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить удалённый доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
@@ -79,10 +79,9 @@ namespace ServiceTool
             var footer=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=new Padding(0,10,0,0)};footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             activity=Label("Установка начнётся только по кнопке",true);activity.Font=new Font("Segoe UI",9);footer.Controls.Add(activity,0,0);
 
-            back=Button("В меню",false);ModuleNavigation.Configure(back);back.Click+=delegate{MenuRequested=true;Close();};footer.Controls.Add(back,1,0);
+            back=Button("В меню",false);ModuleNavigation.Configure(back);back.Click+=delegate{if(ModuleNavigation.ReturnToHub())return;MenuRequested=true;Close();};footer.Controls.Add(back,1,0);
             // Navigation and the journal stay outside the scrolling work area.
             // Only unusually short screens or large text require scrolling it.
-            body.RowCount=4;while(body.RowStyles.Count>4)body.RowStyles.RemoveAt(body.RowStyles.Count-1);body.MinimumSize=new Size(0,440);
             var journalArea=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};journalArea.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));journalArea.RowStyles.Add(new RowStyle(SizeType.Absolute,112));journalArea.RowStyles.Add(new RowStyle(SizeType.Percent,100));journalArea.Controls.Add(transfer,0,0);journalArea.Controls.Add(logCard,0,1);
             var outer=new CompactJournalLayout(body,1,grid,journalArea,footer,176,54);Root.Controls.Add(outer,0,1);
             try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){transfer.Stage("Не выполнено: "+ex.Message,failed:true);Log(ex.Message);}
@@ -102,7 +101,7 @@ namespace ServiceTool
             grid.AllowUserToAddRows=grid.AllowUserToDeleteRows=grid.AllowUserToResizeRows=grid.AllowUserToResizeColumns=grid.AllowUserToOrderColumns=false;
             grid.ReadOnly=true;grid.TouchScrollingEnabled=true;grid.RowHeadersVisible=false;grid.MultiSelect=false;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;
             grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.None;
-            grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=44;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            grid.EnableHeadersVisualStyles=false;grid.ColumnHeadersHeight=40;grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             grid.ColumnHeadersDefaultCellStyle.Font=headerFont;grid.ColumnHeadersDefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;
             grid.DefaultCellStyle.Font=new Font("Segoe UI",9.5F);grid.DefaultCellStyle.Padding=new Padding(4);grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleLeft;
             grid.CellBorderStyle=DataGridViewCellBorderStyle.Single;grid.ColumnHeadersBorderStyle=DataGridViewHeaderBorderStyle.Single;grid.ScrollBars=ScrollBars.None;
@@ -167,7 +166,7 @@ namespace ServiceTool
             grid.ColumnHeadersDefaultCellStyle.BackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.ForeColor=Colors.Text;grid.ColumnHeadersDefaultCellStyle.SelectionBackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.SelectionForeColor=Colors.Text;
             grid.Invalidate();
         }
-        private void Log(string text){if(IsDisposed)return;journal.AppendText(DateTime.Now.ToString("HH:mm:ss")+"  "+text+Environment.NewLine);}
+        private void Log(string text){if(IsDisposed)return;journal.AppendText(DateTime.Now.ToString("HH:mm:ss")+"  "+OperationMessage.FinishSentence(text)+Environment.NewLine);}
         private void Progress(string text){if(busy&&!checking&&!transfer.Snapshot.Complete&&!transfer.Snapshot.Failed)transfer.Stage(text);if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((MethodInvoker)delegate{if(!IsDisposed&&busy&&!transfer.Snapshot.Complete&&!transfer.Snapshot.Failed)activity.Text=text;});}catch(InvalidOperationException){}}
         private void LogProgress(string text){Progress(text);if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((MethodInvoker)delegate{Log(text);});}catch(InvalidOperationException){}}
         private bool ChooseSource()
@@ -183,10 +182,10 @@ namespace ServiceTool
         private void Lock(bool value)
         {
             if(value){if(checking)transfer.BeginOperation("Проверяем список программ…",false);else transfer.BeginOperation("Подготавливаем операцию…");}
-            busy=value;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=remote.Enabled=!value;cancel.Enabled=value;
+            busy=value;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=!value;cancel.Enabled=value;
 
-            back.Enabled=!value||checking;
-            if(!value&&!IsDisposed){if(transfer.Snapshot.Active)transfer.FinishOperation(cancelled?"Операция отменена":"Операция остановлена. Результат — в журнале.");if(transfer.Snapshot.Complete||transfer.Snapshot.Failed)activity.Text=transfer.Snapshot.Stage;UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
+            back.Enabled=!value||checking||ManagerApplicationContext.ActiveContext!=null;UpdateActions();
+            if(!value&&!IsDisposed){if(transfer.Snapshot.Active)transfer.FinishOperation(cancelled?"Операция отменена":"Операция остановлена. Результат — в журнале.",cancelled:cancelled);if(transfer.Snapshot.Complete||transfer.Snapshot.Failed)activity.Text=transfer.Snapshot.Stage;UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
         }
         private async Task RefreshPackages(bool resolveUnknownVersion=false)
         {
@@ -213,10 +212,10 @@ namespace ServiceTool
                 if(cancelled||IsDisposed)return;foreach(var candidate in updates.Where(p=>p!=null)){SoftwarePackage old;if(!packages.TryGetValue(candidate.Id,out old)||SoftwareCatalog.Compare(candidate.Version,old.Version)>=0)packages[candidate.Id]=candidate;}
                 if(cancelled)throw new OperationCanceledException();
                 selection.Clear();foreach(var app in SoftwareCatalog.Apps){if(packages.ContainsKey(app.Id)&&(checks[app.Id].State==LibraryState.Missing || checks[app.Id].State==LibraryState.Installed && packages[app.Id].Version!="0.0" && SoftwareCatalog.Compare(packages[app.Id].Version,checks[app.Id].Version)>0))selection.Add(app.Id);}
-                scanSucceeded=true;Log(resolveUnknownVersion&&updates.Any(u=>u==null)?"Проверка завершена. Официальный источник в сети недоступен, предлагается установка проверенных локальных копий программ.":"Проверка завершена.");activity.Text="Выбери программы и проверь источник установщиков";
+                scanSucceeded=true;Log(resolveUnknownVersion&&updates.Any(u=>u==null)?"Проверка завершена. Официальный источник в сети недоступен, предлагается установка проверенных локальных копий программ.":"Проверка завершена.");activity.Text="Выбери программы и проверь источник установщиков.";
             }
             catch(OperationCanceledException){if(!IsDisposed)Log("Проверка отменена");}catch(Exception ex){if(!IsDisposed)Log("Проверка не завершена: "+ex.Message);}
-            finally{transfer.FinishOperation(cancelled?"Проверка отменена":scanSucceeded?"Проверка списка завершена. Выбери действие.":"Проверка не завершена — прочитай журнал",success:resolveUnknownVersion&&scanSucceeded&&transfer.WorkFinished,failed:!scanSucceeded&&!cancelled);checking=false;if(!IsDisposed)Lock(false);}
+            finally{transfer.FinishOperation(cancelled?"Проверка отменена":scanSucceeded?"Проверка списка завершена. Выбери действие.":"Проверка не завершена — прочитай журнал",success:resolveUnknownVersion&&scanSucceeded&&transfer.WorkFinished,failed:!scanSucceeded&&!cancelled,cancelled:cancelled);checking=false;if(!IsDisposed)Lock(false);}
         }
         private void UpdateRows()
         {
@@ -239,7 +238,11 @@ namespace ServiceTool
         {return SoftwareCatalog.Apps.Where(a=>selection.Contains(a.Id)&&checks.ContainsKey(a.Id)&&packages.ContainsKey(a.Id)&&SoftwareMaintenance.CanInstall(checks[a.Id],packages[a.Id])).Select(a=>a.Id).ToArray();}
         private void UpdateActions()
         {
-            if(install==null)return;install.Enabled=!busy&&ChosenInstallable().Length>0;remove.Enabled=!busy&&ChosenInstalled().Length>0;access.Enabled=!busy&&ChosenInstalled(true).Length>0;
+            if(install==null)return;
+            bool remoteSelected=SoftwareCatalog.Apps.Any(app=>app.Remote&&selection.Contains(app.Id));
+            remote.Enabled=!busy&&remoteSelected;
+            if(!remoteSelected)remote.Checked=false;
+            install.Enabled=!busy&&ChosenInstallable().Length>0;remove.Enabled=!busy&&ChosenInstalled().Length>0;access.Enabled=!busy&&ChosenInstalled(true).Length>0;
         }
         private async Task ConfigureSelected()
         {
@@ -248,11 +251,12 @@ namespace ServiceTool
             cancelled=false;Lock(true);int completed=0;transfer.SetWork(ids.Length);
             try
             {
+                using (await WindowsOperationQueue.EnterAsync(() => Progress(WindowsOperationQueue.WaitingMessage), () => cancelled))
                 using(var active=await Task.Run(()=>LibrarySession.Start(()=>cancelled)))
                 {
                     session=active;foreach(string id in ids){if(cancelled)throw new OperationCanceledException();var request=new SoftwareInstallRequest {Id=id,Version=checks[id].Version,Sha256="",AllowAnyDesk32=true,ConfigureRemote=true,Password=secrets[id]};var result=await Task.Run(()=>active.ExecuteSystem("software-access",request.Serialize(),"",Progress));Log(SoftwareCatalog.Find(id).Name+": "+result.Message);if(result.ExitCode!=0){transfer.FinishOperation(result.Message,failed:true);break;}completed++;transfer.CompleteStep();}
                 }
-            }catch(OperationCanceledException){transfer.FinishOperation("Настройка отменена");Log("Настройка отменена");}catch(Exception ex){transfer.FinishOperation("Настройка прервана: "+ex.Message,failed:true);Log("Настройка прервана: "+ex.Message);}finally{if(!cancelled&&!transfer.Snapshot.Failed&&completed==ids.Length)transfer.FinishOperation("Настройка доступа завершена.",success:true);session=null;secrets.Clear();Lock(false);}
+            }catch(OperationCanceledException){transfer.FinishOperation("Настройка отменена",cancelled:true);Log("Настройка отменена");}catch(Exception ex){transfer.FinishOperation("Настройка прервана: "+ex.Message,failed:true);Log("Настройка прервана: "+ex.Message);}finally{if(!cancelled&&!transfer.Snapshot.Failed&&completed==ids.Length)transfer.FinishOperation("Настройка доступа завершена.",success:true);session=null;secrets.Clear();Lock(false);}
         }
         private async Task RemoveSelected()
         {
@@ -261,6 +265,7 @@ namespace ServiceTool
             cancelled=false;Lock(true);transfer.Report(new TransferProgress{Stage="Подготавливаем очередь…"});bool reboot=false;int completed=0;transfer.SetWork(ids.Length);
             try
             {
+                using (await WindowsOperationQueue.EnterAsync(() => Progress(WindowsOperationQueue.WaitingMessage), () => cancelled))
                 using(var active=await Task.Run(()=>LibrarySession.Start(()=>cancelled)))
                 {
                     session=active;
@@ -271,7 +276,7 @@ namespace ServiceTool
                         try{SoftwareMaintenance.CleanupUser(id,Log);}finally{checks[id]=new SoftwareCheck {Id=id,Version="",Executable="",State=LibraryState.Missing,Detail="Не установлена"};selection.Remove(id);UpdateRows();}completed++;transfer.CompleteStep();
                     }
                 }
-            }catch(OperationCanceledException){transfer.FinishOperation("Удаление отменено. Проверь состояние программ");Log("Удаление отменено. Проверь состояние программ");}catch(Exception ex){transfer.FinishOperation("Удаление не завершено: "+ex.Message,failed:true);Log("Удаление или очистка настроек не завершены: "+ex.Message);}finally{if(!cancelled&&completed==ids.Length)transfer.FinishOperation("Удаление подтверждено.",success:true);session=null;Lock(false);}
+            }catch(OperationCanceledException){transfer.FinishOperation("Удаление отменено. Проверь состояние программ",cancelled:true);Log("Удаление отменено. Проверь состояние программ");}catch(Exception ex){transfer.FinishOperation("Удаление не завершено: "+ex.Message,failed:true);Log("Удаление или очистка настроек не завершены: "+ex.Message);}finally{if(!cancelled&&completed==ids.Length)transfer.FinishOperation("Удаление подтверждено.",success:true);session=null;Lock(false);}
             if(reboot&&!closeAfter)await RestartOffer.Show(this);
         }
         internal string InstallConfirmation(string[] ids)
@@ -279,12 +284,12 @@ namespace ServiceTool
             string text="Установить или обновить выбранные программы?";
             var remoteUpdates=ids.Where(id=>SoftwareCatalog.Find(id).Remote&&checks.ContainsKey(id)&&checks[id].State==LibraryState.Installed).Select(id=>SoftwareCatalog.Find(id).Name).ToArray();
             if(remoteUpdates.Length>0)text+="\r\n\r\nОбновление "+String.Join(" / ",remoteUpdates)+" может прервать текущий удалённый сеанс.";
-            if(remote.Checked&&ids.Any(id=>SoftwareCatalog.Find(id).Remote))text+="\r\n\r\nДля выбранных программ удалённого доступа будет настроен постоянный пароль.";
+            if(remote.Checked&&ids.Any(id=>SoftwareCatalog.Find(id).Remote))text+="\r\n\r\nДля выбранных AnyDesk и RuDesktop будет настроен постоянный пароль.";
             return text;
         }
         private async Task Install()
         {
-            if(busy||preview)return;var ids=ChosenInstallable();if(ids.Length==0){activity.Text="Отметь программы для установки";return;}
+            if(busy||preview)return;var ids=ChosenInstallable();if(ids.Length==0){activity.Text="Отметь программы для установки.";return;}
             if(String.IsNullOrWhiteSpace(source)&&ids.Any(id=>!Path.IsPathRooted(packages[id].File)||!File.Exists(packages[id].File))&&!ChooseSource())return;
             var secrets=new Dictionary<string,string>();
             if(remote.Checked)foreach(string id in ids.Where(id=>SoftwareCatalog.Find(id).Remote))using(var dialog=new SoftwareRemoteDialog(Colors,Icon,id)) {if(dialog.ShowDialog(this)!=DialogResult.OK)return;secrets[id]=dialog.Password;}
@@ -315,6 +320,7 @@ namespace ServiceTool
                     ready.Add(package);transfer.CompleteStep();
                 }
                 if(cancelled)throw new OperationCanceledException();
+                using (await WindowsOperationQueue.EnterAsync(() => Progress(WindowsOperationQueue.WaitingMessage), () => cancelled))
                 using(var active=await Task.Run(()=>LibrarySession.Start(()=>cancelled)))
                 {
                     session=active;
@@ -322,15 +328,15 @@ namespace ServiceTool
                     {
                         if(cancelled){break;}string id=package.Id;
                         var request=new SoftwareInstallRequest {Id=id,Version=package.Version,Sha256=package.Sha256,AllowAnyDesk32=true,ConfigureRemote=secrets.ContainsKey(id),Password=secrets.ContainsKey(id)?secrets[id]:""};
-                        transfer.Report(new TransferProgress{Stage="Устанавливаем "+SoftwareCatalog.Find(id).Name,File=Path.GetFileName(package.File)});
+                        transfer.Report(new TransferProgress{Stage="Устанавливаем "+SoftwareCatalog.Find(id).Name+"…",File=Path.GetFileName(package.File)});
                         var result=await Task.Run(()=>active.ExecuteSystem("software-install",request.Serialize(),package.File,Progress));
                         if(LibraryPlan.Success(result.ExitCode)&&result.State==LibraryState.Installed)transfer.CompleteStep();else transfer.FinishOperation(result.Message,failed:true);Log(SoftwareCatalog.Find(id).Name+": "+result.Message);bool allow=true;checks[id]=await Task.Run(()=>SoftwareDetection.Check(id,allow));UpdateRows();
                         if(result.Reboot){reboot=true;break;}if(!LibraryPlan.Success(result.ExitCode)||result.State!=LibraryState.Installed){break;}
                     }
                 }
             }
-            catch(OperationCanceledException){transfer.Stage("Операция отменена");Log("Отменено. Проверь программы перед повтором");}catch(Exception ex){transfer.Stage("Очередь остановлена: "+ex.Message,failed:true);Log("Очередь остановлена: "+ex.Message);}
-            finally{session=null;if(!cancelled&&transfer.WorkFinished&&!transfer.Snapshot.Failed)transfer.FinishOperation("Очередь выполнена. Установка подтверждена.",success:true);var state=transfer.Snapshot;if(state.Active&&!state.Complete&&!state.Failed)transfer.Report(new TransferProgress{Stage="Очередь завершена. Результат — в журнале.",Active=false});Lock(false);secrets.Clear();}
+            catch(OperationCanceledException){transfer.Stage("Операция отменена",cancelled:true);Log("Отменено. Проверь программы перед повтором");}catch(Exception ex){transfer.Stage("Очередь остановлена: "+ex.Message,failed:true);Log("Очередь остановлена: "+ex.Message);}
+            finally{session=null;if(!cancelled&&transfer.WorkFinished&&!transfer.Snapshot.Failed)transfer.FinishOperation("Очередь выполнена. Установка подтверждена.",success:true);var state=transfer.Snapshot;if(state.Active&&!state.Complete&&!state.Failed)transfer.FinishOperation(cancelled?"Операция отменена.":"Очередь завершена. Результат — в журнале.",cancelled:cancelled);Lock(false);secrets.Clear();}
             if(reboot&&!closeAfter)await RestartOffer.Show(this);
         }
         private void OpenDefaultApps()
@@ -348,18 +354,17 @@ namespace ServiceTool
     internal sealed class SoftwareRemoteDialog : Form
     {
         private readonly BrandTextBox input=new BrandTextBox(),confirmation=new BrandTextBox();
-        private readonly BrandCheckBox remember=new BrandCheckBox(),standard=new BrandCheckBox();private readonly string id;
+        private readonly BrandCheckBox remember=new BrandCheckBox();private readonly string id;
         private readonly System.Windows.Forms.Timer keyboardTimer=new System.Windows.Forms.Timer();
         private readonly ToolTip keyboardTips=new ToolTip();
-        private string customPassword="",customConfirmation="";
         private readonly BrandButton ok;private readonly Label validation;private readonly Image logo;
         internal string Password {get{return input.Text;}}
         internal static bool PasswordsMatch(string password,string repeated){return password!=null&&password.Length>=8&&password.Length<=128&&!password.Any(Char.IsControl)&&String.Equals(password,repeated,StringComparison.Ordinal);}
         internal SoftwareRemoteDialog(ThemePalette colors,Icon icon,string appId,bool loadSaved=true)
         {
             NativeWindowTheme.Bind(this,()=>colors.Dark);
-            SuspendLayout();id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(660,460);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
-            var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=11};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{70,24,38,24,38,24,26,36,36,64,44})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
+            SuspendLayout();id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(660,424);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
+            var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=10};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{70,24,38,24,38,24,26,36,64,44})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,64));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             heading.Controls.Add(new Label {Text="Постоянный пароль для "+SoftwareCatalog.Find(id).Name+"\r\nПодключение без подтверждения на этом компьютере",Dock=DockStyle.Fill,ForeColor=colors.Text,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,0);
             logo=BrandAssets.LoadSoftwareIcon(id);heading.Controls.Add(new PictureBox {Image=logo,SizeMode=PictureBoxSizeMode.Zoom,Dock=DockStyle.Fill,Margin=new Padding(8,8,0,8)},1,0);layout.Controls.Add(heading,0,0);
@@ -370,16 +375,14 @@ namespace ServiceTool
             languageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int width in new[]{10,40,28})languageRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,width));languageRow.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var language=new Label{Name="keyboardLanguage",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleRight,ForeColor=colors.Dark?colors.Warning:Color.FromArgb(190,35,35),Font=new Font("Segoe UI",10F,FontStyle.Bold),Margin=Padding.Empty};languages.Add(language);languageRow.Controls.Add(language,0,0);layout.Controls.Add(languageRow,0,5);
             validation=new Label {Text="От 8 до 128 символов",Dock=DockStyle.Fill,ForeColor=colors.Muted,Margin=Padding.Empty,Font=new Font("Segoe UI",9)};layout.Controls.Add(validation,0,6);
-            remember.Text="Запомнить на этом компьютере для моей учётной записи";remember.Dock=DockStyle.Fill;remember.Palette=colors;remember.Margin=Padding.Empty;layout.Controls.Add(remember,0,8);
-            standard.Text="Использовать стандартный пароль BARS";standard.Dock=DockStyle.Fill;standard.Palette=colors;standard.Margin=Padding.Empty;layout.Controls.Add(standard,0,7);
-            standard.CheckedChanged+=delegate{if(standard.Checked){customPassword=input.Text;customConfirmation=confirmation.Text;input.Text=confirmation.Text="Dk3651340";}else{input.Text=customPassword;confirmation.Text=customConfirmation;}input.Enabled=confirmation.Enabled=!standard.Checked;input.UseSystemPasswordChar=confirmation.UseSystemPasswordChar=true;foreach(var eye in eyes){eye.Enabled=!standard.Checked;eye.Revealed=false;eye.AccessibleName="Показать пароль";eye.Invalidate();}};
-            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,Name="passwordNotice",TextAlign=ContentAlignment.MiddleLeft,ForeColor=colors.Dark?colors.Warning:Color.FromArgb(190,35,35),Font=new Font("Segoe UI",9),Margin=new Padding(0,12,0,4)},0,9);
+            remember.Text="Запомнить на этом компьютере для моей учётной записи";remember.Dock=DockStyle.Fill;remember.Palette=colors;remember.Margin=Padding.Empty;layout.Controls.Add(remember,0,7);
+            layout.Controls.Add(new Label {Text=id=="rudesktop"?"RuDesktop передаёт пароль параметром процесса; он может быть виден локальному администратору во время настройки":"Пароль передаётся AnyDesk через стандартный ввод и не записывается в журнал",Dock=DockStyle.Fill,Name="passwordNotice",TextAlign=ContentAlignment.MiddleLeft,ForeColor=colors.Dark?colors.Warning:Color.FromArgb(190,35,35),Font=new Font("Segoe UI",9),Margin=new Padding(0,12,0,4)},0,8);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var cancel=new BrandButton {Text="Отмена",Palette=colors,Dock=DockStyle.Fill,DialogResult=DialogResult.Cancel,Margin=new Padding(0,0,10,0)};actions.Controls.Add(cancel,0,0);
             ok=new BrandButton {Text="Продолжить",Palette=colors,Primary=true,Dock=DockStyle.Fill,Margin=Padding.Empty,Enabled=false};
             Action validate=delegate{ok.Enabled=PasswordsMatch(input.Text,confirmation.Text);validation.Text=input.Text.Length<8?"Введи не менее 8 символов":!String.Equals(input.Text,confirmation.Text,StringComparison.Ordinal)?"Пароли не совпадают":"Пароли совпадают";};input.TextChanged+=delegate{validate();};confirmation.TextChanged+=delegate{validate();};
             ok.Click+=delegate{if(!PasswordsMatch(input.Text,confirmation.Text))return;try{if(remember.Checked)SoftwarePasswordStore.Save(id,input.Text);else SoftwarePasswordStore.Forget(id);DialogResult=DialogResult.OK;}catch(Exception){validation.Text="Не удалось сохранить пароль: отключи запоминание и повтори";}};
-            actions.Controls.Add(ok,1,0);layout.Controls.Add(actions,0,10);Controls.Add(layout);CancelButton=cancel;AcceptButton=ok;
+            actions.Controls.Add(ok,1,0);layout.Controls.Add(actions,0,9);Controls.Add(layout);CancelButton=cancel;AcceptButton=ok;
             keyboardTips.IsBalloon=true;keyboardTips.ToolTipIcon=ToolTipIcon.Warning;keyboardTips.ToolTipTitle="Caps Lock включён";keyboardTimer.Interval=200;keyboardTimer.Tick+=delegate{UpdateKeyboard();};Shown+=delegate{keyboardTimer.Start();UpdateKeyboard();};InputLanguageChanged+=delegate{UpdateKeyboard();};
             if(loadSaved)try{input.Text=SoftwarePasswordStore.Load(id);remember.Checked=input.Text.Length>0;}catch(Exception){}
             AutoScaleMode=AutoScaleMode.Dpi;ResumeLayout(true);
@@ -401,7 +404,7 @@ namespace ServiceTool
         internal void UpdateKeyboardState(string code,bool capsLocked)
         {
             string text=LanguageLabel(code);foreach(var label in languages)label.Text=text;
-            bool on=capsLocked&&!standard.Checked;foreach(var label in caps){label.Visible=on;if(!on)keyboardTips.Hide(label);}
+            bool on=capsLocked;foreach(var label in caps){label.Visible=on;if(!on)keyboardTips.Hide(label);}
             if(on&&!capsWasOn&&(input.Focused||confirmation.Focused)){var label=caps[input.Focused?0:1];keyboardTips.Show("Caps Lock включён: проверь регистр букв",label,0,label.Height,3000);}capsWasOn=on;
         }
         protected override void Dispose(bool disposing){if(disposing){keyboardTimer.Dispose();keyboardTips.Dispose();}base.Dispose(disposing);if(disposing&&logo!=null)logo.Dispose();}

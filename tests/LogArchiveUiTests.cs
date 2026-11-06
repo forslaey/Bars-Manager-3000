@@ -230,13 +230,15 @@ namespace ServiceTool
                 Assert(((Button)dialog.AcceptButton).Text == "Выбрать путь...",
                     "date dialog describes choosing a destination path (dark=" + dark + ")");
                 VerifyDialogButtons(dialog, dark);
-                Assert(scope.SelectedIndex == 0 && dates.Controls.Count == 12
+                Assert(scope.SelectedIndex == 0, "Today is preselected when present");
+                scope.SelectedIndex = 2;
+                Assert(dates.Controls.Count == 12
                     && MarkedDates(dates).Count == 12 && AllDateChoicesDisabled(dates),
                     "All displays every visible dated folder checked and inactive (dark=" + dark + ")");
                 CheckBox allDate = (CheckBox)dates.Controls[0];
                 VerifyDateTextPaint(allDate, ThemePalette.Create(dark), "All", dark);
                 AssertUnchangedByClick(allDate, "All", dark);
-                scope.SelectedIndex = 1;
+                scope.SelectedIndex = 0;
                 Assert(MarkedDates(dates).Count == 0 && AllDateChoicesDisabled(dates),
                     "Today leaves nonmatching dates unchecked and inactive (dark=" + dark + ")");
                 VerifyDateTextPaint((CheckBox)dates.Controls[0], ThemePalette.Create(dark), "Today unchecked", dark);
@@ -251,7 +253,7 @@ namespace ServiceTool
                 VerifyDateTextPaint(todayDate, ThemePalette.Create(dark), "Today checked", dark);
                 AssertUnchangedByClick(todayDate, "Today checked", dark);
                 DialogField<Button>(dialog, "previous").PerformClick();
-                scope.SelectedIndex = 2;
+                scope.SelectedIndex = 1;
                 Assert(MarkedDates(dates).Count == 0,
                     "All and Today display marks do not populate the manual selection (dark=" + dark + ")");
                 ((Button)dialog.AcceptButton).PerformClick();
@@ -275,8 +277,8 @@ namespace ServiceTool
                 Assert(((CheckBox)dates.Controls[0]).Checked && !DialogField<Button>(dialog, "previous").Enabled,
                     "returning to the first page restores its checkbox selection (dark=" + dark + ")");
                 scope.SelectedIndex = 0;
-                scope.SelectedIndex = 1;
                 scope.SelectedIndex = 2;
+                scope.SelectedIndex = 1;
                 ((Button)dialog.AcceptButton).PerformClick();
                 var selected = new HashSet<string>(dialog.Selection.FolderNames, StringComparer.OrdinalIgnoreCase);
                 Assert(dialog.DialogResult == DialogResult.OK && dialog.Selection.Scope == LogArchiveScope.SelectedFolders
@@ -289,7 +291,7 @@ namespace ServiceTool
                 new List<LogDateFolder> { new LogDateFolder { Name = "2026.10.14", Date = today.AddDays(-1) } }, today))
             {
                 ShowOffscreen(dialog);
-                DialogField<ComboBox>(dialog, "scope").SelectedIndex = 1;
+                DialogField<ComboBox>(dialog, "scope").SelectedIndex = 0;
                 ((Button)dialog.AcceptButton).PerformClick();
                 Assert(dialog.Selection == null && dialog.DialogResult != DialogResult.OK,
                     "Today cannot confirm when no matching dated folder exists");
@@ -297,7 +299,7 @@ namespace ServiceTool
             using (var dialog = new LogArchiveDialog(ThemePalette.Create(false), "Сегодня", available, today))
             {
                 ShowOffscreen(dialog);
-                DialogField<ComboBox>(dialog, "scope").SelectedIndex = 1;
+                DialogField<ComboBox>(dialog, "scope").SelectedIndex = 0;
                 ((Button)dialog.AcceptButton).PerformClick();
                 Assert(dialog.Selection != null && dialog.Selection.Scope == LogArchiveScope.Today
                     && dialog.Selection.Today.Date == today,
@@ -354,7 +356,7 @@ namespace ServiceTool
                     for (int x = left; x < right; ++x)
                     {
                         Color pixel = bitmap.GetPixel(x, y);
-                        if (Contrast(pixel, palette.Surface) < 4.5) continue;
+                        if (Contrast(pixel, item.BackColor) < 4.5) continue;
                         // The checked mark lies outside this region; a legible date must
                         // supply several characters' worth of contrasting text pixels.
                         ++glyphPixels;

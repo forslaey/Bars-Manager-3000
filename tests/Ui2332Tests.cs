@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -58,7 +58,7 @@ namespace ServiceTool
                 }
                 using(var libraries=new LibraryManagerForm(true))
                 {
-                    libraries.SetTheme(dark,false);Show(libraries);var root=Field<TableLayoutPanel>(libraries,"Root");root.Dock=DockStyle.None;root.Size=new Size(1350,1100);Pump();int before=Field<ServiceGrid>(libraries,"grid").Height;int journalHeight=Field<JournalTextBox>(libraries,"journal").Height;root.Size=new Size(1350,2400);Pump();Check(Field<ServiceGrid>(libraries,"grid").Height>before+900,"Libraries give portrait space to component list");Check(Field<JournalTextBox>(libraries,"journal").Height==journalHeight,"Library journal does not steal list space");libraries.Close();
+                    libraries.SetTheme(dark,false);Show(libraries);var root=Field<TableLayoutPanel>(libraries,"Root");var host=root.Parent as FillContentPanel;if(host!=null){host.Controls.Remove(root);libraries.Controls.Remove(host);host.Dispose();libraries.Controls.Add(root);}root.Dock=DockStyle.None;root.Size=new Size(1350,1100);Pump();int before=Field<ServiceGrid>(libraries,"grid").Height;int journalHeight=Field<JournalTextBox>(libraries,"journal").Height;root.Size=new Size(1350,2400);Pump();Check(Field<ServiceGrid>(libraries,"grid").Height>before+900,"Libraries give portrait space to component list");Check(Field<JournalTextBox>(libraries,"journal").Height==journalHeight,"Library journal does not steal list space");libraries.Close();
                 }
                 using(var guide=new UserGuideForm())
                 {

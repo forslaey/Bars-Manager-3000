@@ -13,7 +13,7 @@ namespace ServiceTool
         internal long Bytes, Total;
         internal double Overall=-1;
         internal string WorkText;
-        internal bool Complete, Paused, Failed;
+        internal bool Complete, Paused, Failed, Cancelled;
         internal bool Active = true;
     }
 
@@ -34,9 +34,9 @@ namespace ServiceTool
         internal Action<string> OperationReporter {
             get { long id;lock(sync)id=operationId;return text=>{lock(sync){if(!operationRunning||id!=operationId)return;UpdateWorkMessage(text);}}; }
         }
-        internal void FinishOperation(string text,bool success=false,bool failed=false)
+        internal void FinishOperation(string text,bool success=false,bool failed=false,bool cancelled=false)
         {
-            lock(sync){if(success)workDone=workTotal;var final=WorkSnapshot(text);operationRunning=false;operationId++;final.Complete=success;final.Failed=failed;final.Active=false;snapshot=final;}
+            lock(sync){if(success)workDone=workTotal;var final=WorkSnapshot(OperationMessage.FinishSentence(text));operationRunning=false;operationId++;final.Complete=success;final.Failed=failed;final.Cancelled=cancelled;final.Active=false;snapshot=final;}
         }
         TransferProgress WorkSnapshot(string text){return new TransferProgress{Stage=text,Active=operationAnimated,Key="operation-"+operationId,Overall=workTotal>0?Math.Min(.999,(workDone+workFraction)/workTotal):-1,WorkText=workTotal>0?"Выполнено "+workDone+" из "+workTotal+" задач":""};}
         void UpdateWorkMessage(string text){
@@ -57,6 +57,7 @@ namespace ServiceTool
         string sampleFile; bool wasPaused;
         TransferProgress lastPaint;
         internal ThemePalette Palette;
+        internal bool InlineDetails { get; set; }
         internal double DisplayedFraction { get { return displayed; } }
         internal TransferProgress Snapshot { get { lock(sync) return snapshot; } }
         internal DownloadProgressView()
@@ -73,11 +74,11 @@ namespace ServiceTool
                 else snapshot=progress;
             }
         }
-        internal void Stage(string stage, string file = null, bool complete = false, bool failed = false)
+        internal void Stage(string stage, string file = null, bool complete = false, bool failed = false, bool cancelled = false)
         {
-            if(operationRunning){if(failed)FinishOperation(stage,failed:true);else if(stage.IndexOf("отмен",StringComparison.OrdinalIgnoreCase)>=0)FinishOperation(stage);else if(complete)FinishOperation(stage,success:true);else OperationReporter(stage);return;}
+            if(operationRunning){if(failed)FinishOperation(stage,failed:true);else if(cancelled)FinishOperation(stage,cancelled:true);else if(complete)FinishOperation(stage,success:true);else OperationReporter(stage);return;}
             var previous = Snapshot;
-            Report(new TransferProgress { Stage = stage, File = file ?? previous.File, Bytes = 0, Total = 0, Complete = complete, Failed = failed, Active=!complete&&!failed&&stage.IndexOf("отмен",StringComparison.OrdinalIgnoreCase)<0&&stage.IndexOf("заверш",StringComparison.OrdinalIgnoreCase)<0 });
+            Report(new TransferProgress { Stage = complete || failed || cancelled ? OperationMessage.FinishSentence(stage) : stage, File = file ?? previous.File, Bytes = 0, Total = 0, Complete = complete, Failed = failed, Cancelled = cancelled, Active=!complete&&!failed&&!cancelled&&stage.IndexOf("заверш",StringComparison.OrdinalIgnoreCase)<0 });
         }
         protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); animation.Enabled = Visible && IsHandleCreated; }
         protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e); animation.Enabled = Visible; }
@@ -122,15 +123,19 @@ namespace ServiceTool
             string percent = p.Complete ? "100%" : p.Overall>=0?Math.Floor(p.Overall*100)+"%":p.Total > 0 ? Math.Floor(Math.Min(.999, p.Bytes / (double)p.Total) * 100) + "%" : "";
             var flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
             int percentWidth = percent.Length == 0 ? 0 : TextRenderer.MeasureText(e.Graphics, "100%", Font, Size.Empty, flags).Width + px(12);
-            TextRenderer.DrawText(e.Graphics, p.Stage ?? "", Font, new Rectangle(1,0,Math.Max(1,Width-percentWidth-2),line), colors.Text, flags | TextFormatFlags.EndEllipsis);
+            string stage = p.Stage ?? "";
+            if (InlineDetails && !String.IsNullOrEmpty(p.WorkText)) stage += " · " + p.WorkText;
+            TextRenderer.DrawText(e.Graphics, stage, Font, new Rectangle(1,0,Math.Max(1,Width-percentWidth-2),line), colors.Text, flags | TextFormatFlags.EndEllipsis);
             TextRenderer.DrawText(e.Graphics, percent, Font, new Rectangle(Width-percentWidth,0,percentWidth,line), colors.Text, flags | TextFormatFlags.Right);
+            bool interrupted = p.Failed || p.Cancelled;
+            Color interruptionColor = colors.Dark ? Color.FromArgb(255,116,109) : Color.FromArgb(179,41,54);
             using(var shape = Capsule(bar))
             using(var track = new SolidBrush(colors.Dark ? colors.SurfaceAlt : Color.FromArgb(211,223,216)))
             {
                 // Do not clip to a rounded region: GDI+ region clipping has aliased edges.
                 e.Graphics.FillPath(track, shape);
-                Color accent = p.Failed ? Color.FromArgb(190,75,65) : p.Paused ? colors.Muted : colors.Accent;
-                using(var fill = new LinearGradientBrush(bar, accent, ControlPaint.Light(accent), 0F))
+                Color accent = interrupted ? interruptionColor : p.Paused ? colors.Muted : colors.Accent;
+                using(Brush fill = interrupted ? (Brush)new SolidBrush(accent) : new LinearGradientBrush(bar, accent, ControlPaint.Light(accent), 0F))
                 {
                     if(p.Overall>=0 || p.Total > 0 || p.Complete)
                     {
@@ -138,11 +143,12 @@ namespace ServiceTool
                         if(width>0)using(var filled=Capsule(new RectangleF(bar.Left,bar.Top,width,bar.Height)))e.Graphics.FillPath(fill,filled);
                     }
                 }
-                using(var outline=new Pen(colors.Border,Math.Max(1F,scale)))e.Graphics.DrawPath(outline,shape);
+                using(var outline=new Pen(interrupted ? interruptionColor : colors.Border,Math.Max(1F,scale)))e.Graphics.DrawPath(outline,shape);
             }
+            if (InlineDetails) return;
             string details = p.Total > 0 ? SizeText(p.Bytes) + " из " + SizeText(p.Total) : p.Bytes > 0 ? SizeText(p.Bytes) : "";
             if(!String.IsNullOrEmpty(p.WorkText))details=p.WorkText+(details.Length>0?" · "+details:"");
-            bool receiving = p.Stage != null && p.Stage.StartsWith("Скачивание") && !p.Paused && !p.Failed && !p.Complete;
+            bool receiving = p.Stage != null && p.Stage.StartsWith("Скачивание") && !p.Paused && !interrupted && !p.Complete;
             if(receiving && speed > 0) { details += " · " + SizeText((long)speed) + "/с"; if(p.Total > p.Bytes) details += " · осталось около " + Math.Ceiling((p.Total-p.Bytes)/speed).ToString("0") + " с"; }
             TextRenderer.DrawText(e.Graphics, details, Font, new Rectangle(1,bar.Bottom+gap,Math.Max(1,Width-2),line), colors.Text, flags | TextFormatFlags.EndEllipsis);
             TextRenderer.DrawText(e.Graphics, p.File ?? "", Font, new Rectangle(1,bar.Bottom+gap+line,Math.Max(1,Width-2),line), colors.Muted, flags | TextFormatFlags.PathEllipsis);

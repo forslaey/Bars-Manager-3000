@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -35,7 +35,7 @@ namespace ServiceTool
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Activity = Label("Готово к работе", true); Activity.AutoEllipsis = false; Activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(Activity, 0, 0);
-            Back = Button("В меню", false); ModuleNavigation.Configure(Back); Back.Click += delegate { if (!Busy||Scanning) { if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;} MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 1, 0);
+            Back = Button("В меню", false); ModuleNavigation.Configure(Back); Back.Click += delegate { if (ModuleNavigation.ReturnToHub()) return; if (!Busy||Scanning) { if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;} MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 1, 0);
             Body.Controls.Add(footer, 0, 3); Root.Controls.Add(Body, 0, 1);
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
@@ -53,6 +53,8 @@ namespace ServiceTool
         }
         protected async Task<LibraryInstallResult> Execute(string action, string data, string path)
         {
+            bool readOnly = action == "features-query" || action == "initial-settings" && data.StartsWith("query:", StringComparison.Ordinal);
+            using (readOnly ? null : await WindowsOperationQueue.EnterAsync(() => Progress(WindowsOperationQueue.WaitingMessage), () => CancelRequested))
             using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => CancelRequested)))
             { Session = session; try { return await Task.Run(() => session.ExecuteSystem(action, data, path, CaptureProgress())); } finally { Session = null; } }
         }
@@ -60,6 +62,7 @@ namespace ServiceTool
         protected async Task<List<LibraryInstallResult>> ExecuteAll(IList<string[]> steps, Action<LibraryInstallResult> completed = null)
         {
             var results = new List<LibraryInstallResult>();if(OperationView!=null)OperationView.SetWork(steps.Count);
+            using (await WindowsOperationQueue.EnterAsync(() => Progress(WindowsOperationQueue.WaitingMessage), () => CancelRequested))
             using (LibrarySession session = await Task.Run(() => LibrarySession.Start(() => CancelRequested)))
             {
                 Session = session;
@@ -78,7 +81,7 @@ namespace ServiceTool
         }
         Action<string> CaptureProgress(){long revision=OperationView==null?0:OperationView.OperationRevision;var report=OperationView==null?(Action<string>)(text=>{}):OperationView.OperationReporter;return text=>{if(OperationView!=null&&OperationView.OperationRevision!=revision)return;report(text);Progress(OperationView==null?text:OperationView.Snapshot.Stage);};}
         protected override void OnThemeChanged(){base.OnThemeChanged();if(OperationView!=null){OperationView.Palette=Colors;OperationView.Invalidate();}}
-        protected void Failure(Exception ex) { Activity.Text = "Не выполнено"; if(OperationView!=null)OperationView.FinishOperation("Не выполнено: "+ex.Message,failed:true);BrandMessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        protected void Failure(Exception ex) { Activity.Text = "Не выполнено."; if(OperationView!=null)OperationView.FinishOperation("Не выполнено: "+ex.Message,failed:true);BrandMessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         protected async Task Restart()
         {
             await RestartOffer.Show(this);
@@ -163,7 +166,7 @@ namespace ServiceTool
         }
         protected override void OnThemeChanged() { foreach (var row in rows) row.Choice.Palette = Colors; }
         private void Lock(bool busy)
-        { Busy = busy; Back.Enabled = check.Enabled = !busy; if (busy) foreach (var row in rows) row.Choice.Enabled = false; else ApplyStates(); }
+        { Busy = busy; check.Enabled = !busy; Back.Enabled = !busy || ManagerApplicationContext.ActiveContext != null; if (busy) foreach (var row in rows) row.Choice.Enabled = false; else ApplyStates(); }
         private void ApplyStates()
         {
             foreach (var row in rows)
@@ -188,7 +191,7 @@ namespace ServiceTool
         private async Task Check()
         {
             if (Busy || preview) return; Lock(true); Activity.Text = "Проверяем Windows…";
-            try { var result = await Execute("features-query", "", ""); RecordFeatureStates(result.Message); if (states.Count == 0) throw new IOException("Windows не вернула список компонентов"); Activity.Text = RestartRequired ? "Windows ожидает перезагрузки после изменения компонентов" : "Проверка завершена"; }
+            try { var result = await Execute("features-query", "", ""); RecordFeatureStates(result.Message); if (states.Count == 0) throw new IOException("Windows не вернула список компонентов"); Activity.Text = RestartRequired ? "Для завершения изменений нужна перезагрузка." : "Проверка завершена."; }
             catch (Exception ex) { states.Clear(); Failure(ex); }
             finally { Lock(false); }
         }
@@ -196,7 +199,7 @@ namespace ServiceTool
         {
             if (Busy || preview) return;
             var selected = rows.Where(r => r.Choice.Enabled && r.Choice.Checked).ToArray();
-            if (selected.Length == 0) { Activity.Text = "Отметь компоненты"; return; }
+            if (selected.Length == 0) { Activity.Text = "Отметь компоненты."; return; }
             var install = String.Join(",", selected.Where(r => WindowsComponents.Classify(r.Profile, states) != WindowsComponents.ComponentState.Installed).Select(r => r.Profile.Id));
             var remove = String.Join(",", selected.Where(r => WindowsComponents.Classify(r.Profile, states) == WindowsComponents.ComponentState.Installed).Select(r => r.Profile.Id));
             string question = install.Length > 0 && remove.Length > 0 ? "Установить одни и удалить другие выбранные компоненты Windows?"
@@ -214,7 +217,7 @@ namespace ServiceTool
                 restart = RestartRequired;
                 var observed = await Execute("features-query", "", ""); RecordFeatureStates(observed.Message);
                 restart = RestartRequired;
-                Activity.Text = restart ? "Изменения применены. Нужна перезагрузка" : "Проверка завершена. Компоненты Windows не запросили перезагрузку";
+                Activity.Text = restart ? "Изменения применены. Нужна перезагрузка." : "Проверка завершена. Компоненты Windows не запросили перезагрузку.";
             }
             catch (Exception ex) { restart = RestartRequired; states.Clear(); Failure(ex); }
             finally { Lock(false); }
@@ -226,14 +229,14 @@ namespace ServiceTool
     {
         private readonly BrandTextBox sourceLabel;
         private readonly BrandTextBox destination;
-        private readonly BrandButton chooseSource,chooseTarget,deploy,remove;
+        private readonly BrandButton chooseSource,chooseTarget,deploy,remove,cancel;
         private readonly BrandCheckBox shortcuts=new BrandCheckBox();
         private readonly bool preview;
         private string source;
         internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(520,500))
         {
             HideThemeSelector();FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;preview=previewMode; MinimumSize=SizeFromClientSize(new Size(520,500));ClientSize=new Size(520,500);
-            Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,12);
+            Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,18);
             Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
             Body.GetControlFromPosition(0,0).Margin=new Padding(0,8,0,12);
             var card=new Card {Dock=DockStyle.Fill,Padding=new Padding(16,16,16,8),Margin=new Padding(0,0,0,8)};
@@ -248,13 +251,23 @@ namespace ServiceTool
             chooseTarget=Button("Выбрать путь…",false);chooseTarget.Click+=delegate{ChooseTarget();};var targetRow=new PathPickerRow(destination,chooseTarget,168){Dock=DockStyle.Fill,FillAvailableWidth=true};content.Controls.Add(targetRow,0,4);content.SetColumnSpan(targetRow,2);
             shortcuts.Text=PathFieldMetrics.ShortcutCaption;shortcuts.Checked=true;shortcuts.Dock=DockStyle.Fill;shortcuts.Margin=new Padding(0,16,0,0);shortcuts.Palette=Colors;content.Controls.Add(shortcuts,0,5);content.SetColumnSpan(shortcuts,2);
             card.Controls.Add(content);Body.Controls.Add(card,0,1);
-            var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(0,4,0,0)};
-            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            deploy=Button("Установить",true);deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
-            remove=Button("Удалить",false);remove.Destructive=false;remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,1,0);actions.Layout+=delegate{int gap=(int)Math.Round(10F*actions.Font.Height/16F);int width=Math.Max(1,(actions.ClientSize.Width-gap)/2);foreach(var button in new[]{deploy,remove}){button.Dock=DockStyle.None;button.Anchor=AnchorStyles.Top|AnchorStyles.Left;button.Margin=Padding.Empty;button.Size=new Size(width,actions.ClientSize.Height);}deploy.Location=Point.Empty;actions.ColumnStyles[0].SizeType=SizeType.Absolute;actions.ColumnStyles[0].Width=actions.ClientSize.Width-width;actions.ColumnStyles[1].SizeType=SizeType.Absolute;actions.ColumnStyles[1].Width=width;remove.Location=new Point(actions.ClientSize.Width-width,0);};Body.Controls.Add(actions,0,2);
-            if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=ex.Message;}
-            OperationView=new DownloadProgressView();
-            var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Body.SetRow(actions,3);Body.RowCount=5;Body.RowStyles.Insert(2,new RowStyle(SizeType.Absolute,112));
+            var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=5,RowCount=1,Margin=Padding.Empty};
+            for (int column = 0; column < 5; column++)
+                actions.ColumnStyles.Add(column % 2 == 0 ? new ColumnStyle(SizeType.Percent, 100F / 3) : new ColumnStyle(SizeType.Absolute, 12));
+            actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            deploy=Button("Распаковать",true);deploy.Margin=Padding.Empty;deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
+            remove=Button("Удалить",false);remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,2,0);
+            cancel=Button("Отменить",false);cancel.Margin=Padding.Empty;cancel.Enabled=false;cancel.Click+=delegate
+            {
+                CancelRequested=true;
+                cancel.Enabled=false;
+                if(Session!=null)Session.Cancel();
+                Activity.Text="Отменяем распаковку…";
+            };
+            actions.Controls.Add(cancel,4,0);Body.Controls.Add(actions,0,2);
+            if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=OperationMessage.FinishSentence(ex.Message);}
+            OperationView=new DownloadProgressView { InlineDetails = true };
+            var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Body.SetRow(actions,3);Body.RowCount=5;Body.RowStyles.Insert(2,new RowStyle(SizeType.Absolute,106));
             OperationView.Dock=DockStyle.Fill;OperationView.Margin=new Padding(0,8,0,8);Body.Controls.Add(OperationView,0,2);
             MinimumSize=SizeFromClientSize(new Size(520,612));ClientSize=new Size(520,612);
             LimitContent(new Size(520, 612));
@@ -262,13 +275,13 @@ namespace ServiceTool
         }
         protected override void OnThemeChanged(){base.OnThemeChanged();shortcuts.Palette=Colors;}
         private void Lock(bool busy)
-        {if(busy)OperationView.BeginOperation("Подготавливаем распаковку или удаление…",true,3);else if(OperationView.Snapshot.Active)OperationView.FinishOperation(Activity.Text,success:true);Busy=busy;chooseSource.Enabled=chooseTarget.Enabled=deploy.Enabled=remove.Enabled=destination.Enabled=shortcuts.Enabled=Back.Enabled=!busy;}
+        {if(busy){CancelRequested=false;OperationView.BeginOperation("Подготавливаем распаковку или удаление…",true,3);}else cancel.Enabled=false;if(!busy&&OperationView.Snapshot.Active)OperationView.FinishOperation(Activity.Text,success:true);Busy=busy;chooseSource.Enabled=chooseTarget.Enabled=deploy.Enabled=remove.Enabled=destination.Enabled=shortcuts.Enabled=!busy;Back.Enabled=!busy||ManagerApplicationContext.ActiveContext!=null;}
         private bool Choose()
         {
             using(var dialog=new FolderBrowserDialog {Description="Выбери папку _tools или папку Библиотеки",ShowNewFolderButton=false})
             {
                 if(dialog.ShowDialog(this)!=DialogResult.OK)return false;string path=dialog.SelectedPath;if(Directory.Exists(Path.Combine(path,"_tools")))path=Path.Combine(path,"_tools");
-                try{ToolsDeployment.Discover(path);source=path;sourceLabel.Text=source;Activity.Text="Комплект утилит найден";return true;}catch(Exception ex){Failure(ex);return false;}
+                try{ToolsDeployment.Discover(path);source=path;sourceLabel.Text=source;Activity.Text="Комплект утилит найден.";return true;}catch(Exception ex){Failure(ex);return false;}
             }
         }
         private void ChooseTarget()
@@ -280,14 +293,22 @@ namespace ServiceTool
         {
             if(Busy||preview)return;if(!(source!=null&&Directory.Exists(source))&&!Choose())return;
             string target;try{target=ToolsDeployment.TargetFolder(destination.Text);ToolsDeployment.Discover(source);}catch(Exception ex){Failure(ex);return;}
-            if(BrandMessageBox.Show(this,"Установить утилиты в "+target+"?\r\n"+(shortcuts.Checked?"Создадим ярлыки на рабочем столе.":"Ярлыки не создаются.")+"\r\nСуществующие настройки сохраняются, прежняя папка остаётся в резервной копии.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-            Lock(true);
+            if(BrandMessageBox.Show(this,"Распаковать утилиты в "+target+"?\r\n"+(shortcuts.Checked?"Создадим ярлыки на рабочем столе.":"Ярлыки не создаются.")+"\r\nСуществующие настройки сохраняются, прежняя папка остаётся в резервной копии.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
+            Lock(true);cancel.Enabled=true;
             try
             {
-                var result=await Execute("tools-deploy",source,target);if(result.ExitCode!=0)throw new IOException(result.Message);
+                var result=await Execute("tools-deploy",source,target);
+                cancel.Enabled=false;
+                if(result.ExitCode==1602)throw new OperationCanceledException();
+                if(result.ExitCode!=0)throw new IOException(result.Message);
                 OperationView.CompleteStep();ToolsDeployment.EnableAdministratorLaunch(source,target);OperationView.CompleteStep();
                 ToolsDeployment.ShortcutsAt(source,target,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),shortcuts.Checked);
-                OperationView.CompleteStep();Activity.Text=shortcuts.Checked?"Утилиты установлены, ярлыки созданы":"Утилиты установлены без создания ярлыков";
+                OperationView.CompleteStep();Activity.Text=shortcuts.Checked?"Утилиты установлены, ярлыки созданы.":"Утилиты установлены без создания ярлыков.";
+            }
+            catch(OperationCanceledException)
+            {
+                Activity.Text="Распаковка отменена.";
+                OperationView.FinishOperation(Activity.Text,cancelled:true);
             }
             catch(Exception ex){Failure(ex);}finally{Lock(false);}
         }
@@ -306,7 +327,7 @@ namespace ServiceTool
             try
             {
                 var result=await Execute("tools-remove",String.Join("\n",tools.Select(t=>t.Directory)),target);if(result.ExitCode!=0)throw new IOException(result.Message);
-                OperationView.CompleteStep();ToolsDeployment.RemoveReferences(target,tools,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));OperationView.CompleteStep();OperationView.CompleteStep();Activity.Text="Утилиты и их ярлыки удалены";
+                OperationView.CompleteStep();ToolsDeployment.RemoveReferences(target,tools,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));OperationView.CompleteStep();OperationView.CompleteStep();Activity.Text="Утилиты и их ярлыки удалены.";
             }
             catch(Exception ex){Failure(ex);}finally{Lock(false);}
         }
@@ -315,8 +336,21 @@ namespace ServiceTool
     {
         internal static async Task Show(IWin32Window owner)
         {
-            if (BrandMessageBox.Show(owner, "Для завершения изменений нужна перезагрузка Windows. Сохрани открытые документы.\r\n\r\nПерезагрузить компьютер сейчас? Нажми «Нет», чтобы сделать это позже.", "Перезагрузка Windows", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
-            try { using (var session = await Task.Run(() => LibrarySession.Start())) await Task.Run(() => session.ExecuteSystem("system-restart", "restart-confirmed", "", ignored => { })); }
+            IDisposable turn;
+            if (!WindowsOperationQueue.TryEnter(out turn))
+            {
+                BrandMessageBox.Show(owner, "Дождись завершения другой системной операции перед перезагрузкой.", "Перезагрузка Windows", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            try
+            {
+                using (turn)
+                {
+                    if (BrandMessageBox.Show(owner, "Для завершения изменений нужна перезагрузка Windows. Сохрани открытые документы.\r\n\r\nПерезагрузить компьютер сейчас? Нажми «Нет», чтобы сделать это позже.", "Перезагрузка Windows", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+                    using (var session = await Task.Run(() => LibrarySession.Start()))
+                        await Task.Run(() => session.ExecuteSystem("system-restart", "restart-confirmed", "", ignored => { }));
+                }
+            }
             catch (Exception ex) { BrandMessageBox.Show(owner, ex.Message, "Перезагрузка Windows", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
     }

@@ -92,7 +92,7 @@ internal static class ManagementTests
             Assert(!Parses(new[] { "--manage-service", "stop", Encode(name), "disabled" }), "stop cannot change startup type");
             Assert(!Parses(new[] { "--manage-service", "startup", Encode(name), "none" }), "startup requires a valid mode");
             Assert(!Parses(new[] { "--manage-service", "startup", Encode(name), "Auto" }), "startup allowlist is exact");
-            Assert(!Parses(new[] { "--manage-service", "delete", Encode(name), "none" }), "delete is not an available action");
+            Assert(Parses(new[] { "--manage-service", "delete", Encode(name), "none" }), "delete is accepted without a startup mode");
             Assert(!Parses(new[] { "--manage-service", "start", "/w==", "none" }), "invalid UTF8 rejected");
             Assert(!Parses(new[] { "--manage-service", "start", "Y Q==", "none" }), "base64 whitespace rejected");
             Assert(!Parses(new[] { "--manage-service", "start", "YQ===", "none" }), "invalid base64 rejected");
@@ -106,7 +106,7 @@ internal static class ManagementTests
             Throws<FileNotFoundException>(delegate { ServiceManagement.BuildHelperStartInfo(Path.Combine(scratch, "missing.exe"), name, "start", "none"); }, "missing helper rejected");
             // Only invalid helper requests are executed: validation must return before any native call.
             Assert(ServiceManagement.RunHelper(null) == 87, "invalid helper invocation returns Win32 invalid-parameter");
-            Assert(ServiceManagement.RunHelper(new[] { "--manage-service", "delete", Encode(name), "none" }) == 87, "invalid action cannot reach SCM");
+            Assert(ServiceManagement.RunHelper(new[] { "--manage-service", "delete", Encode(name), "auto" }) == 87, "invalid action cannot reach SCM");
 
             Assert(ServiceManagement.NextRunningStep(4, true, false) == ServiceManagement.RunningStep.Done, "already running is idempotent");
             Assert(ServiceManagement.NextRunningStep(1, false, false) == ServiceManagement.RunningStep.Done, "already stopped is idempotent");

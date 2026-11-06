@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -30,7 +30,7 @@ namespace ServiceTool
                         new SoftwareManagerForm(true), new ToolsDeploymentForm(true),
                         new WindowsFeaturesForm(true, true), new InitialSystemSettingsForm(true) };
                     Size[] limits = { new Size(1160,860), new Size(1440,1040), new Size(1520,1040),
-                        new Size(1280,1040), new Size(640,500), new Size(760,590), new Size(1280,960) };
+                        new Size(1280,1040), new Size(520,612), new Size(760,590), new Size(1280,960) };
                     for (int i = 0; i < forms.Length; i++) using (var form = forms[i])
                     {
                         var module = form as ManagerModuleForm;
@@ -83,7 +83,7 @@ namespace ServiceTool
                                 Check(toggle.Right == toggle.Parent.ClientSize.Width, "Refresh toggle right edge: " + context);
                                 Check(toggle.Parent.ClientRectangle.Contains(toggle.Bounds), "Refresh toggle clipped: " + context);
                             }
-                            foreach (var theme in Children(form).OfType<ThemeToggleButton>())
+                            foreach (var theme in Children(form).OfType<ThemeToggleButton>().Where(toggle=>toggle.Visible))
                                 Check(theme.Parent.ClientRectangle.Contains(theme.Bounds), "Theme switch clipped: " + context);
                             foreach (var button in Children(form).OfType<BrandButton>().Where(b=>b.Visible))
                                 Check(button.Parent.ClientRectangle.Contains(button.Bounds), "Button outside parent: " + context + " / " + button.Text);

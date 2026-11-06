@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -64,7 +64,7 @@ namespace ServiceTool
                             try
                             {
                                 ToolsDeployment.SafePath(candidate); string arch=SoftwareCatalog.Architecture(candidate);
-                                if (arch!="x64" && !(id=="anydesk" && arch=="x86")) continue;
+                                if (arch!="x64" && !(allowAnyDesk32 && id=="anydesk" && arch=="x86")) continue;
                                 var meta=FileVersionInfo.GetVersionInfo(candidate); string expected=app.Name;
                                 if ((meta.ProductName ?? "").IndexOf(expected,StringComparison.OrdinalIgnoreCase)<0) continue;
                                 Version parsed; if (!Version.TryParse(version,out parsed)) continue;

@@ -65,7 +65,7 @@ namespace ServiceTool
         private static readonly object Gate = new object();
         private static List<LibraryPackage> Normalize(IEnumerable<LibraryPackage> packages)
         {
-            var values = packages.Where(p => p != null && p.Kind != LibraryKind.Composite && (p.Name ?? "").IndexOf("RuntimePack Full", StringComparison.OrdinalIgnoreCase) < 0 && (p.RelativePath ?? "").IndexOf("RuntimePack_Full", StringComparison.OrdinalIgnoreCase) < 0).ToList();
+            var values = packages.Where(p => p != null && IsLibraryLocation(p.RelativePath) && p.Kind != LibraryKind.Composite && (p.Name ?? "").IndexOf("RuntimePack Full", StringComparison.OrdinalIgnoreCase) < 0 && (p.RelativePath ?? "").IndexOf("RuntimePack_Full", StringComparison.OrdinalIgnoreCase) < 0).ToList();
             foreach (var package in values.Where(p => p.Kind == LibraryKind.VcBundle || p.Kind == LibraryKind.VcLegacy))
             {
                 package.Group = "Visual C++"; package.Name = package.Kind == LibraryKind.VcLegacy ? "Visual C++ 2012/2013: профиль 2005–2013 + Lite" : "Visual C++ v14 (2015–2026) + Lite";
@@ -74,6 +74,14 @@ namespace ServiceTool
                 if (!values.Any(p => p.Kind == LibraryKind.VcLegacy)) values.Add(LibraryDiscovery.Legacy(modern));
             return values;
         }
+        private static bool IsLibraryLocation(string path)
+        {
+            if (String.IsNullOrWhiteSpace(path)) return false;
+            string[] parts = path.Split('\\', '/');
+            return (parts.Length == 1 || String.Equals(parts[0], "Microsoft .NET", StringComparison.OrdinalIgnoreCase))
+                && SoftwareCatalog.PackageId(parts[parts.Length - 1]) == null;
+        }
+
         internal static string CachePath { get { return ApplicationStorage.FilePath("library-catalog.xml"); } }
         public static List<LibraryPackage> All() { lock (Gate) return current.OrderBy(p => p.Order).ToList(); }
         public static LibraryPackage Find(string id) { lock (Gate) return current.FirstOrDefault(p => p.Id == id); }

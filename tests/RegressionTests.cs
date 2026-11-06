@@ -214,9 +214,9 @@ namespace ServiceTool
                     Button button = Field<Button>(form, "refreshButton");
                     DataGridView grid = Field<DataGridView>(form, "servicesGrid");
                     Label status = Field<Label>(form, "statusTitle");
-                    Check(button.PointToScreen(Point.Empty).Y >= status.PointToScreen(Point.Empty).Y + status.Height &&
+                    Check(status.PointToScreen(Point.Empty).Y >= button.PointToScreen(Point.Empty).Y + button.Height &&
                         grid.PointToScreen(Point.Empty).Y >= button.PointToScreen(Point.Empty).Y + button.Height,
-                        "Registration actions fit between the compact status header and list");
+                        "Registration actions precede the compact status header and list");
                     Check(!Field<Label>(form, "statusDetail").Visible && !Field<Label>(form, "hint").Visible,
                         "Both removed lines remain hidden after resizing");
                 }

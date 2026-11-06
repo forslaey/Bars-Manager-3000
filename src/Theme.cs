@@ -554,6 +554,9 @@ namespace ServiceTool
     internal sealed class BrandComboBox : ComboBox
     {
         private readonly PopupFrame popupFrame;
+        internal bool UseManagedPopup;
+        private ToolStripDropDown managedPopup;
+        private bool suppressOwnerClick;
         public ThemePalette Palette;
         public bool HoverHighlight = false;
         private bool hovered;
@@ -589,19 +592,119 @@ namespace ServiceTool
             SetStyle(ControlStyles.ResizeRedraw|ControlStyles.AllPaintingInWmPaint|ControlStyles.OptimizedDoubleBuffer, true);FlatStyle=FlatStyle.Flat;
         }
 
-        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e);SetWindowTheme(Handle,String.Empty,String.Empty); }
+        protected override void OnHandleCreated(EventArgs e) { base.OnHandleCreated(e);SetWindowTheme(Handle,String.Empty,String.Empty);BindPopup(); }
         protected override void OnMouseEnter(EventArgs e) { hovered = true;if(HoverHighlight)Invalidate();base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hovered = false;if(HoverHighlight)Invalidate();base.OnMouseLeave(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
         protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
         protected override void OnEnabledChanged(EventArgs e) { Invalidate(); base.OnEnabledChanged(e); }
-        protected override void OnDropDown(EventArgs e) {
-            base.OnDropDown(e);
+        private void BindPopup() {
+            if (popupFrame == null) return;
             var info=new ComboBoxInformation();info.Size=System.Runtime.InteropServices.Marshal.SizeOf(typeof(ComboBoxInformation));
             if(GetComboBoxInfo(Handle,ref info)&&info.ListHandle!=IntPtr.Zero){popupFrame.Bind(info.ListHandle);}
+        }
+        protected override void OnDropDown(EventArgs e) {
+            if (!UseManagedPopup) { BindPopup(); popupFrame.ApplyTheme(); }
+            base.OnDropDown(e);
             Invalidate();
         }
-        protected override void OnHandleDestroyed(EventArgs e){if(popupFrame!=null)popupFrame.Detach();base.OnHandleDestroyed(e);}
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            if (managedPopup != null) managedPopup.Close();
+            if (popupFrame != null) popupFrame.Detach();
+            base.OnHandleDestroyed(e);
+        }
+
+        private sealed class FlatPopupRenderer : ToolStripRenderer
+        {
+            protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+            {
+                using (var fill = new SolidBrush(e.ToolStrip.BackColor))
+                    e.Graphics.FillRectangle(fill, e.AffectedBounds);
+            }
+        }
+
+        private void ShowManagedPopup()
+        {
+            if (!Enabled || Items.Count == 0 || managedPopup != null || Palette == null) return;
+            OnDropDown(EventArgs.Empty);
+            int rowHeight = Math.Max(ItemHeight, Font.Height + 8);
+            int width = Math.Max(Width, DropDownWidth);
+            var list = new ListBox
+            {
+                Font = Font, BackColor = Palette.SurfaceAlt, ForeColor = Palette.Text,
+                BorderStyle = BorderStyle.None, IntegralHeight = false,
+                DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = rowHeight
+            };
+            foreach (object item in Items) list.Items.Add(GetItemText(item));
+            list.SelectedIndex = SelectedIndex;
+            list.DrawItem += delegate(object sender, DrawItemEventArgs e) { OnDrawItem(e); };
+
+            var popup = new ToolStripDropDown
+            {
+                AutoSize = false, Padding = new Padding(1), BackColor = Palette.Border,
+                DropShadowEnabled = false, Renderer = new FlatPopupRenderer(),
+                LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow
+            };
+            int height = Math.Min(Items.Count, Math.Max(1, MaxDropDownItems)) * rowHeight;
+            var host = new ToolStripControlHost(list)
+            {
+                AutoSize = false, Margin = Padding.Empty, Padding = Padding.Empty, Size = new Size(width - 2, height)
+            };
+            popup.Items.Add(host);
+            popup.Size = new Size(width, height + 2);
+            managedPopup = popup;
+
+            Action commit = delegate
+            {
+                if (list.SelectedIndex < 0) return;
+                SelectedIndex = list.SelectedIndex;
+                OnSelectionChangeCommitted(EventArgs.Empty);
+                popup.Close();
+                if (CanFocus) Focus();
+            };
+            list.MouseUp += delegate(object sender, MouseEventArgs e)
+            {
+                int index = list.IndexFromPoint(e.Location);
+                if (e.Button == MouseButtons.Left && index >= 0) { list.SelectedIndex = index; commit(); }
+            };
+            list.KeyDown += delegate(object sender, KeyEventArgs e)
+            {
+                if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; commit(); }
+                else if (e.KeyCode == Keys.Escape || e.KeyCode == Keys.F4 || (e.Alt && e.KeyCode == Keys.Up))
+                {
+                    e.SuppressKeyPress = true;
+                    popup.Close();
+                    if (CanFocus) Focus();
+                }
+            };
+            popup.Closed += delegate(object sender, ToolStripDropDownClosedEventArgs e)
+            {
+                managedPopup = null;
+                suppressOwnerClick = e.CloseReason == ToolStripDropDownCloseReason.AppClicked &&
+                    RectangleToScreen(ClientRectangle).Contains(Cursor.Position);
+                if (suppressOwnerClick && IsHandleCreated)
+                    BeginInvoke((MethodInvoker)delegate { suppressOwnerClick = false; });
+                OnDropDownClosed(EventArgs.Empty);
+                if (IsHandleCreated) BeginInvoke((MethodInvoker)delegate { popup.Dispose(); });
+                else popup.Dispose();
+            };
+            Point below = PointToScreen(new Point(0, Height));
+            Rectangle work = Screen.FromControl(this).WorkingArea;
+            popup.Show(this, new Point(0, below.Y + popup.Height > work.Bottom ? -popup.Height : Height));
+            list.Focus();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (UseManagedPopup && (keyData == Keys.F4 || keyData == (Keys.Alt | Keys.Down) || keyData == Keys.Space))
+            {
+                if (managedPopup == null) ShowManagedPopup();
+                else managedPopup.Close();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
         protected override void OnDropDownClosed(EventArgs e) { Invalidate(); base.OnDropDownClosed(e); }
 
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct PaintInfo {public IntPtr Dc;public int Erase;public Rectangle Bounds;public int Restore,Update;[System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValArray,SizeConst=32)]public byte[] Reserved;}
@@ -609,8 +712,42 @@ namespace ServiceTool
         [System.Runtime.InteropServices.DllImport("user32.dll")]private static extern bool EndPaint(IntPtr handle,ref PaintInfo info);
         protected override void WndProc(ref Message message)
         {
+            if (UseManagedPopup)
+            {
+                switch (message.Msg)
+                {
+                    case 0x014F: // CB_SHOWDROPDOWN
+                        if (message.WParam == IntPtr.Zero) { if (managedPopup != null) managedPopup.Close(); }
+                        else ShowManagedPopup();
+                        message.Result = (IntPtr)1;
+                        return;
+                    case 0x0157: // CB_GETDROPPEDSTATE
+                        message.Result = managedPopup != null ? (IntPtr)1 : IntPtr.Zero;
+                        return;
+                    case 0x0201: // WM_LBUTTONDOWN
+                        if (CanFocus) Focus();
+                        if (suppressOwnerClick) suppressOwnerClick = false;
+                        else if (managedPopup == null) ShowManagedPopup();
+                        else managedPopup.Close();
+                        return;
+                    case 0x0202: // WM_LBUTTONUP
+                    case 0x0203: // WM_LBUTTONDBLCLK
+                        return;
+                }
+            }
             if(Palette!=null&&DropDownStyle==ComboBoxStyle.DropDownList&&message.Msg==WM_PAINT){PaintInfo paint;IntPtr dc=BeginPaint(Handle,out paint);try{using(var graphics=Graphics.FromHdc(dc))PaintChrome(graphics);}finally{EndPaint(Handle,ref paint);}return;}
             if(Palette!=null&&DropDownStyle==ComboBoxStyle.DropDownList&&message.Msg==0x14){message.Result=(IntPtr)1;return;}
+            if (Palette != null && popupFrame != null && message.Msg == 0x0134)
+            {
+                IntPtr brush = popupFrame.BackgroundBrush();
+                if (brush != IntPtr.Zero) { message.Result = brush; return; }
+            }
+            if (Palette != null && DropDownStyle == ComboBoxStyle.DropDownList &&
+                (message.Msg == WM_PRINT || message.Msg == WM_PRINTCLIENT) && message.WParam != IntPtr.Zero)
+            {
+                using (Graphics graphics = Graphics.FromHdc(message.WParam)) PaintChrome(graphics);
+                return;
+            }
             base.WndProc(ref message);
             if (Palette == null || DropDownStyle == ComboBoxStyle.Simple || IsDisposed) return;
             if ((message.Msg == WM_PRINT || message.Msg == WM_PRINTCLIENT) && message.WParam != IntPtr.Zero)
@@ -659,24 +796,119 @@ namespace ServiceTool
                 graphics.DrawRectangle(pen, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
         }
 
-        // Native popup borders do not inherit owner-drawn item colours. Paint the
-        // popup's non-client frame in the same palette as the closed field.
-        private sealed class PopupFrame:NativeWindow
+        // The list is a separate native window. Handle erase and frame before
+        // Windows can draw the default light background or border.
+        private sealed class PopupFrame : NativeWindow
         {
-            readonly BrandComboBox owner;
-            [System.Runtime.InteropServices.DllImport("user32.dll")]static extern IntPtr GetWindowDC(IntPtr h);
-            [System.Runtime.InteropServices.DllImport("user32.dll")]static extern int ReleaseDC(IntPtr h,IntPtr dc);
-            [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool GetWindowRect(IntPtr h,out NativeRectangle rect);
-            internal PopupFrame(BrandComboBox owner){this.owner=owner;}
-            internal void Bind(IntPtr handle){if(Handle==handle)return;Detach();AssignHandle(handle);}
-            internal void Detach(){if(Handle!=IntPtr.Zero)ReleaseHandle();}
-            protected override void WndProc(ref Message m){base.WndProc(ref m);if((m.Msg==0x85||m.Msg==0xF||m.Msg==0x86)&&owner.Palette!=null&&Handle!=IntPtr.Zero){
-                NativeRectangle rect;if(!GetWindowRect(Handle,out rect))return;int width=rect.Right-rect.Left,height=rect.Bottom-rect.Top;if(width<6||height<6)return;
-                IntPtr dc=GetWindowDC(Handle);if(dc==IntPtr.Zero)return;try{using(var graphics=Graphics.FromHdc(dc))using(var brush=new SolidBrush(owner.Palette.SurfaceAlt))using(var pen=new Pen(owner.Palette.Border)){
-                    graphics.FillRectangle(brush,0,0,width,2);graphics.FillRectangle(brush,0,height-2,width,2);graphics.FillRectangle(brush,0,0,2,height);graphics.FillRectangle(brush,width-2,0,2,height);graphics.DrawRectangle(pen,0,0,width-1,height-1);
-                }}finally{ReleaseDC(Handle,dc);}
-            }}
+            private readonly BrandComboBox owner;
+            private IntPtr brush;
+            private Color brushColor;
+            private bool? darkTheme;
+
+            [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetWindowDC(IntPtr window);
+            [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr window, IntPtr dc);
+            [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out NativeRectangle rect);
+            [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out NativeRectangle rect);
+            [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr window, int index);
+            [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int FillRect(IntPtr dc, ref NativeRectangle rect, IntPtr brush);
+            [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern IntPtr CreateSolidBrush(int color);
+            [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr handle);
+            [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+            internal PopupFrame(BrandComboBox owner) { this.owner = owner; }
+
+            internal void Bind(IntPtr handle)
+            {
+                if (Handle == handle) return;
+                Detach();
+                AssignHandle(handle);
+            }
+
+            internal void ApplyTheme()
+            {
+                if (Handle == IntPtr.Zero || owner.Palette == null || darkTheme == owner.Palette.Dark) return;
+                darkTheme = owner.Palette.Dark;
+                SetWindowTheme(Handle, darkTheme.Value ? "DarkMode_Explorer" : "Explorer", null);
+            }
+
+            internal IntPtr BackgroundBrush()
+            {
+                if (owner.Palette == null) return IntPtr.Zero;
+                Color color = owner.Palette.SurfaceAlt;
+                if (brush != IntPtr.Zero && color == brushColor) return brush;
+                if (brush != IntPtr.Zero) DeleteObject(brush);
+                brushColor = color;
+                brush = CreateSolidBrush(ColorTranslator.ToWin32(color));
+                return brush;
+            }
+
+            internal void Detach()
+            {
+                if (Handle != IntPtr.Zero) ReleaseHandle();
+                if (brush != IntPtr.Zero) { DeleteObject(brush); brush = IntPtr.Zero; }
+                darkTheme = null;
+            }
+
+            protected override void WndProc(ref Message message)
+            {
+                if (owner.Palette != null)
+                {
+                    if (message.Msg == 0x0014 && message.WParam != IntPtr.Zero)
+                    {
+                        NativeRectangle client;
+                        IntPtr fill = BackgroundBrush();
+                        if (fill != IntPtr.Zero && GetClientRect(Handle, out client))
+                        {
+                            FillRect(message.WParam, ref client, fill);
+                            message.Result = (IntPtr)1;
+                            return;
+                        }
+                    }
+                    if (message.Msg == 0x0086) { message.Result = (IntPtr)1; return; }
+                    if (message.Msg == 0x0085 && PaintFrame(ref message)) return;
+                }
+                base.WndProc(ref message);
+            }
+
+            private bool PaintFrame(ref Message message)
+            {
+                NativeRectangle bounds;
+                if (!GetWindowRect(Handle, out bounds)) return false;
+                int width = bounds.Right - bounds.Left, height = bounds.Bottom - bounds.Top;
+                if (width < 6 || height < 6) return false;
+                if ((GetWindowLong(Handle, -16) & 0x00200000) != 0)
+                {
+                    // Preserve the native scrollbar while excluding the outer border.
+                    IntPtr region = CreateRectRgn(bounds.Left + 2, bounds.Top + 2, bounds.Right - 2, bounds.Bottom - 2);
+                    if (region == IntPtr.Zero) return false;
+                    try
+                    {
+                        var scrollbarPaint = Message.Create(Handle, message.Msg, region, message.LParam);
+                        base.WndProc(ref scrollbarPaint);
+                    }
+                    finally { DeleteObject(region); }
+                }
+                IntPtr dc = GetWindowDC(Handle);
+                if (dc == IntPtr.Zero) return false;
+                try
+                {
+                    using (var graphics = Graphics.FromHdc(dc))
+                    using (var fill = new SolidBrush(owner.Palette.SurfaceAlt))
+                    using (var pen = new Pen(owner.Palette.Border))
+                    {
+                        graphics.FillRectangle(fill, 0, 0, width, 2);
+                        graphics.FillRectangle(fill, 0, height - 2, width, 2);
+                        graphics.FillRectangle(fill, 0, 0, 2, height);
+                        graphics.FillRectangle(fill, width - 2, 0, 2, height);
+                        graphics.DrawRectangle(pen, 0, 0, width - 1, height - 1);
+                    }
+                    message.Result = IntPtr.Zero;
+                    return true;
+                }
+                finally { ReleaseDC(Handle, dc); }
+            }
         }
+
         private Rectangle DropDownButtonRectangle()
         {
             ComboBoxInformation information = new ComboBoxInformation();

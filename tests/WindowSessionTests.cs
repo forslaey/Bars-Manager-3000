@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Collections.Generic;
@@ -36,7 +36,7 @@ namespace ServiceTool
       var source=Children(form).OfType<Button>().Single(b=>b.Text=="Выбрать папку...");
       int gap=grid.PointToScreen(Point.Empty).Y-source.PointToScreen(new Point(0,source.Height)).Y;
       Check(gap>=10,"Folder group separated from table: "+gap);
-      if(dark)using(var bmp=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bmp,new Rectangle(Point.Empty,form.Size));bmp.Save(@"C:\ServiceManager3000\work\current-verification\v2.3.36\programs-initial.png");}
+      if(dark)using(var bmp=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bmp,new Rectangle(Point.Empty,form.Size));bmp.Save(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"programs-initial.png"));}
      }
     }
     using(var context=new ManagerApplicationContext(()=>new ManagerHub())) {
@@ -63,13 +63,17 @@ namespace ServiceTool
       closer.Start();var shown=ModuleNavigation.ShowDialog(software,()=>new UserGuideForm());
       Check(Object.ReferenceEquals(shown,guide)&&!guide.IsDisposed,"Nested modal survives close");
      }
-     software.Close();Pump();Check(software.IsDisposed&&guide.IsDisposed&&context.CurrentWindow==null,"Cross disposes all cached windows");
+     software.Close();Pump();
+     Check(software.IsDisposed&&hub.Visible&&!guide.IsDisposed,"Closing one module leaves the launcher and guide cache available");
+     foreach(var remaining in Application.OpenForms.OfType<ToolsDeploymentForm>().ToArray())remaining.Close();
+     hub.Close();Pump();
+     Check(guide.IsDisposed&&context.CurrentWindow==null,"Closing the last window disposes cached dialogs");
     }
     using(var context=new ManagerApplicationContext(()=>new MainForm(null,true))) {
      var services=(MainForm)context.CurrentWindow;
      var journal=Children(services).OfType<JournalTextBox>().Single();Back(services);
      typeof(MainForm).GetMethod("PostLog",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(services,new object[]{"HIDDEN-SERVICE-RESULT"});Pump();
-     Check(journal.Text.Contains("HIDDEN-SERVICE-RESULT"),"Hidden service operation result preserved in journal");context.CurrentWindow.Close();Pump();
+     Check(journal.Text.Contains("HIDDEN-SERVICE-RESULT"),"Hidden service operation result preserved in journal");services.Close();context.CurrentWindow.Close();Pump();
     }
     foreach(Rectangle area in new[]{new Rectangle(0,0,1920,1040),new Rectangle(-1080,0,1080,1880),new Rectangle(0,-900,1440,860)})
     foreach(Rectangle bounds in new[]{new Rectangle(-9999,9999,2500,2000),new Rectangle(20,40,800,600)})

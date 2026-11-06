@@ -10,6 +10,11 @@ namespace ServiceTool
     }
     internal static class ModuleNavigation
     {
+        internal static bool ReturnToHub()
+        {
+            var context = ManagerApplicationContext.ActiveContext;
+            return context != null && context.ShowHub();
+        }
         internal static T ShowDialog<T>(Form owner, System.Func<T> factory) where T : Form
         {
             var context=ManagerApplicationContext.ActiveContext;

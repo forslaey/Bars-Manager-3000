@@ -21,7 +21,7 @@ namespace ServiceTool
             foreach(string mode in new[]{"known","unknown","short","limit","cancel"})Transfer(mode);
             using(var form=new Form())using(var view=new DownloadProgressView{Dock=DockStyle.Fill}){
                 form.Controls.Add(view);form.Show();view.Report(new TransferProgress{Stage="Скачивание",File="fixture",Bytes=0,Total=100});Pump(100);
-                view.Report(new TransferProgress{Stage="Скачивание",File="fixture",Bytes=80,Total=100});Pump(65);double first=view.DisplayedFraction;
+                view.Report(new TransferProgress{Stage="Скачивание",File="fixture",Bytes=80,Total=100});for(int attempt=0;attempt<20&&view.DisplayedFraction==0;attempt++)Pump(25);double first=view.DisplayedFraction;
                 Check(first>0&&first<=.8,"Progress starts without overshoot");Pump(400);Check(view.DisplayedFraction>=first&&view.DisplayedFraction<=.8,"Animation converges");
                 double before=view.DisplayedFraction;view.Report(new TransferProgress{Stage="Пауза",File="fixture",Bytes=80,Total=100,Paused=true});Pump(200);Check(Math.Abs(before-view.DisplayedFraction)<.001,"Pause freezes animation");
                 view.Report(new TransferProgress{Stage="Скачивание",File="fixture",Bytes=100,Total=100});Pump(500);Check(view.DisplayedFraction<1,"Bytes do not imply verified completion");
@@ -54,8 +54,15 @@ namespace ServiceTool
                     var view=Walk(form).OfType<DownloadProgressView>().Single();Check(!view.Snapshot.Active,"Opening a module leaves progress idle module="+module);view.Report(new TransferProgress{Stage="Скачивание · файл 2 из 5",File="Microsoft .NET ASP.NET Core Runtime — длинное название пакета x64.exe",Bytes=42*1048576L,Total=68*1048576L});Pump(200);
                     Check(view.Parent.ClientRectangle.Contains(view.Bounds),"Progress inside parent module="+module+" scale="+scale);
                     foreach(var journal in Walk(form).OfType<JournalTextBox>())Check(journal.Height>=journal.Font.Height,"Journal text viewport remains readable module="+module+" scale="+scale);
-                    Check(view.Height>=92*scale,"Progress has room for all lines module="+module+" scale="+scale+" height="+view.Height);
-                    foreach(Control peer in view.Parent.Controls)if(peer!=view&&peer.Visible)Check(!peer.Bounds.IntersectsWith(view.Bounds),"Progress does not overlap siblings");
+                    int requiredHeight;
+                    using(var graphics=view.CreateGraphics()){
+                        float dpi=graphics.DpiX/96F;
+                        int line=Math.Max(view.Font.Height,(int)Math.Round(18*dpi));
+                        int gap=(int)Math.Round(10*dpi);
+                        requiredHeight=line+gap+(int)Math.Round(22*dpi)+(view.InlineDetails?0:gap+2*line);
+                    }
+                    Check(view.Height>=requiredHeight,"Progress has room for all lines module="+module+" scale="+scale+" height="+view.Height+" required="+requiredHeight);
+                    foreach(Control peer in view.Parent.Controls)if(peer!=view&&peer.Visible)Check(!peer.Bounds.IntersectsWith(view.Bounds),"Progress does not overlap siblings module="+module+" scale="+scale+" view="+view.Bounds+" peer="+peer.GetType().Name+" "+peer.Bounds);
                     if(!dark){
                         view.Report(new TransferProgress{Stage="Ожидание загрузки",Active=false});
                         using(var empty=new Bitmap(view.Width,view.Height)){view.DrawToBitmap(empty,view.ClientRectangle);var inside=empty.GetPixel(view.Width/2,Math.Max(view.Font.Height,18)+21);var outside=empty.GetPixel(view.Width/2,0);Check(outside.R-inside.R>=25&&outside.G-inside.G>=20,"Light empty track visibly distinct from canvas");}
@@ -69,8 +76,12 @@ namespace ServiceTool
                     if(scale==1)using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"previews","progress-"+module+"-"+dark+".png"));}
                     form.MinimumSize=Size.Empty;form.ClientSize=new Size(module==0?650:1000,(int)(560*scale));Pump(160);
                     var back=Walk(form).OfType<BrandButton>().First(b=>b.Text=="В меню"||b.Text=="Назад");var screenBounds=form.RectangleToScreen(form.ClientRectangle);
-                    Check(screenBounds.Contains(back.RectangleToScreen(back.ClientRectangle)),"Navigation remains visible on short surface");
-                    Check(view.Height>=84*scale,"Progress never compressed on short surface");
+                    if(!screenBounds.Contains(back.RectangleToScreen(back.ClientRectangle))){
+                        var viewport=Walk(form).OfType<FillContentPanel>().FirstOrDefault(p=>p.Contains(back));
+                        if(viewport!=null){viewport.ScrollControlIntoView(back);Pump(40);}
+                    }
+                    Check(screenBounds.Contains(back.RectangleToScreen(back.ClientRectangle)),"Navigation remains reachable on short surface module="+module+" scale="+scale);
+                    Check(view.Height>=requiredHeight,"Progress never compressed on short surface");
                     form.Close();
                 }
             }

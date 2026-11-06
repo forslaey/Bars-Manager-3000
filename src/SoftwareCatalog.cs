@@ -35,7 +35,7 @@ namespace ServiceTool
             new SoftwareDefinition { Id="notepad", Name="Notepad++", Exe="notepad++.exe", Folder="Notepad++", Publisher="NOTEPAD++" },
             new SoftwareDefinition { Id="7zip", Name="7-Zip", Exe="7zFM.exe", Folder="7-Zip", Publisher="" },
             new SoftwareDefinition { Id="anydesk", Name="AnyDesk", Exe="AnyDesk.exe", Folder="AnyDesk", Publisher="AnyDesk Software GmbH", Remote=true },
-            new SoftwareDefinition { Id="rudesktop", Name="RuDesktop", Exe="rudesktop.exe", Folder="RuDesktop", Publisher="Advanced Technologies LLC", Remote=true }
+            new SoftwareDefinition { Id="rudesktop", Name="RuDesktop", Exe="rudesktop.exe", Folder="RuDesktop", Publisher="Advanced Technologies LLC", Remote=true },
         };
         internal static SoftwareDefinition Find(string id)
         { var value = Apps.SingleOrDefault(a => a.Id == id); if (value == null) throw new InvalidDataException("Неизвестная программа"); return value; }
@@ -67,7 +67,7 @@ namespace ServiceTool
             {
                 if (!name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Нужен MSI " + app.Name + " x64");
                 var properties = LibraryDiscovery.MsiProperties(file, out arch);
-                if (!properties.ContainsKey("ProductName") || !String.Equals(properties["ProductName"],app.Name,StringComparison.OrdinalIgnoreCase) || arch != "x64") throw new InvalidDataException("Нужен установщик " + app.Name + " x64");
+                if (!properties.ContainsKey("ProductName") || !String.Equals(properties["ProductName"],app.Name,StringComparison.OrdinalIgnoreCase) || arch != "x64") throw new InvalidDataException("Не подтверждён MSI для " + app.Name);
                 version = properties["ProductVersion"];
                 if(id=="chrome" && version.Split('.').Length!=4)throw new InvalidDataException("Версия старого MSI Chrome закодирована; используй актуальный автономный установщик Google");
             }

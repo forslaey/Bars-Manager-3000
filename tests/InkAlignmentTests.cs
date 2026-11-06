@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Collections.Generic;
@@ -65,7 +65,7 @@ namespace ServiceTool
        Check(needed<=title.Height,id+" full heading fits shared row, wrapped when necessary: needed="+needed+" height="+title.Height);
       }
      }
-     if(scale==1.25F){string folder=@"C:\ServiceManager3000\work\current-verification\v2.3.37";System.IO.Directory.CreateDirectory(folder);
+     if(scale==1.25F){string folder=System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"ink-previews");System.IO.Directory.CreateDirectory(folder);
       using(var bmp=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bmp,new Rectangle(Point.Empty,form.Size));bmp.Save(System.IO.Path.Combine(folder,form.GetType().Name+(dark?"-dark":"-light")+".png"));}
      }
     }

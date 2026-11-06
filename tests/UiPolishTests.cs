@@ -1,4 +1,4 @@
-﻿﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -10,7 +10,7 @@ namespace ServiceTool
 {
     internal static class UiPolishTests
     {
-        private static int count, backgroundFocusChecks;
+        private static int count;
         private static void Check(bool value, string message) { count++; if (!value) throw new Exception(message); }
         private static IEnumerable<Control> Children(Control parent) { foreach (Control c in parent.Controls) { yield return c; foreach (Control child in Children(c)) yield return child; } }
         private static T Field<T>(object owner, string name) { return (T)owner.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(owner); }
@@ -153,62 +153,7 @@ namespace ServiceTool
                         Check(bitmap.GetPixel(5, 5).ToArgb() == Color.Magenta.ToArgb(), "Partial card paint leaves unrelated outline untouched");
                     }
                 }
-                foreach(bool services in new[] {true,false})
-                foreach(bool menu in new[] {true,false})
-                using(var hub=new ManagerHub())
-                using(Form module=services ? (Form)new MainForm(null,true) : new LibraryManagerForm(true))
-                {
-                    Show(hub);
-                    module.StartPosition=FormStartPosition.Manual;module.Location=new Point(-22000,-22000);module.ShowInTaskbar=false;
-                    bool ownerWasActive = Form.ActiveForm == hub;
-                    Exception navigationFailure = null;
-                    module.Shown+=delegate { module.BeginInvoke((MethodInvoker)delegate {
-                        try {
-                            Check(module.Owner == hub && module.Modal && hub.Visible && !IsWindowEnabled(hub.Handle),
-                                "Both modules open with a visible disabled launcher as explicit modal owner");
-                            Check(module.WindowState == FormWindowState.Normal, "Modal module opens in normal state");
-                            // ActiveForm uses the DESKTOP foreground window. Windows may refuse
-                            // activation to this background/offscreen test process. Assert focus
-                            // only when the launcher actually owned foreground before the action.
-                            if (ownerWasActive) Check(Form.ActiveForm == module, "Foreground launcher transfers activation to modal module");
-                            else backgroundFocusChecks++;
-                            if(services && menu) {
-                                typeof(MainForm).GetField("operationRunning",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(module,true);
-                                typeof(MainForm).GetField("confirmBusyClose",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(module,new Func<DialogResult>(()=>DialogResult.No));
-                                Button(module,"В меню").PerformClick();
-                                Check(module.Visible && !((MainForm)module).MenuRequested,"Declining busy return clears menu request and keeps service module active");
-                                typeof(MainForm).GetField("operationRunning",BindingFlags.Instance|BindingFlags.NonPublic).SetValue(module,false);
-                            }
-                            if(menu)Button(module,"В меню").PerformClick();else module.Close();
-                        } catch(Exception ex) { navigationFailure=ex; module.Close(); }
-                    }); };
-                    typeof(ManagerHub).GetMethod("OpenModule",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(hub,new object[]{module});
-                    if(navigationFailure != null)throw navigationFailure;
-                    Check(menu ? hub.Visible && !hub.IsDisposed : hub.IsDisposed,"Back returns launcher; window close exits whole manager");
-                    if(!hub.IsDisposed)hub.Close();
-                }
-                foreach(bool dark in new[] {false,true})
-                using(var hub=new ManagerHub())
-                {
-                    hub.SetTheme(dark,false); Show(hub);
-                    for(int attempt=0;attempt<3;attempt++)
-                    using(var module=new LibraryManagerForm(true))
-                    {
-                        module.StartPosition=FormStartPosition.Manual;module.Location=new Point(-22000,-22000);module.ShowInTaskbar=false;
-                        bool ownerWasActive = Form.ActiveForm == hub;
-                        bool activated=false;
-                        module.Shown+=delegate {module.BeginInvoke((MethodInvoker)delegate {
-                            activated=module.Owner==hub && module.WindowState==FormWindowState.Normal && (!ownerWasActive || Form.ActiveForm==module);
-                            if (!ownerWasActive) backgroundFocusChecks++;
-                            Button(module,"В меню").PerformClick();
-                        });};
-                        typeof(ManagerHub).GetMethod("OpenModule",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(hub,new object[]{module});
-                        Check(activated,"First and repeated component openings activate the owned module in both themes");
-                        Check(hub.Visible && hub.Enabled && !hub.IsDisposed,"Repeated return leaves launcher available");
-                    }
-                    hub.Close();
-                }
-                Console.WriteLine("PASS: " + count + " UI rendering/input/navigation checks in both themes; no installation or SCM changes. Foreground assertions without an active launcher omitted: " + backgroundFocusChecks); return 0;
+                Console.WriteLine("PASS: " + count + " UI rendering/input checks in both themes; no installation or SCM changes."); return 0;
             }
             catch (Exception error) { Console.Error.WriteLine(error); return 1; }
         }

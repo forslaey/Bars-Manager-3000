@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
@@ -11,6 +11,7 @@ namespace ServiceTool
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr wParam,IntPtr lParam);
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle,int message,IntPtr wParam,ref NativePoint point);
         private bool updating;
+        private int wheelRemainder;
         private readonly TouchScrollSupport touchScroll;
         internal GuideReader(){touchScroll=new TouchScrollSupport(this,delta=>ScrollTo(ScrollPosition+delta));}
         internal event EventHandler ViewportChanged;
@@ -26,7 +27,20 @@ namespace ServiceTool
         protected override void OnVScroll(EventArgs e){base.OnVScroll(e);Notify();}
         protected override void WndProc(ref Message m)
         {
-            if(m.Msg==0x20A){int delta=(short)((m.WParam.ToInt64()>>16)&0xffff);ScrollTo(ScrollPosition-(int)Math.Round(delta/120.0*Font.Height*3));return;}
+            if (m.Msg == 0x20A)
+            {
+                wheelRemainder += (short)((m.WParam.ToInt64() >> 16) & 0xffff);
+                int lines = wheelRemainder * 3 / 120;
+                wheelRemainder -= lines * 120 / 3;
+                if (lines != 0)
+                {
+                    // RichEdit can scroll by lines without estimating the position of off-screen text.
+                    SendMessage(Handle, 0xB6, IntPtr.Zero, new IntPtr(-lines));
+                    Notify();
+                }
+                m.Result = IntPtr.Zero;
+                return;
+            }
             base.WndProc(ref m);if(m.Msg==0x115||m.Msg==0x101)Notify();
         }
     }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -141,7 +141,13 @@ namespace ServiceTool
             var bundle=Button("Скачать комплект",false);bundle.Click+=delegate{OpenModule(()=>new BundleDownloadForm());};footer.Controls.Add(bundle,0,0);
             var guide=Button("Инструкция",false);guide.AccessibleName="Открыть инструкцию";guide.Click+=delegate{ModuleNavigation.ShowDialog(this,()=>new UserGuideForm());SetTheme(ThemePreference.LoadDark(),false);};footer.Controls.Add(guide,2,0);
             var about=Button("О программе",false);about.Margin=Padding.Empty;about.Click+=delegate{using(var dialog=new AboutDialog(Colors,Icon))dialog.ShowDialog(this);};footer.Controls.Add(about,3,0);
-            body.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { OpenModule(() => new InitialSystemSettingsForm()); }),0,2);
+            var lastRow = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            lastRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            lastRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            lastRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            lastRow.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { OpenModule(() => new InitialSystemSettingsForm()); }),0,0);
+            lastRow.Controls.Add(ModuleCard("Логи программ BARS", "Логи клиентских программ BARS.\r\nВыбор приложения или папки", "Логи программ BARS", delegate { OpenModule(() => new ApplicationLogsForm()); }), 1, 0);
+            body.Controls.Add(lastRow, 0, 2);
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1);
             LimitContent(new Size(1160, 860));
@@ -179,7 +185,10 @@ namespace ServiceTool
         }
         internal void OpenModule(Type type, Func<Form> factory)
         {
-            if (RequestedModule != null || IsDisposed) return;
+            if (IsDisposed) return;
+            var context = ManagerApplicationContext.ActiveContext;
+            if (context != null) { context.OpenModule(type, factory); return; }
+            if (RequestedModule != null) return;
             RequestedModuleType = type;
             RequestedModule = factory;
             Close();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
@@ -27,11 +27,11 @@ namespace ServiceTool
                     using(var form=new MainForm(null,true))
                     {
                         form.SetTheme(dark,false);form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.Show();Application.DoEvents();
-                        var toggle=Field<RefreshToggle>(form,"autoRefreshToggle");var button=Field<Button>(form,"servicesButton");
+                        var toggle=Field<RefreshToggle>(form,"autoRefreshToggle");var grid=Field<ServiceGrid>(form,"servicesGrid");
                         for(int pass=0;pass<6;pass++)
                         {
                             form.WindowState=pass%2==0?FormWindowState.Maximized:FormWindowState.Normal;Application.DoEvents();form.PerformLayout();Application.DoEvents();
-                            Check(Math.Abs(toggle.PointToScreen(new Point(toggle.Width,0)).X-button.PointToScreen(new Point(button.Width,0)).X)<=2,"Refresh right edge matches Open services after maximize/restore");
+                            Check(Math.Abs(toggle.PointToScreen(new Point(toggle.Width,0)).X-grid.PointToScreen(new Point(grid.ClientSize.Width,0)).X)<=2,"Refresh right edge matches the table after maximize/restore");
                             using(var graphics=toggle.CreateGraphics())
                             {
                                 int text=TextRenderer.MeasureText(graphics,toggle.Text,toggle.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;

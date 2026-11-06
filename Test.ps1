@@ -1,4 +1,4 @@
-﻿param([string] $BuildDirectory, [switch] $Sign, [string] $ReferenceAssemblies, [switch] $UtilitySmoke, [switch] $SoftwareSmoke)
+﻿param([string] $BuildDirectory, [switch] $Sign, [string] $ReferenceAssemblies, [switch] $UtilitySmoke, [switch] $SoftwareSmoke, [switch] $Audit, [switch] $LayoutAudit)
 $ErrorActionPreference = 'Stop'
 $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $taskCompiler)) {
@@ -14,6 +14,9 @@ $taskBuild = if ([String]::IsNullOrWhiteSpace($BuildDirectory)) {
     [IO.Path]::GetFullPath($BuildDirectory)
 }
 New-Item -ItemType Directory -Path $taskBuild -Force | Out-Null
+if ([String]::IsNullOrWhiteSpace($ReferenceAssemblies)) {
+    $ReferenceAssemblies = & (Join-Path $PSScriptRoot 'tools\Prepare-References.ps1')
+}
 $taskPackage = Join-Path $taskBuild 'package'
 & (Join-Path $PSScriptRoot 'Build.ps1') -OutputDirectory $taskPackage -Sign:$Sign -ReferenceAssemblies $ReferenceAssemblies
 $taskVersionMatch = [regex]::Match((Get-Content -LiteralPath (Join-Path $taskSource 'AssemblyInfo.cs') -Raw), 'AssemblyFileVersion\("([0-9.]+)"\)')
@@ -26,14 +29,45 @@ foreach ($taskArchitecture in @('x86','x64')) {
     try { $taskResource.CopyTo($taskResourceOutput) } finally { $taskResourceOutput.Dispose(); $taskResource.Dispose() }
 }
 
+$taskFailures = New-Object 'System.Collections.Generic.List[string]'
 function Invoke-TaskTests([string] $taskName, [string] $taskMain, [string[]] $taskInputs) {
     $taskOutput = Join-Path $taskBuild ($taskName + '.exe')
-    $taskArguments = @('/nologo', '/target:exe', '/platform:anycpu', '/utf8output', '/codepage:65001', "/out:$taskOutput", "/main:$taskMain", '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Xml.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.IO.Compression.dll', '/reference:System.IO.Compression.FileSystem.dll', '/reference:System.Configuration.Install.dll', '/reference:System.ServiceProcess.dll', '/reference:System.Security.dll', '/reference:System.Web.Extensions.dll', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png")
+    $taskArguments = @('/nologo', '/target:exe', '/platform:anycpu', '/utf8output', '/codepage:65001', "/out:$taskOutput", "/main:$taskMain", '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Xml.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.IO.Compression.dll', '/reference:System.IO.Compression.FileSystem.dll', '/reference:System.Configuration.Install.dll', '/reference:System.ServiceProcess.dll', '/reference:System.Security.dll', '/reference:System.Web.Extensions.dll', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png", "/resource:$(Join-Path $taskAssets 'BundleManifest.json'),BARS.BundleManifest.json")
+    $taskArguments = @('/noconfig','/nostdlib+',"/reference:$(Join-Path $ReferenceAssemblies 'mscorlib.dll')") + @($taskArguments | ForEach-Object {
+        if ($_.StartsWith('/reference:')) { "/reference:$(Join-Path $ReferenceAssemblies $_.Substring(11))" } else { $_ }
+    })
     foreach ($taskArchitecture in @('x86','x64')) { $taskArguments += "/resource:$(Join-Path $taskBuild "Installer.$taskArchitecture.exe"),BARS.Helper.$taskArchitecture" }
     & $taskCompiler @taskArguments @taskInputs
-    if ($LASTEXITCODE -ne 0) { throw "Не удалось собрать $taskName" }
-    & $taskOutput
-    if ($LASTEXITCODE -ne 0) { throw "Ошибка проверок $taskName" }
+    if ($LASTEXITCODE -ne 0) { $taskFailures.Add($taskName); Write-Warning "Не удалось собрать $taskName"; return }
+    $stdout = Join-Path $taskBuild ($taskName + '.out.txt')
+    $stderr = Join-Path $taskBuild ($taskName + '.err.txt')
+    $process = Start-Process -FilePath $taskOutput -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    try {
+        $null = $process.Handle
+        if (!$process.WaitForExit(90000)) { $process.Kill(); $process.WaitForExit(); $taskFailures.Add($taskName); Write-Warning "Истекло время теста $taskName" }
+        elseif ($process.ExitCode -ne 0) { $taskFailures.Add($taskName); Write-Warning "Ошибка проверок $taskName" }
+        Get-Content -LiteralPath $stdout,$stderr
+    } finally { $process.Dispose() }
+}
+
+$taskUiSources = @(Get-ChildItem -LiteralPath $taskSource -File -Filter '*.cs' | ForEach-Object FullName)
+if ($LayoutAudit) {
+    foreach ($name in @('LogArchiveUiTests','ResponsiveLayoutTests','DownloadProgressTests')) {
+        Invoke-TaskTests $name ("ServiceTool." + $name) ($taskUiSources + (Join-Path $taskTests ($name + '.cs')))
+    }
+    if ($taskFailures.Count) { throw ("Не пройдены проверки: " + ($taskFailures -join ", ")) }
+    return
+}
+if ($Audit) {
+    $auditFailures = @()
+    foreach ($name in @('AuditRegressionTests','NavigationTests','ThemeTests','GridViewportTests','TouchGridTests','TouchTextTests','ComboStabilityTests','LogArchivePolishTests','LogArchiveTests','DotNetPresentationTests','SoftwareMaintenanceTests','BundleMirrorTests')) {
+        try { Invoke-TaskTests $name ("ServiceTool." + $name) ($taskUiSources + (Join-Path $taskTests ($name + '.cs'))) }
+        catch { $auditFailures += $name; Write-Warning $_.Exception.Message }
+    }
+    if ($taskFailures.Count) { throw ("Не пройдены проверки: " + ($taskFailures -join ", ")) }
+    if ($auditFailures.Count) { throw ("Не пройдены проверки: " + ($auditFailures -join ", ")) }
+    Write-Output "Проверки повторного аудита пройдены: $taskBuild"
+    return
 }
 
 $taskCore = Join-Path $taskSource 'ServiceCore.cs'
@@ -41,27 +75,6 @@ $taskManagement = Join-Path $taskSource 'ServiceManagement.cs'
 Invoke-TaskTests 'CoreTests' 'CoreTests' @($taskCore, (Join-Path $taskTests 'CoreTests.cs'))
 Invoke-TaskTests 'ManagementTests' 'ManagementTests' @($taskCore, $taskManagement, (Join-Path $taskTests 'ManagementTests.cs'))
 Invoke-TaskTests 'ManagedServiceStoreTests' 'ManagedServiceStoreTests' @($taskCore, (Join-Path $taskSource 'ApplicationStorage.cs'), (Join-Path $taskSource 'ManagedServiceStore.cs'), (Join-Path $taskTests 'ManagedServiceStoreTests.cs'))
-$taskUiSources = @((Join-Path $taskSource 'Program.cs'), $taskCore, $taskManagement, (Join-Path $taskSource 'Theme.cs'), (Join-Path $taskSource 'BrandAssets.cs'), (Join-Path $taskSource 'ManagedServiceStore.cs'), (Join-Path $taskSource 'JournalControls.cs'), (Join-Path $taskSource 'AboutDialog.cs'), (Join-Path $taskSource 'ServiceLogArchive.cs'), (Join-Path $taskSource 'LogArchiveDialog.cs'), (Join-Path $taskSource 'ServiceInstallProfile.cs'), (Join-Path $taskSource 'ServiceProfileInstaller.cs'), (Join-Path $taskSource 'ServiceAccountDialog.cs'), (Join-Path $taskSource 'WindowsAccountInfo.cs'))
-$taskUiSources += Join-Path $taskSource 'EmbeddedHelpers.cs'
-$taskUiSources += Join-Path $taskSource 'AssemblyInfo.cs'
-$taskUiSources += Join-Path $taskSource 'ApplicationStorage.cs'
-$taskUiSources += Join-Path $taskSource 'ProcedureWait.cs'
-$taskUiSources += @('DownloadTransfer.cs','DownloadProgressView.cs','SoftwarePackageStorage.cs') | ForEach-Object { Join-Path $taskSource $_ }
-$taskUiSources += Join-Path $taskSource 'GuideSectionListBox.cs'
-$taskUiSources += Join-Path $taskSource 'TouchGrid.cs'
-$taskUiSources += @('BundleDownloadForm.cs','BundleReceipts.cs','BundleTransfer.cs','YandexBundleSource.cs') | ForEach-Object { Join-Path $taskSource $_ }
-$taskUiSources += Join-Path $taskSource 'TouchScrollSupport.cs'
-$taskUiSources += Join-Path $taskSource 'BoundedContentPanel.cs'
-$taskUiSources += Join-Path $taskSource 'LibraryJournal.cs'
-$taskUiSources += Join-Path $taskSource 'BarsFolderPermissions.cs'
-$taskUiSources += @('KioskTouchSettings.cs','PasswordEyeButton.cs','InitialSystemSettings.cs','InitialSystemSettingsForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
-$taskUiSources += @('LibraryCatalog.cs','LibraryCore.cs','LibraryDiscovery.cs','LibraryInstaller.cs','ManagerHub.cs','UserGuideForm.cs','LibraryManagerForm.cs','LibraryGridScrollBar.cs','LibraryHeartbeat.cs','LibraryMaintenance.cs','LibraryActionDialog.cs','LibraryVersions.cs','LibraryVcProfiles.cs','LibraryCancellation.cs','WindowsComponents.cs','ToolsDeployment.cs','UtilityModules.cs','InstallerRebootGuard.cs','PausedLibraryQueue.cs','SoftwareCatalog.cs','SoftwareSources.cs','SoftwareDetection.cs','SoftwareInstaller.cs','CompactJournalLayout.cs','SoftwareManagerForm.cs') | ForEach-Object { Join-Path $taskSource $_ }
-$taskUiSources += @('BrandMessageBox.cs','JournalPanel.cs','SystemSettingsPresentation.cs','GuideReader.cs','ModuleNavigation.cs') | ForEach-Object { Join-Path $taskSource $_ }
-$taskUiSources += Join-Path $taskSource 'ManagerApplicationContext.cs'
-$taskUiSources += Join-Path $taskSource 'WindowPlacement.cs'
-$taskUiSources += Join-Path $taskSource 'ExecutableArchitecture.cs'
-$taskUiSources += Join-Path $taskSource 'DotNetUpdates.cs'
-$taskUiSources += Join-Path $taskSource 'DotNetUpdatesForm.cs'
 Invoke-TaskTests 'NavigationTests' 'ServiceTool.NavigationTests' ($taskUiSources + (Join-Path $taskTests 'NavigationTests.cs'))
 Invoke-TaskTests 'ReviewRegressionTests' 'ServiceTool.ReviewRegressionTests' ($taskUiSources + (Join-Path $taskTests 'ReviewRegressionTests.cs'))
 & (Join-Path $taskTests 'WindowsFeatureCommands.Tests.ps1') -AssemblyPath (Join-Path $taskPackage $taskPackageName)
@@ -128,7 +141,6 @@ Invoke-TaskTests 'Ui2330Tests' 'ServiceTool.Ui2330Tests' ($taskUiSources + (Join
 Invoke-TaskTests 'KioskTouchTests' 'ServiceTool.KioskTouchTests' ($taskUiSources + (Join-Path $taskTests 'KioskTouchTests.cs'))
 
 Invoke-TaskTests 'Ui2332Tests' 'ServiceTool.Ui2332Tests' ($taskUiSources + (Join-Path $taskTests 'Ui2332Tests.cs'))
-Write-Output "Все проверки пройдены. Временные сборки: $taskBuild"
 Write-Output 'Реальные процедуры установки, удаления и управления службами не выполнялись.'
 
 Invoke-TaskTests 'WindowSessionTests' 'ServiceTool.WindowSessionTests' ($taskUiSources + (Join-Path $taskTests 'WindowSessionTests.cs'))
@@ -136,3 +148,5 @@ Invoke-TaskTests 'WindowSessionTests' 'ServiceTool.WindowSessionTests' ($taskUiS
 Invoke-TaskTests 'InkAlignmentTests' 'ServiceTool.InkAlignmentTests' ($taskUiSources + (Join-Path $taskTests 'InkAlignmentTests.cs'))
 
 Invoke-TaskTests 'RuntimeFeatureTests' 'ServiceTool.RuntimeFeatureTests' ($taskUiSources + (Join-Path $taskTests 'RuntimeFeatureTests.cs'))
+if ($taskFailures.Count) { throw ("Не пройдены проверки: " + ($taskFailures -join ", ")) }
+Write-Output "Все проверки пройдены. Временные сборки: $taskBuild"

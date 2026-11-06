@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -188,6 +188,12 @@ namespace ServiceTool
                 Check(Field<List<ServiceEntry>>(form, "matches").Count == 0, "Automatic discovery does not select a service or install anything");
                 Check(toggle.Checked && timer.Interval == 10000, "Autorefresh defaults to on, interval 10 seconds");
                 typeof(MainForm).GetMethod("UpdateRefreshTimer", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form, null);
+                Check(!timer.Enabled, "Refresh stays disabled while the window is hidden");
+                int beforeShow = reads;
+                form.Show();
+                for(int attempt=0;attempt<100&&reads==beforeShow;attempt++)await Task.Delay(10);
+                Check(reads>beforeShow,"Opening refreshes the injected catalog before testing queued ticks");
+                await Wait(form);
                 Check(timer.Enabled, "Default-on refresh starts the timer when the window opens");
                 toggle.Checked = false;
                 MethodInfo tick = typeof(System.Windows.Forms.Timer).GetMethod("OnTick", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -217,7 +223,7 @@ namespace ServiceTool
                     form.SetTheme(dark, false);
                     Check(toggle.Palette.Dark == dark, "Refresh switch follows theme");
                 }
-                Check(Field<Label>(form, "statusTitle").Parent.Parent.Parent == grid.Parent.Parent, "Status summary and service list share one card");
+                Check(Field<Label>(form, "statusTitle").Parent.Parent == grid.Parent.Parent, "Status summary and service list share one card");
                 Check(Field<Button>(form, "installButton").Margin.Top == Field<Button>(form, "installButton").Margin.Bottom, "Action buttons have symmetric vertical spacing");
                 Application.DoEvents();
                 Check(Field<PictureBox>(form, "brandImage").Top == (Field<PictureBox>(form, "brandImage").Parent.ClientSize.Height - Field<PictureBox>(form, "brandImage").Height) / 2,

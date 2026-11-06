@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -131,7 +131,7 @@ namespace ServiceTool
                         var checks = Field<Dictionary<string, LibraryCheck>>(form, "checks");
                         int installedRow = grid.Rows.Cast<DataGridViewRow>().First(row => checks[((LibraryPackage)row.Tag).Id].State == LibraryState.Installed).Index;
                         grid.Focus(); grid.CurrentCell = grid.Rows[installedRow].Cells[1]; Application.DoEvents();
-                        Check(install.Text == "Переустановить/удалить выбранные", "Installed focused row changes primary action");
+                        Check(install.Text == "Действия с выбранными", "Installed focused row changes primary action");
                         var targets = (List<LibraryCheck>)typeof(LibraryManagerForm).GetMethod("ActionTargets", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form, null);
                         Check(targets.Count == 1 && targets[0].State == LibraryState.Installed, "Focused row overrides previously checked missing components");
                         int packRow = grid.Rows.Cast<DataGridViewRow>().First(row => checks[((LibraryPackage)row.Tag).Id].State == LibraryState.Missing).Index;

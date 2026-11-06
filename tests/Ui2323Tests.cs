@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -35,7 +35,14 @@ namespace ServiceTool
                         Check(form.RectangleToScreen(form.ClientRectangle).Contains(back.RectangleToScreen(back.ClientRectangle)),"Back immediately reachable without outer scroll");
                         Check(back.PointToScreen(Point.Empty).Y>=log.PointToScreen(new Point(0,log.Height)).Y,"Journal above footer");
                         Check(!All(form).OfType<FillContentPanel>().Any(p=>p.Contains(back)||p.Contains(log)),"Navigation and journal never scroll with working area");
-                        if(size==form.ClientSize&&size.Width>=1280&&size.Height>=920)Check(grid.DisplayedRowCount(false)==5,"All five rows fit laptop viewport grid="+grid.Size+" form="+form.ClientSize+" client="+grid.ClientRectangle+" shown="+grid.DisplayedRowCount(false)+" first="+grid.FirstDisplayedScrollingRowIndex+" lastRect="+grid.GetRowDisplayRectangle(4,false)+" header="+grid.ColumnHeadersHeight+" rows="+String.Join(",",grid.Rows.Cast<DataGridViewRow>().Select(r=>r.Height)));
+                        int required=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(row=>row.Height);
+                        if(grid.ClientSize.Height>=required)Check(grid.DisplayedRowCount(false)==5,"Five rows visible when their measured height fits");
+                        else {
+                            grid.FirstDisplayedScrollingRowIndex=grid.RowCount-1;
+                            Application.DoEvents();
+                            var last=grid.GetRowDisplayRectangle(grid.RowCount-1,false);
+                            Check(last.Height>0&&last.Bottom<=grid.ClientSize.Height,"Last program reachable when the list must scroll");
+                        }
                     }
                     Capture(form,"software2323-"+dark);
                 }

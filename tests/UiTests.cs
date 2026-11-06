@@ -103,7 +103,7 @@ namespace ServiceTool
                 Assert(Field<Button>(form, "installButton").Enabled, "A complete catalog without an exact match permits installation");
                 Assert(!Field<Button>(form, "removeButton").Enabled, "An unrelated service cannot enable removal");
                 Assert(Field<DataGridView>(form, "servicesGrid").Rows.Count == 0, "Unrelated entries are excluded from the grid");
-                Assert(Field<Label>(form, "statusTitle").Text == "Регистрация не найдена", "Confirmed absence is displayed");
+                Assert(Field<Label>(form, "statusTitle").Text == "Поддержка установки как службы не подтверждена.", "Inert file with no registration is displayed");
                 Assert(Field<bool>(form, "verified"), "Complete absence is verified");
             }
             Console.WriteLine("PASS: complete catalog without matching registration");
@@ -115,7 +115,7 @@ namespace ServiceTool
             {
                 await InvokeAsync(form, "SetExecutableAsync", executableA);
                 Assert(!Field<Button>(form, "installButton").Enabled && Field<Button>(form, "removeButton").Enabled, "A stopped service remains registered and removable");
-                Assert(Field<Label>(form, "statusTitle").Text == "Служба зарегистрирована и остановлена", "Stopped registration is not presented as running");
+                Assert(Field<Label>(form, "statusTitle").Text == "Служба зарегистрирована и остановлена.", "Stopped registration is not presented as running");
                 DataGridView grid = Field<DataGridView>(form, "servicesGrid");
                 Assert(grid.Rows.Count == 1, "Stopped registration appears in the grid");
                 Assert(Convert.ToString(grid.Rows[0].Cells[1].Value) == "stopped-A" && Convert.ToString(grid.Rows[0].Cells[2].Value) == "Остановлена", "The grid preserves identity and translates stopped state");
@@ -139,7 +139,7 @@ namespace ServiceTool
                 await InvokeAsync(form, "RefreshStatusAsync", false);
                 Assert(!Field<Button>(form, "installButton").Enabled && !Field<Button>(form, "removeButton").Enabled, "Catalog failure cannot permit either action");
                 Assert(!Field<bool>(form, "verified") && Field<DataGridView>(form, "servicesGrid").Rows.Count == 1, "Catalog failure retains the last known registration without trusting it");
-                Assert(Field<Label>(form, "statusTitle").Text == "Статус не удалось проверить", "Catalog failure is distinct from absent registration");
+                Assert(Field<Label>(form, "statusTitle").Text == "Статус не удалось проверить.", "Catalog failure is distinct from absent registration");
                 Assert(Field<Label>(form, "statusDetail").Text.Contains("Injected catalog access failure"), "Failure details reach the UI");
                 Assert(Field<Button>(form, "refreshButton").Enabled && Field<Button>(form, "chooseButton").Enabled, "Read failure leaves a recovery path");
                 await InvokeAsync(form, "RefreshStatusAsync", false);
@@ -156,7 +156,7 @@ namespace ServiceTool
                 await InvokeAsync(form, "SetExecutableAsync", executableA);
                 Assert(!Field<Button>(form, "installButton").Enabled && !Field<Button>(form, "removeButton").Enabled, "Incomplete absence cannot authorize installation or removal");
                 Assert(!Field<bool>(form, "verified"), "An unmatched partial catalog remains unverified");
-                Assert(Field<Label>(form, "statusTitle").Text == "Статус регистрации неизвестен", "Partial absence is shown as unknown");
+                Assert(Field<Label>(form, "statusTitle").Text == "Статус регистрации неизвестен.", "Partial absence is shown as unknown");
                 Assert(Field<Label>(form, "statusDetail").Text.Contains(warning), "Partial absence explains its uncertainty");
             }
             Console.WriteLine("PASS: unmatched partial catalog is unknown");

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -149,7 +149,7 @@ namespace ServiceTool
                     }
                     if (form is ManagerHub)
                     {
-                        var allCards = Children(form).OfType<Card>().ToArray(); Check(allCards.Length==5,"Five launcher cards"); var cards=allCards.Where(c=>c.Width<allCards.Max(v=>v.Width)-5).ToArray(); Check(cards.Length == 4 && cards.Max(c=>c.Width)-cards.Min(c=>c.Width)<=1 && cards.Max(c => c.Height) - cards.Min(c => c.Height) <= 1, "Four equal cards in a complete 2x2 grid: " + String.Join(",", cards.Select(c => c.Height)));
+                        var allCards = Children(form).OfType<Card>().ToArray(); Check(allCards.Length==6,"Six launcher cards"); var cards=allCards.GroupBy(c=>c.Parent).Single(group=>group.Count()==4).ToArray(); Check(cards.Length == 4 && cards.Max(c=>c.Width)-cards.Min(c=>c.Width)<=1 && cards.Max(c => c.Height) - cards.Min(c => c.Height) <= 1, "Four equal cards in a complete 2x2 grid: " + String.Join(",", cards.Select(c => c.Height)));
                         var actions = cards.Select(c => Children(c).OfType<BrandButton>().Single()).ToArray();
                         Check(actions.Select(b => b.Size).Distinct().Count() == 1, "All launch actions equal size");
                         Check(actions.Any(b => b.Text == "Установка программ"), "Programs module is its own launcher card");
@@ -171,7 +171,7 @@ namespace ServiceTool
                     if (form is ToolsDeploymentForm)
                     {
                         var path = Children(form).OfType<BrandTextBox>().Single(b=>!b.ReadOnly);
-                        Check(buttons.Any(b=>b.Text=="Установить")&&buttons.Any(b=>b.Text=="Удалить")&&!buttons.Any(b=>b.Text=="Путь по умолчанию"),"Utilities install/remove without default-path button");
+                        Check(buttons.Any(b=>b.Text=="Распаковать")&&buttons.Any(b=>b.Text=="Удалить")&&buttons.Any(b=>b.Text=="Отменить")&&!buttons.Any(b=>b.Text=="Путь по умолчанию"),"Utilities install/remove without default-path button");
                         Check(Children(form).OfType<BrandCheckBox>().Single().Checked,"Desktop shortcuts default to enabled");
                         Check(path.Text == ToolsDeployment.DefaultTarget, "Unpack path prefilled with C:\\DataKrat\\_tools and editable");
                         Check(!Children(form).OfType<Label>().Any(l => l.Text.Contains("Ярлыки с иконками EXE")), "Descriptive block removed from utilities window");

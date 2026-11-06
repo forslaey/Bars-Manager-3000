@@ -36,15 +36,15 @@ namespace ServiceTool
             Text = installing ? "Установка с учётной записью" : "Настройки установки службы";
             Font = new Font("Segoe UI", 10F);
             BackColor = colors.Canvas; ForeColor = colors.Text;
-            ClientSize = new Size(620, 576);
+            ClientSize = new Size(620, 532);
             AutoScaleDimensions = new SizeF(96F, 96F); AutoScaleMode = AutoScaleMode.Dpi;
-            FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false; MinimizeBox = false;
+            FormBorderStyle = FormBorderStyle.FixedSingle; Icon = BrandAssets.LoadIcon(); MaximizeBox = false; MinimizeBox = false;
             ShowInTaskbar = false; StartPosition = FormStartPosition.CenterParent;
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 18),
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 16),
                 RowCount = 14, ColumnCount = 2, Margin = Padding.Empty };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 158));
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            float[] heights = { 34, 30, 42, 12, 42, 58, 38, 38, 30, 52, 48, 22, 12, 42 };
+            float[] heights = { 34, 30, 42, 12, 42, 58, 38, 38, 30, 52, 48, 22, 12, 40 };
             foreach (float height in heights) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             Label title = MakeLabel(installing ? "Установка .NET-службы" : "Как устанавливать эту службу", colors.Text);
             title.Font = titleFont; layout.Controls.Add(title, 0, 0); layout.SetColumnSpan(title, 2);
@@ -94,9 +94,9 @@ namespace ServiceTool
             var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft,
                 WrapContents = false, Margin = Padding.Empty };
             var accept = new BrandButton { Text = installing ? "Установить" : "Сохранить", Palette = colors,
-                Primary = true, Size = new Size(145, 40), Margin = Padding.Empty };
-            var cancel = new BrandButton { Text = "Отмена", Palette = colors, Size = new Size(110, 40),
-                Margin = new Padding(0, 0, 10, 0), DialogResult = DialogResult.Cancel };
+                Primary = true, Size = new Size(144, 40), Margin = Padding.Empty };
+            var cancel = new BrandButton { Text = "Отмена", Palette = colors, Size = new Size(144, 40),
+                Margin = new Padding(0, 0, 12, 0), DialogResult = DialogResult.Cancel };
             accept.Click += AcceptSettings;
             actions.Controls.Add(accept); actions.Controls.Add(cancel);
             layout.Controls.Add(actions, 0, 13); layout.SetColumnSpan(actions, 2);

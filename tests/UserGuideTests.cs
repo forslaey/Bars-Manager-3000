@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -105,7 +105,7 @@ namespace ServiceTool
                     {
                         matches.Clear(); matches.Add(new ServiceEntry { Name = "Example", DisplayName = "Example service", State = state }); Call(form, "ShowRegistrationStatus");
                         string title = Field<Label>(form, "statusTitle").Text;
-                        Check(title == MainForm.RegistrationText(state), "Header reflects the single service state");
+                        Check(title == OperationMessage.FinishSentence(MainForm.RegistrationText(state)), "Header reflects the single service state");
                         Check(!Field<Label>(form, "statusDetail").Visible && !Field<Label>(form, "hint").Visible, "Both lower lines stay hidden for all service states");
                     }
                     matches[0].State = "Running"; Call(form, "ShowRegistrationStatus");
@@ -118,7 +118,7 @@ namespace ServiceTool
                 {
                     Show(hub, 1F); var buttons = All(hub).OfType<BrandButton>();
                     Check(buttons.Count(button => button.Text == "Инструкция") == 1, "Dedicated guide launcher button");
-                    Check(buttons.Count(button => button.Primary) == 5, "Five module cards retained"); Capture(hub, "hub-guide"); hub.Close();
+                    Check(buttons.Count(button => button.Primary) == 6, "Six module cards retained"); Capture(hub, "hub-guide"); hub.Close();
                 }
                 Console.WriteLine("PASS: " + count + " guide/search/service UI checks. Both themes; simulated 100/125/150/200%. No service operations or installers."); return 0;
             }

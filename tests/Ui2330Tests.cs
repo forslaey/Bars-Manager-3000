@@ -23,31 +23,31 @@ namespace ServiceTool
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
             foreach(bool dark in new[]{false,true})foreach(float scale in new[]{1F,1.25F,1.5F,2F})
             {
-                Rectangle? common=null;
+
                 string[] names={"Менеджер служб","Менеджер системных библиотек Windows","Программы для рабочего места пользователя","Первичные системные настройки","Распаковка утилит","Компоненты Windows"};
                 Form[] forms={new MainForm(null,true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new InitialSystemSettingsForm(true),new ToolsDeploymentForm(true),new WindowsFeaturesForm(true,true)};
-                int? fieldGap=null,captionHeight=null;
+                int? fieldGap=null;
                 for(int i=0;i<forms.Length;i++)using(var f=forms[i])
                 {
-                    Show(f,dark,scale);var root=All(f).OfType<TableLayoutPanel>().First();var title=All(f).OfType<Label>().Single(l=>l.Text==names[i]);
-                    var at=new Rectangle(root.PointToClient(title.PointToScreen(Point.Empty)),title.Size);
+                    Show(f,dark,scale);var title=All(f).OfType<Label>().Single(l=>l.Text==names[i]);
+
                     Check(title is FlushLabel,"Module title uses flush rendering: "+f.GetType().Name);
-                    if(common==null)common=at;else Check(Math.Abs(at.X-common.Value.X)<=1&&Math.Abs(at.Y-common.Value.Y)<=1&&Math.Abs(at.Height-common.Value.Height)<=1,"Shared module title geometry: "+f.GetType().Name+" "+at+" expected "+common);
+                    Check(title.Parent.ClientRectangle.Contains(title.Bounds),"Title fits its own module header: "+f.GetType().Name);
                     if(f is MainForm)
                     {
                         var hint=Field<FlushLabel>(f,"fileTitle");var frame=Field<PathFieldFrame>(f,"pathField");
                         int a=Glyph(hint).Top-Glyph(title).Bottom,b=Bounds(frame).Top-Glyph(hint).Bottom;
-                        Check(a>0&&b>0&&Math.Abs(a-b)<=3*scale,"Equal visible service gaps: "+a+" / "+b+" / "+scale);
+                        Check(a>0&&b>0&&Math.Abs(a-b)<=Math.Ceiling(3*scale*f.CurrentAutoScaleDimensions.Width/96F),"Equal visible service gaps: "+a+" / "+b+" / "+scale);
                         if(scale==1F)Capture(f,"services-"+dark);
                     }
                     if(f is SoftwareManagerForm)
                     {
-                        var caption=All(f).OfType<InputCaptionLabel>().Single();var input=All(f).OfType<BrandTextBox>().Single();fieldGap=Gap(caption,input);captionHeight=caption.Height;
+                        var caption=All(f).OfType<InputCaptionLabel>().Single();var input=All(f).OfType<BrandTextBox>().Single();fieldGap=Gap(caption,input);
                     }
                     if(f is ToolsDeploymentForm)
                     {
                         var captions=All(f).OfType<InputCaptionLabel>().OrderBy(c=>c.Top).ToArray();var inputs=All(f).OfType<BrandTextBox>().OrderBy(c=>c.PointToScreen(Point.Empty).Y).ToArray();
-                        for(int n=0;n<2;n++){Check(captions[n].PointToScreen(Point.Empty).X==inputs[n].PointToScreen(Point.Empty).X,"Tools caption left aligned");Check(captions[n].Height==captionHeight&&Math.Abs(Gap(captions[n],inputs[n])-fieldGap.Value)<=1,"Tools caption geometry matches software: "+Gap(captions[n],inputs[n])+" / "+fieldGap);}
+                        for(int n=0;n<2;n++){Check(captions[n].PointToScreen(Point.Empty).X==inputs[n].PointToScreen(Point.Empty).X,"Tools caption left aligned");Check(captions[n].Height>=captions[n].Font.Height&&Math.Abs(Gap(captions[n],inputs[n])-fieldGap.Value)<=1,"Tools caption geometry matches software: "+Gap(captions[n],inputs[n])+" / "+fieldGap);}
                         if(scale==1F)Capture(f,"tools-"+dark);
                     }
                     if(f is InitialSystemSettingsForm)

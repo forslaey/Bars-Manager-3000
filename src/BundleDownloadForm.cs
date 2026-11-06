@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -46,7 +46,7 @@ namespace ServiceTool
         {
             MinimumSize=SizeFromClientSize(new Size(650,680));ClientSize=new Size(650,680);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;Root.RowStyles[0].Height=60;
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=7,Margin=Padding.Empty};body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-            foreach(float height in new[]{50F,40F,104F,0F,40F,112F,100F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
+            foreach(float height in new[]{50F,40F,104F,0F,40F,120F,100F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
             body.Controls.Add(ModuleHeading("Загрузка комплекта"),0,0);
             var path=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,168));path.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var caption=Caption("Папка комплекта",false);path.Controls.Add(caption,0,0);folder.ReadOnly=true;folder.AutoSize=false;folder.Text=libraryRoot??BundlePreferences.Load();folder.Dock=DockStyle.None;folder.Anchor=AnchorStyles.Left|AnchorStyles.Right;folder.Margin=Padding.Empty;
@@ -67,7 +67,7 @@ namespace ServiceTool
             scan=Button("Проверить",false);start=Button("Скачать",true);pause=Button("Пауза",false);stop=Button("Отменить",false);back=Button("В меню",false);results=Button("Результаты",false);results.Click+=delegate{ShowResults();};
             scan.Click+=async delegate{await Scan();};start.Click+=async delegate{await Download();};pause.Click+=delegate{if(!downloading)return;if(paused){paused=false;pause.Text="Пауза";}else{paused=true;pause.Enabled=false;pause.Text="Пауза…";if(cancellation!=null)cancellation.Cancel();}};
             stop.Click+=delegate{if(busy&&BrandMessageBox.ConfirmStop(this,"Остановить загрузку? Готовые файлы и данные для продолжения сохранятся.")==DialogResult.Yes){cancelRequested=true;paused=false;if(cancellation!=null)cancellation.Cancel();}};
-            back.Click+=delegate{MenuRequested=true;Close();};int index=0;foreach(var button in new[]{scan,start,results,pause,stop,back}){ModuleNavigation.Configure(button);button.Dock=DockStyle.Fill;button.Margin=new Padding(0,5,index%3==2?0:10,5);actions.Controls.Add(button,index%3,index/3);index++;}body.RowCount=6;body.RowStyles.RemoveAt(6);body.MinimumSize=new Size(0,480);
+            back.Click+=delegate{if(ModuleNavigation.ReturnToHub())return;MenuRequested=true;Close();};int index=0;foreach(var button in new[]{scan,start,results,pause,stop,back}){ModuleNavigation.Configure(button);button.Dock=DockStyle.Fill;button.Margin=new Padding(0,5,index%3==2?0:10,5);actions.Controls.Add(button,index%3,index/3);index++;}body.RowCount=6;body.RowStyles.RemoveAt(6);body.MinimumSize=new Size(0,480);
             var content=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.RowStyles.Add(new RowStyle(SizeType.Percent,100));content.RowStyles.Add(new RowStyle(SizeType.Absolute,100));content.Controls.Add(new FillContentPanel(body){Margin=Padding.Empty,PreserveScrollOnFocus=true},0,0);content.Controls.Add(actions,0,1);Root.Controls.Add(content,0,1);
             timer.Tick+=delegate{RefreshProgress();};VisibleChanged+=delegate{timer.Enabled=Visible;};
             FormClosing+=delegate(object sender,FormClosingEventArgs e){if(busy){e.Cancel=true;if(BrandMessageBox.Show(this,"Остановить загрузку и закрыть окно? Готовые файлы сохранятся.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)==DialogResult.Yes){closeAfter=true;cancelRequested=true;paused=false;if(cancellation!=null)cancellation.Cancel();}}};
@@ -75,8 +75,8 @@ namespace ServiceTool
         }
         bool GroupSelected(string group){return group=="Программы"?false:group=="Утилиты"?tools.Checked:libraries.Checked;}
         static string SizeText(long bytes){return (bytes/1048576.0).ToString("0.0")+" МиБ";}
-        void Log(string text){if(IsDisposed)return;if(InvokeRequired){try{BeginInvoke((MethodInvoker)delegate{Log(text);});}catch(InvalidOperationException){}return;}journal.AppendText(DateTime.Now.ToString("HH:mm:ss")+"  "+text+Environment.NewLine);}
-        void UpdateState(){results.Enabled=!busy&&scannedRoot!=null&&entries.Any(e=>!e.Done);scan.Enabled=choose.Enabled=!busy;start.Enabled=!busy&&entries.Any(e=>e.Selected&&e.Allowed&&!e.Done);pause.Enabled=downloading;stop.Enabled=busy;back.Enabled=!busy;libraries.Enabled=tools.Enabled=!busy;}
+        void Log(string text){if(IsDisposed)return;if(InvokeRequired){try{BeginInvoke((MethodInvoker)delegate{Log(text);});}catch(InvalidOperationException){}return;}journal.AppendText(DateTime.Now.ToString("HH:mm:ss")+"  "+OperationMessage.FinishSentence(text)+Environment.NewLine);}
+        void UpdateState(){results.Enabled=!busy&&scannedRoot!=null&&entries.Any(e=>!e.Done);scan.Enabled=choose.Enabled=!busy;start.Enabled=!busy&&entries.Any(e=>e.Selected&&e.Allowed&&!e.Done);pause.Enabled=downloading;stop.Enabled=busy;back.Enabled=!busy||ManagerApplicationContext.ActiveContext!=null;libraries.Enabled=tools.Enabled=!busy;}
         void ShowResults()
         {
             var source=entries.Where(e=>!e.Done).ToArray();if(source.Length==0)return;var rows=source.Select(e=>new BundleDifferenceItem {Path=e.File.Path.TrimStart('/'),State=e.State,Allowed=e.Allowed,Selected=e.Selected}).ToArray();
@@ -85,7 +85,16 @@ namespace ServiceTool
         }
         async Task Scan(BundleCloud? forcedCloud=null)
         {
-            if(busy)return;bool suggestAlternative=false;BundleCloud cloud;if(forcedCloud.HasValue)cloud=forcedCloud.Value;else using(var picker=new BundleCloudDialog(true)){if(picker.ShowDialog(this)!=DialogResult.OK)return;cloud=picker.Cloud;}busy=true;cancelRequested=false;paused=false;batch=null;cancellation=new CancellationTokenSource();UpdateState();string root=Path.GetFullPath(folder.Text);Log("Проверяем выбранные разделы: читаем каталог облака и сверяем локальные файлы.");summary.Text="Читаем выбранное облако и проверяем локальные файлы…";total.BeginOperation(summary.Text);
+            if(busy)return;bool suggestAlternative=false;BundleCloud cloud;if(forcedCloud.HasValue)cloud=forcedCloud.Value;else using(var picker=new BundleCloudDialog(true)){if(picker.ShowDialog(this)!=DialogResult.OK)return;cloud=picker.Cloud;}string root;
+            try { root=Path.GetFullPath(folder.Text); }
+            catch(Exception ex)
+            {
+                if (!(ex is ArgumentException) && !(ex is NotSupportedException) && !(ex is IOException)) throw;
+                summary.Text="Неверный путь к папке комплекта.";
+                Log(summary.Text+" "+ex.Message);
+                return;
+            }
+            busy=true;cancelRequested=false;paused=false;batch=null;cancellation=new CancellationTokenSource();UpdateState();Log("Проверяем выбранные разделы: читаем каталог облака и сверяем локальные файлы…");summary.Text="Читаем выбранное облако и проверяем локальные файлы…";total.BeginOperation(summary.Text);
             try
             {
                 var token=cancellation.Token;
@@ -110,7 +119,7 @@ namespace ServiceTool
                 total.FinishOperation("Сверка завершена",success:true);summary.Text="Проверено: "+entries.Count+" файлов. Недостающие и ранее загруженные неизменённые установщики выбраны; остальные локальные файлы защищены.";
                 RootAccepted=true;BundlePreferences.Save(root);
             }
-            catch(Exception ex){summary.Text=cancellation.IsCancellationRequested?"Проверка отменена":"Не удалось проверить: "+ex.Message;total.Stage(summary.Text,failed:true);Log(summary.Text);suggestAlternative=!cancellation.IsCancellationRequested;}
+            catch(Exception ex){summary.Text=cancellation.IsCancellationRequested?"Проверка отменена.":OperationMessage.FinishSentence("Не удалось проверить: "+ex.Message);total.Stage(summary.Text,failed:!cancellation.IsCancellationRequested,cancelled:cancellation.IsCancellationRequested);Log(summary.Text);suggestAlternative=!cancellation.IsCancellationRequested;}
             finally{busy=false;cancellation.Dispose();cancellation=null;UpdateState();if(closeAfter)Close();}
             if(suggestAlternative&&!closeAfter&&BrandMessageBox.Show(this,"Не удалось проверить выбранное облако. Попробовать альтернативное?","Проверка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)await Scan(cloud==BundleCloud.Google?BundleCloud.Yandex:BundleCloud.Google);
         }
@@ -163,7 +172,7 @@ namespace ServiceTool
                 }while(!closeAfter&&!cancelRequested);
                 RefreshProgress();BundleSession.Save(scannedRoot,selected.Where(e=>!e.Done).Select(e=>e.File));summary.Text="Готово: "+selected.Count(e=>e.Done)+" из "+selected.Count+". Компоненты Windows не устанавливались. Остальные выбранные файлы можно повторить.";
             }
-            catch(Exception ex){summary.Text="Загрузка не завершена: "+ex.Message;total.Stage(summary.Text,failed:true);Log(summary.Text);}
+            catch(Exception ex){summary.Text=OperationMessage.FinishSentence("Загрузка не завершена: "+ex.Message);total.Stage(summary.Text,failed:true);Log(summary.Text);}
             finally{busy=false;downloading=false;paused=false;pause.Text="Пауза";if(cancellation!=null){cancellation.Dispose();cancellation=null;}UpdateState();if(closeAfter)Close();}
             int remaining=selected.Count(e=>!e.Done);
             if(!cancelRequested&&!closeAfter&&remaining>0)
@@ -191,7 +200,7 @@ namespace ServiceTool
                     bool failed=batch.Any(e=>e.State!=null&&e.State.StartsWith("Ошибка"));
                     string stage=paused?"Пауза":cancelRequested?"Загрузка отменена":complete?"Готово":active==null?"Подготовка…":active.State;
                     if(stage=="Скачивание")stage="Скачивание · готово "+batch.Count(e=>e.Done)+" из "+batch.Count;
-                    total.Report(new TransferProgress{Key="Комплект",NetworkBytes=Interlocked.Read(ref receivedBytes),Stage=stage,File=active==null?"":active.File.Path.TrimStart('/'),Bytes=bytes,Total=size,Complete=complete,Paused=paused||cancelRequested,Failed=failed&&!complete});
+                    total.Report(new TransferProgress{Key="Комплект",NetworkBytes=Interlocked.Read(ref receivedBytes),Stage=stage,File=active==null?"":active.File.Path.TrimStart('/'),Bytes=bytes,Total=size,Complete=complete,Paused=paused&&!cancelRequested,Cancelled=cancelRequested&&!complete,Active=!cancelRequested&&!complete,Failed=failed&&!complete});
                 }
             }
         }

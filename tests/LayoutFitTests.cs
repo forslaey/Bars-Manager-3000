@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -62,7 +62,7 @@ namespace ServiceTool
                             Check(Math.Abs(picker.Parent.PointToScreen(new Point(picker.Left,picker.Bottom-2)).Y-field.Parent.PointToScreen(new Point(field.Left,field.Bottom-1)).Y-4*metricsScale)<=1,"Utility picker sits four units below path frame at "+scale);
                             Check(fields.Length==2&&fields[0].Size==fields[1].Size,"Source and destination have matching thin frames");
                             Check(field.Height<picker.Height,"Path frame is thinner from the top, keeping bottom alignment");
-                            Check(form.ClientSize.Width<=640*metricsScale+1&&form.ClientSize.Height<=500*metricsScale+1,"Utility window stays compact in both dimensions");
+                            Check(form.ClientSize.Width<=520*metricsScale+1&&form.ClientSize.Height<=612*metricsScale+1,"Utility window stays compact in both dimensions");
                             Check(form.Text=="Распаковка утилит","Short utility window title");
                             Check(Children(form).OfType<Label>().Any(l=>l.Text=="Будет взято из:")&&Children(form).OfType<Label>().Any(l=>l.Text=="Путь распаковки:"),"Clear independent path captions");
                         }
@@ -97,7 +97,7 @@ namespace ServiceTool
                         }
                         if(form is ManagerHub)
                         {
-                            var cards=Children(form).OfType<Card>().ToArray();Check(cards.Length==5,"Five launcher cards");
+                            var cards=Children(form).OfType<Card>().ToArray();Check(cards.Length==6,"Six launcher cards");
                             foreach(var card in cards){var b=Children(card).OfType<BrandButton>().Single();var at=card.PointToClient(b.PointToScreen(Point.Empty));Check(Math.Abs(at.X*2+b.Width-card.Width)<=2,"Launcher action horizontally centered");Check(card.Height-at.Y-b.Height>=12*metricsScale && card.Height-at.Y-b.Height<=16*metricsScale,"Launcher action near lower edge with consistent inset at "+scale+" card "+card.Size+" gap "+(card.Height-at.Y-b.Height));}
                         }
                         if(form is LibraryManagerForm)

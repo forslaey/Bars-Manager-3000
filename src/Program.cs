@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -152,7 +152,7 @@ namespace ServiceTool
         private readonly Button stopButton;
         private readonly Button applyStartupButton;
         private readonly Button collectLogsButton;
-        private readonly ComboBox startupCombo = new BrandComboBox();
+        private readonly ComboBox startupCombo = new BrandComboBox { UseManagedPopup = true };
         private readonly PictureBox brandImage = new PictureBox();
         private readonly Image lightBrandLogo;
         private readonly Image darkBrandLogo;
@@ -179,6 +179,7 @@ namespace ServiceTool
         private string loggedStoreWarning = String.Empty;
         private bool focusSelectedExecutable;
         private string selectedPath;
+        private ServiceFileKind selectedFileKind;
         private int revision;
         private bool refreshing;
         private bool operationRunning;
@@ -419,7 +420,6 @@ namespace ServiceTool
             for (int i = 0; i < 6; i++) actionButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F/6));
             installButton = MakeButton("Установить службу", true);
             removeButton = MakeButton("Удалить службу", false);
-            ((BrandButton)removeButton).Destructive = true;
             refreshButton = MakeButton("Обновить статус", false);
             servicesButton = MakeButton("Открыть службы", false);
             installProfileButton = MakeButton("Настройка установки", false);
@@ -625,7 +625,7 @@ namespace ServiceTool
             activity.Font = new Font("Segoe UI", 8.5F);
             activity.Tag = "muted";
             activity.ForeColor = muted;
-            activity.Text = "Локальный компьютер; автообновление каждые 10 с";
+            activity.Text = "Локальный компьютер; автообновление каждые 10 с.";
             TableLayoutPanel footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0), Padding = new Padding(0, 8, 0, 0) };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
@@ -633,7 +633,7 @@ namespace ServiceTool
             footer.Controls.Add(activity, 0, 0);
             Button menuButton = MakeButton("В меню", false);
             ModuleNavigation.Configure(menuButton);
-            menuButton.Click += delegate { MenuRequested = true; Close(); };
+            menuButton.Click += delegate { if (ModuleNavigation.ReturnToHub()) return; MenuRequested = true; Close(); };
             footer.Controls.Add(menuButton, 1, 0);
             layout.Controls.Add(footer, 0, 4);
 
@@ -686,7 +686,7 @@ namespace ServiceTool
         private void UpdateRefreshActivity()
         {
             activity.Text = "Локальный компьютер" + (lastChecked.HasValue ? "; проверено в " + lastChecked.Value.ToString("HH:mm:ss") : "") +
-                (autoRefreshToggle.Checked ? "; автообновление каждые 10 с" : "; автообновление выключено");
+                (autoRefreshToggle.Checked ? "; автообновление каждые 10 с." : "; автообновление выключено.");
         }
 
         private Label MakeLabel(string text, float size, Color color, Rectangle bounds)
@@ -885,6 +885,7 @@ namespace ServiceTool
             if (!servicePaths.TryGetValue(entry.Name, out executable)) executable = null;
             if (String.Equals(selectedPath, executable, StringComparison.OrdinalIgnoreCase)) return;
             selectedPath = executable;
+            selectedFileKind = ServiceFileKind.Unknown;
             revision++;
             pathBox.Text = executable ?? "Путь .exe этой службы недоступен";
             fileTitle.Text = executable == null ? "Выбери .exe для установки" : ExecutableArchitecture.FileCaption(executable);
@@ -1063,6 +1064,7 @@ namespace ServiceTool
                 if (String.Equals(ExecutablePaths.Normalize(fullPath), ExecutablePaths.Normalize(Application.ExecutablePath), StringComparison.OrdinalIgnoreCase))
                     throw new ArgumentException("Выбери .exe-файл службы, а не сам Bars Service Manager 3000.");
                 selectedPath = fullPath;
+                selectedFileKind = ServiceFileInspection.Identify(fullPath, installProfiles.Get(fullPath).Mode == ServiceInstallMode.ManagedDotNet);
                 revision++;
                 verified = false;
                 focusSelectedExecutable = true;
@@ -1076,8 +1078,8 @@ namespace ServiceTool
                 pathBox.Text = fullPath;
                 fileTitle.Text = ExecutableArchitecture.FileCaption(fullPath);
                 toolTips.SetToolTip(fileTitle,fileTitle.Text);
-                SetStatus("Проверяем регистрацию…", "Читаем список служб локального компьютера.", muted);
-                AppendLog("Выбран .exe службы BARS: " + fullPath);
+                SetStatus("Проверяем регистрацию…", "Читаем список служб локального компьютера…", muted);
+                AppendLog("Выбран файл: " + fullPath);
                 UpdateActions();
                 await RefreshStatusAsync(false);
             }
@@ -1241,7 +1243,16 @@ namespace ServiceTool
             else if (!verified)
                 SetStatus("Статус регистрации неизвестен", lastSnapshot == null ? "Обнови список служб." : lastSnapshot.Warning, Color.DarkOrange);
             else if (matches.Count == 0)
-                SetStatus("Регистрация не найдена", "Среди служб Windows нет прямой ссылки на выбранный .exe.", muted);
+            {
+                if (selectedFileKind == ServiceFileKind.OrdinaryProgram)
+                    SetStatus("Выбрана обычная программа", "Открой модуль «Установка программ».", muted);
+                else if (selectedFileKind == ServiceFileKind.Unknown)
+                    SetStatus("Поддержка установки как службы не подтверждена", "Проверь инструкцию к выбранному файлу.", muted);
+                else if (selectedFileKind == ServiceFileKind.WindowsWidget)
+                    SetStatus("Виджет можно зарегистрировать средствами Windows", "Для установки проверь пути IndexPath и PublicPath в appsettings.json.", muted);
+                else
+                    SetStatus("Распознан установщик службы", "Регистрация по выбранному пути пока отсутствует.", muted);
+            }
             else
             {
                 string title = matches.Count == 1 ? RegistrationText(matches[0].State)
@@ -1329,13 +1340,13 @@ namespace ServiceTool
                 token.ThrowIfCancellationRequested();
                 SetStatus("Собираем логи…", serviceName + ": ZIP создаётся без остановки службы.", blue);
                 AppendLog("Сбор TXT/LOG-логов службы " + serviceName + ".");
-                activity.Text = "Создаём ZIP. Для отмены нажми «Отменить сбор».";
+                activity.Text = "Создаём ZIP… Для отмены нажми «Отменить сбор».";
                 LogArchiveResult result = await Task.Factory.StartNew(delegate
                     { return ServiceLogArchive.Create(executable, serviceName, destination, selection, token); });
                 if (closing) return;
                 SetStatus("Логи собраны", "Файлов: " + result.FileCount + ". Архив: " + destination, Color.FromArgb(21, 128, 85));
                 AppendLog("Логи службы " + serviceName + " сохранены: " + destination + ". Файлов: " + result.FileCount + ".");
-                activity.Text = "Архив сохранён в " + DateTime.Now.ToString("HH:mm:ss");
+                activity.Text = "Архив сохранён в " + DateTime.Now.ToString("HH:mm:ss") + ".";
             }
             catch (OperationCanceledException)
             {
@@ -1364,12 +1375,31 @@ namespace ServiceTool
             if (operationRunning || refreshing || !verified || String.IsNullOrEmpty(selectedPath)) return;
             string executable = selectedPath;
             ServiceInstallProfile installProfile = installProfiles.Get(executable);
+            ServiceFileKind fileKind = ServiceFileInspection.Identify(executable, installProfile.Mode == ServiceInstallMode.ManagedDotNet);
+            if (install && fileKind == ServiceFileKind.OrdinaryProgram)
+            {
+                SetStatus("Выбрана обычная программа", "Открой модуль «Установка программ».", muted);
+                return;
+            }
+            if (install && fileKind == ServiceFileKind.Unknown &&
+                BrandMessageBox.Show(this,
+                    "Поддержка установки как службы не подтверждена. Продолжай, только если в инструкции к этому файлу указан ключ -i. Запустить штатную установку?",
+                    "Проверка файла", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            if (install && fileKind == ServiceFileKind.WindowsWidget &&
+                BrandMessageBox.Show(this,
+                    "Зарегистрировать службу Bars.BackendWidget средствами Windows? Перед этим проверь, что IndexPath и PublicPath в appsettings.json содержат полный путь до папки widgets.",
+                    "Установка виджета", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+
             string accountPassword = null;
             operationRunning = true;
             timer.Stop();
             UpdateActions();
             SetStatus(install ? "Устанавливаем службу…" : "Удаляем регистрацию…", "Подтверди запрос Windows на права администратора, если он появится.", blue);
-            activity.Text = "Выполняется процедура. Дождись завершения работы.";
+            activity.Text = "Выполняется процедура…";
+            IDisposable systemOperation = null;
+            Task detachedProcedure = null;
             try
             {
                 if (install && installProfile.Mode == ServiceInstallMode.ManagedDotNet && installProfile.Account == InstallAccountKind.User)
@@ -1392,12 +1422,53 @@ namespace ServiceTool
                         }
                     }
                 }
+                systemOperation = await WindowsOperationQueue.EnterAsync(() => activity.Text = WindowsOperationQueue.WaitingMessage, () => closing);
+                activity.Text = "Выполняется процедура…";
+                if (install && String.Equals(Path.GetFileName(executable), "Bars.PaymentProcessing.Service.exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    ServiceSnapshot snapshot = await Task.Factory.StartNew<ServiceSnapshot>(readCatalog);
+                    if (closing) return;
+                    AcceptSnapshot(snapshot);
+                    ServiceEntry registered = snapshot.Entries.Find(entry =>
+                        String.Equals(entry.Name, "Bars.PaymentProcessing.Service", StringComparison.OrdinalIgnoreCase) ||
+                        String.Equals(entry.DisplayName, "Барс. Служба платежей", StringComparison.OrdinalIgnoreCase));
+                    if (registered != null)
+                    {
+                        string detail = "Windows уже содержит регистрацию «" + registered.Name + "». " +
+                            "Путь текущей службы: " + registered.BinaryPath + ". Для замены версии сначала удали текущую регистрацию.";
+                        SetStatus("Служба платежей уже зарегистрирована", detail, Color.DarkOrange);
+                        AppendLog(detail);
+                        activity.Text = "Установка не запущена.";
+                        return;
+                    }
+                    if (!snapshot.Complete)
+                        throw new InvalidOperationException("Не удалось проверить все регистрации Windows. Обнови статус и повтори установку.");
+                }
+                if (!install && !await PrepareServiceRemovalAsync(executable)) return;
+
                 int exitCode;
                 bool processStillRunning = false;
                 int procedureProcessId = 0;
                 ProcedureWaitReason waitReason = ProcedureWaitReason.Exited;
                 string executionDetail = String.Empty;
-                if (installProfile.Mode == ServiceInstallMode.ManagedDotNet)
+                if (fileKind == ServiceFileKind.WindowsWidget)
+                {
+                    if (!install && matches.Count != 1)
+                        throw new InvalidOperationException("Для удаления виджета выбери файл с одной зарегистрированной службой.");
+                    ProcessStartInfo startInfo = install ? ServiceFileInspection.CreateWidget(executable) :
+                        ServiceManagement.BuildHelperStartInfo(Application.ExecutablePath, matches[0].Name, "delete", "none");
+                    AppendLog(install ? "Регистрируем виджет средствами Windows…" : "Удаляем регистрацию виджета средствами Windows…");
+                    exitCode = await Task.Factory.StartNew(delegate
+                    {
+                        using (Process process = Process.Start(startInfo))
+                        {
+                            if (process == null) throw new InvalidOperationException("Windows не запустила процедуру регистрации.");
+                            process.WaitForExit();
+                            return process.ExitCode;
+                        }
+                    });
+                }
+                else if (installProfile.Mode == ServiceInstallMode.ManagedDotNet)
                 {
                     AppendLog((install ? "Установка" : "Удаление") + " службы BARS в особом режиме .NET: " + executable + ".");
                     ProfileInstallResult result = await Task.Factory.StartNew(delegate
@@ -1415,14 +1486,23 @@ namespace ServiceTool
                     UpdateActions();
                     ProcedureWaitResult completion = await Task.Factory.StartNew(delegate
                     {
-                        using (Process process = Process.Start(startInfo))
+                        Process process = Process.Start(startInfo);
+                        if (process == null) throw new InvalidOperationException("Windows не вернула процесс службы BARS.");
+                        try
                         {
-                            if (process == null) throw new InvalidOperationException("Windows не вернула процесс службы BARS.");
                             procedureProcessId = process.Id;
-                            return ProcedureWait.Run(process.WaitForExit, delegate { return process.ExitCode; },
+                            var result = ProcedureWait.Run(process.WaitForExit, delegate { return process.ExitCode; },
                                 readCatalog, executable, install, waitCancellation,
-                                delegate(int seconds) { PostLog(".exe процедуры ещё работает (" + seconds + " с). Можно прекратить ожидание, не останавливая процесс."); });
+                                delegate(int seconds) { PostLog("Ждём завершения процедуры (" + seconds + " с)…"); });
+                            if (!result.Exited)
+                            {
+                                Process pending = process;
+                                detachedProcedure = Task.Run(() => { using (pending) pending.WaitForExit(); });
+                                process = null;
+                            }
+                            return result;
                         }
+                        finally { if (process != null) process.Dispose(); }
                     });
                     exitCode = completion.ExitCode;
                     processStillRunning = !completion.Exited;
@@ -1430,7 +1510,7 @@ namespace ServiceTool
                 }
                 if (closing) return;
                 AppendLog(processStillRunning
-                    ? "Ожидание .exe прекращено; процесс " + procedureProcessId + " ещё работает. Код выхода неизвестен. Проверяем регистрацию."
+                    ? "Ожидание завершено. Процесс процедуры " + procedureProcessId + " ещё не завершился. Проверяем регистрацию…"
                     : "Выполнение работы со службой BARS завершено. Код выхода: " + exitCode + ".");
                 if(exitCode==unchecked((int)0x80008096))
                 {
@@ -1445,7 +1525,7 @@ namespace ServiceTool
                     }
                     else if(!install)AppendLog("Без запуска EXE можно удалить регистрацию средствами Windows; это требует однозначно найденной службы. Выбери установленную службу в таблице и повтори удаление. Файлы при таком удалении не стираются.");
                 }
-                SetStatus("Проверяем результат…", "Повторно читаем регистрацию службы после выполнения процедуры.", blue);
+                SetStatus("Проверяем результат…", "Повторно читаем регистрацию службы после выполнения процедуры…", blue);
                 Exception lastError = null;
                 verified = false;
                 for (int attempt = 0; attempt < 6; attempt++)
@@ -1469,14 +1549,24 @@ namespace ServiceTool
                 {
                     string reason = waitReason == ProcedureWaitReason.RegistrationObserved ? "Регистрация изменилась" :
                         waitReason == ProcedureWaitReason.TimedOut ? "Истекли 2 минуты ожидания" : "Ожидание остановлено";
-                    SetStatus(reason + ", но .exe ещё работает",
-                        (expected ? (install ? "Служба уже зарегистрирована. " : "Регистрация службы уже удалена. ") : "Результат регистрации пока не подтверждён. ") +
-                        "Процесс " + procedureProcessId + " не остановлен; код выхода неизвестен. Менеджер доступен. Проверь результат в оснастке «Службы» Windows.", Color.DarkOrange);
+                    string title = expected
+                        ? (install ? "Служба зарегистрирована. Процесс установки завершается…" : "Регистрация службы удалена. Процесс удаления завершается…")
+                        : reason + ". " + (install ? "Установка пока не подтверждена." : "Удаление пока не подтверждено.");
+                    SetStatus(title,
+                        "Процесс " + procedureProcessId + " может продолжать работу. Код выхода пока неизвестен.", Color.DarkOrange);
+                }
+                else if (install && (exitCode == 1072 || exitCode == 1073 || exitCode == 1078))
+                {
+                    string detail = exitCode == 1072
+                        ? "Windows ещё завершает удаление прежней регистрации. Проверь, что служба остановлена, закрой оснастку «Службы» и обнови список."
+                        : "Системное имя или отображаемое имя уже занято. Проверь, какая версия зарегистрирована, прежде чем менять её.";
+                    SetStatus("Имя службы уже занято", detail, Color.DarkOrange);
+                    AppendLog(detail);
                 }
                 else if (exitCode != 0)
                 {
                     SetStatus(exitCode==unchecked((int)0x80008096)?"Не удалось найти совместимую версию фреймворка.":"Процедура вернула ошибку с кодом " + exitCode,
-                        !String.IsNullOrEmpty(executionDetail) ? executionDetail : verified ? "Наблюдаемое состояние регистрации показано ниже. Подробности смотри в журнале службы BARS." : "Дополнительно не удалось проверить регистрацию службы.", Color.Firebrick);
+                        !String.IsNullOrEmpty(executionDetail) ? executionDetail : verified ? "Наблюдаемое состояние регистрации показано ниже. Проверь конфигурацию службы и её журнал." : "Дополнительно не удалось проверить регистрацию службы.", Color.Firebrick);
                 }
                 else if (!verified)
                     SetStatus("Процедура завершена, но статус не проверен", lastError == null ? "Повтори проверку статуса." : lastError.Message, Color.DarkOrange);
@@ -1484,13 +1574,14 @@ namespace ServiceTool
                     SetStatus(install ? "Установка подтверждена" : "Удаление подтверждено",
                         install ? "Служба найдена в регистрации Windows. Установка не означает автоматический запуск." : "Прямые ссылки на выбранный .exe в списке служб больше не найдены.", Color.FromArgb(21, 128, 85));
                 else
-                    SetStatus("Результат не подтверждён",
-                        install ? "Процедура вернула 0, но регистрация этой службы пока не найдена." : "Процедура вернула 0, но связанные службы ещё присутствуют. Возможно, удаление ожидает остановки службы или закрытия оснастки.", Color.DarkOrange);
+                    SetStatus(install ? "Установка не подтверждена. Проверь конфигурацию службы." : "Результат не подтверждён",
+                        install ? "Команда установки завершилась с кодом 0, но Windows не показывает службу с выбранным путём. Проверь конфигурацию службы, её журнал за время установки и список служб Windows." : "Процедура вернула 0, но связанные службы ещё присутствуют. Возможно, удаление ожидает остановки службы или закрытия оснастки.", Color.DarkOrange);
                 AppendLog(expected ? "Ожидаемое состояние регистрации подтверждено." : "Ожидаемое состояние не подтверждено. Обнови статус и проверь журнал службы BARS.");
                 if (lastError != null) AppendLog("Ошибка проверки: " + lastError.Message);
                 ShowCatalogWarning();
-                activity.Text = "Проверка после процедуры завершена в " + DateTime.Now.ToString("HH:mm:ss");
+                activity.Text = "Проверка после процедуры завершена в " + DateTime.Now.ToString("HH:mm:ss") + ".";
             }
+            catch (OperationCanceledException) { if (!closing) SetStatus("Операция отменена", String.Empty, muted); }
             catch (Win32Exception ex)
             {
                 if (closing) return;
@@ -1504,11 +1595,63 @@ namespace ServiceTool
             catch (Exception ex) { if (!closing) HandleOperationError(ex); }
             finally
             {
+                if (systemOperation != null) WindowsOperationQueue.ReleaseAfter(systemOperation, detachedProcedure, Path.GetFileName(executable));
                 accountPassword = null;
                 if (procedureWaitCancellation != null) { procedureWaitCancellation.Dispose(); procedureWaitCancellation = null; }
                 operationRunning = false;
                 if (!closing) { UpdateRefreshTimer(); UpdateActions(); }
             }
+        }
+
+        private async Task<bool> PrepareServiceRemovalAsync(string executable)
+        {
+            ServiceSnapshot snapshot = await Task.Factory.StartNew<ServiceSnapshot>(readCatalog);
+            if (closing) return false;
+            AcceptSnapshot(snapshot);
+            if (!snapshot.Complete)
+                throw new InvalidOperationException("Не удалось полностью проверить список служб. Обнови статус и повтори удаление.");
+
+            List<ServiceEntry> active = matches.FindAll(entry => entry.State != "Stopped");
+            if (active.Count > 0)
+            {
+                if (matches.Count != 1)
+                    throw new InvalidOperationException("Этот файл связан с несколькими службами. Останови их по отдельности и повтори удаление.");
+
+                string name = active[0].Name;
+                SetStatus("Останавливаем службу перед удалением…", name, blue);
+                AppendLog("Перед удалением останавливаем службу: " + name + ".");
+                ProcessStartInfo startInfo = ServiceManagement.BuildHelperStartInfo(Application.ExecutablePath, name, "stop", "none");
+                int result = await Task.Factory.StartNew(delegate
+                {
+                    using (Process process = Process.Start(startInfo))
+                    {
+                        if (process == null) throw new InvalidOperationException("Windows не запустила процедуру остановки службы.");
+                        process.WaitForExit();
+                        return process.ExitCode;
+                    }
+                });
+                if (closing) return false;
+
+                snapshot = await Task.Factory.StartNew<ServiceSnapshot>(readCatalog);
+                if (closing) return false;
+                AcceptSnapshot(snapshot);
+                if (!snapshot.Complete || matches.Exists(entry => entry.State != "Stopped") ||
+                    (matches.Count > 0 && (result != 0 || matches.Count != 1 || matches[0].Name != name)))
+                {
+                    string detail = result == 0 ? "Windows не подтвердила остановку выбранной службы." : new Win32Exception(result).Message;
+                    SetStatus("Удаление не запущено", detail, Color.Firebrick);
+                    AppendLog("Удаление не запущено: " + detail);
+                    activity.Text = "Проверка остановки службы завершена.";
+                    return false;
+                }
+                if (matches.Count > 0) AppendLog("Остановка подтверждена: " + name + ".");
+            }
+
+            if (matches.Count > 0) return true;
+            SetStatus("Регистрация службы удалена.", "Служба больше не числится в Windows.", Color.FromArgb(21, 128, 85));
+            AppendLog("Служба больше не числится в Windows. Повторное удаление не требуется.");
+            activity.Text = "Проверка регистрации завершена.";
+            return false;
         }
 
         private void HandleOperationError(Exception ex)
@@ -1523,7 +1666,7 @@ namespace ServiceTool
             bool ready = !operationRunning && !refreshing && verified && !String.IsNullOrEmpty(selectedPath);
             chooseButton.Enabled = !operationRunning;
             installProfileButton.Enabled = !operationRunning && !String.IsNullOrEmpty(selectedPath);
-            installButton.Enabled = ready && matches.Count == 0;
+            installButton.Enabled = ready && matches.Count == 0 && selectedFileKind != ServiceFileKind.OrdinaryProgram;
             removeButton.Enabled = ready && matches.Count > 0;
             refreshButton.Text = procedureWaitCancellation == null ? "Обновить статус" : "Прекратить ожидание";
             refreshButton.Enabled = !refreshing && (!operationRunning || procedureWaitCancellation != null);
@@ -1531,8 +1674,19 @@ namespace ServiceTool
             UpdateServiceControls(false);
         }
 
+        private static string EndMessage(string message)
+        {
+            if (String.IsNullOrWhiteSpace(message)) return String.Empty;
+            message = message.TrimEnd();
+            if (message.EndsWith("…", StringComparison.Ordinal))
+                return message;
+            return message.EndsWith(".", StringComparison.Ordinal) ? message : message + ".";
+        }
+
         private void SetStatus(string title, string detail, Color color)
         {
+            if (title != "Службы BARS") title = EndMessage(title);
+            detail = EndMessage(detail);
             bool changed = statusTitle.Text != title || statusDetail.Text != detail;
             statusTitle.Text = title;
             statusTone = color == Color.Firebrick ? "error" : color == Color.DarkOrange ? "warning" :
@@ -1542,7 +1696,7 @@ namespace ServiceTool
             statusDetail.Visible = false;
             toolTips.SetToolTip(statusTitle, detail);
             if (changed && (statusTone == "error" || statusTone == "warning") && !String.IsNullOrEmpty(detail))
-                AppendLog(title + ": " + detail);
+                AppendLog(title.TrimEnd('.') + ": " + detail);
         }
 
         private async Task RunServiceCommandAsync(string action, string mode)
@@ -1556,12 +1710,14 @@ namespace ServiceTool
             string description = action == "start" ? "Запускаем службу…" : action == "stop" ? "Останавливаем службу…" : "Изменяем режим запуска…";
             SetStatus(description, entry.DisplayName + ", имя службы: " + serviceName, blue);
             AppendLog(ServiceActionMessage(entry,action,mode));
-            activity.Text = "Выполняется действие для выбранной службы.";
+            activity.Text = "Выполняется действие для выбранной службы…";
             int result = -1;
             Exception failure = null;
             bool cancelled = false;
             try
             {
+                using (action == "stop" ? null : await WindowsOperationQueue.EnterAsync(() => activity.Text = WindowsOperationQueue.WaitingMessage, () => closing))
+                {
                 ProcessStartInfo startInfo = ServiceManagement.BuildHelperStartInfo(Application.ExecutablePath, serviceName, action, mode);
                 result = await Task.Factory.StartNew(delegate
                 {
@@ -1576,7 +1732,9 @@ namespace ServiceTool
                         return process.ExitCode;
                     }
                 });
+                }
             }
+            catch (OperationCanceledException) { cancelled = true; }
             catch (Win32Exception ex) { cancelled = ex.NativeErrorCode == 1223; if (!cancelled) failure = ex; }
             catch (Exception ex) { failure = ex; }
             finally
@@ -1632,7 +1790,7 @@ namespace ServiceTool
         private void AppendLog(string message)
         {
             if (log.TextLength > 60000) log.Text = log.Text.Substring(log.TextLength - 40000);
-            log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + message + Environment.NewLine);
+            log.AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + EndMessage(message) + Environment.NewLine);
             log.SelectionStart=log.TextLength;log.SelectionLength=0;
             ((JournalTextBox)log).ScrollToLine(Int32.MaxValue);
         }
@@ -1640,7 +1798,7 @@ namespace ServiceTool
         private void PostLog(string message)
         {
             if (closing || IsDisposed || !IsHandleCreated) return;
-            try { BeginInvoke((Action)delegate { if (!closing) { AppendLog(message); activity.Text = message; } }); }
+            try { BeginInvoke((Action)delegate { if (!closing) AppendLog(message); }); }
             catch (InvalidOperationException) { }
         }
 

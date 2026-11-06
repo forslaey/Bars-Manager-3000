@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -45,9 +45,9 @@ namespace ServiceTool
                     form.SetTheme(dark,false);Show(form);if(scale!=1F)form.Scale(new SizeF(scale,scale));Pump();
                     var grid=All(form).OfType<ServiceGrid>().Single();var host=All(form).OfType<FillContentPanel>().Single();
                     var choices=All(form).OfType<BrandCheckBox>().OrderBy(c=>c.Top).ToArray();
-                    Check(choices.Length==3&&choices.Select(c=>c.Height).Distinct().Count()==1,"Equal checkbox height");
-                    float factor=choices[0].Height/36F;Check(choices.All(c=>c.Height>=36*scale-1),"Comfortable checkbox height");
-                    Check(choices[1].Top-choices[0].Bottom==choices[2].Top-choices[1].Bottom,"Equal checkbox spacing");
+                    Check(choices.Length==1&&choices[0].Text.Contains("AnyDesk / RuDesktop"),"Only the current remote-access option is available");
+                    float factor=choices[0].Height/36F;
+                    Check(choices[0].Height>=choices[0].Font.Height+6,"Remote-access option fits its text");
                     var field=All(form).OfType<BrandTextBox>().Single();var caption=All(form).OfType<Label>().Single(l=>l.Text=="Папка установщиков:");
                     Check(ScreenBounds(field).Top-ScreenBounds(caption).Bottom>=6*factor-1,"Folder caption separated from input");
                     foreach(var size in new[]{new Size(1000,700),new Size(1120,780),new Size(1080,1920),new Size(1800,900)})
