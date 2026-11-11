@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Diagnostics;
@@ -15,7 +15,7 @@ namespace ServiceTool
   private static void Reject(Action action,string text){try{action();}catch(IOException){count++;return;}catch(InvalidDataException){count++;return;}throw new Exception(text);}
   private static T Field<T>(object o,string name){return (T)o.GetType().GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).GetValue(o);}
   private static void Call(object o,string name,params object[] args){o.GetType().GetMethod(name,BindingFlags.Instance|BindingFlags.NonPublic).Invoke(o,args);}
-  private static void Show(Form form){form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-22000,-22000);form.Show();Application.DoEvents();}
+  private static void Show(Form form){form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=form is SoftwareRemoteDialog ? Screen.PrimaryScreen.WorkingArea.Location : new Point(-20000,-20000);form.Show();Application.DoEvents();}
   [STAThread]internal static int Main(string[] args)
   {
    if(args.Length==1&&args[0]=="--linger"){System.Threading.Thread.Sleep(30000);return 0;}

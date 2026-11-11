@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -8,7 +8,7 @@ namespace ServiceTool
     internal static class BrandMessageBox
     {
         internal static DialogResult ConfirmStop(Control owner,string text)
-        {using(var dialog=new BrandMessageDialog(text,"Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2,ThemePalette.Create(owner.BackColor.GetBrightness()<.5F),true))return dialog.ShowDialog(owner);}
+        {using(var dialog=new BrandMessageDialog(text,"Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2,ThemePalette.Create(owner.BackColor.GetBrightness()<.5F),true))return ScopedDialogs.Show(owner.FindForm(), dialog);}
         internal static DialogResult Show(string text,string caption="BARS Manager 3000",MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1)
         {return Show(Form.ActiveForm,text,caption,buttons,icon,defaultButton);}
         internal static DialogResult Show(IWin32Window owner,string text,string caption="BARS Manager 3000",MessageBoxButtons buttons=MessageBoxButtons.OK,MessageBoxIcon icon=MessageBoxIcon.None,MessageBoxDefaultButton defaultButton=MessageBoxDefaultButton.Button1)
@@ -16,7 +16,14 @@ namespace ServiceTool
             var control=owner as Control;
             bool dark=control==null?ThemePreference.LoadDark():control.BackColor.GetBrightness()<0.5F;
             using(var dialog=new BrandMessageDialog(text,caption,buttons,icon,defaultButton,ThemePalette.Create(dark)))
-                return owner==null?dialog.ShowDialog():dialog.ShowDialog(owner);
+            {
+                if (owner == null)
+                {
+                    dialog.StartPosition = FormStartPosition.CenterScreen;
+                    return dialog.ShowDialog();
+                }
+                return control == null ? dialog.ShowDialog(owner) : ScopedDialogs.Show(control.FindForm(), dialog);
+            }
         }
     }
     internal sealed class BrandMessageDialog : Form
@@ -41,17 +48,19 @@ namespace ServiceTool
             var viewport=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};var scroll=new JournalScrollBar{AlwaysVisible=false,Dock=DockStyle.Right,Width=14,Palette=colors};scroll.Bind(message);viewport.Controls.Add(message);viewport.Controls.Add(scroll);
             if(compact){symbol.Font=new Font("Segoe UI",16F,FontStyle.Bold);message.Multiline=true;message.ScrollBars=ScrollBars.None;message.Dock=DockStyle.None;message.Anchor=AnchorStyles.Left|AnchorStyles.Right;message.Height=measured.Height+6;viewport.SizeChanged+=delegate{message.Width=Math.Max(1,viewport.ClientSize.Width-scroll.Width);message.Top=Math.Max(0,(viewport.ClientSize.Height-message.Height)/2);};}
             content.Controls.Add(symbol,0,0);content.Controls.Add(viewport,1,0);layout.Controls.Add(content,0,0);
-            var row=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty};
+            var row=new TableLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty};
+            var footerButtons = new System.Collections.Generic.List<Button>();
             DialogResult[] results=buttons==MessageBoxButtons.YesNo?new[]{DialogResult.Yes,DialogResult.No}:buttons==MessageBoxButtons.YesNoCancel?new[]{DialogResult.Yes,DialogResult.No,DialogResult.Cancel}:buttons==MessageBoxButtons.OKCancel?new[]{DialogResult.OK,DialogResult.Cancel}:buttons==MessageBoxButtons.RetryCancel?new[]{DialogResult.Retry,DialogResult.Cancel}:new[]{DialogResult.OK};
             Button selected=null;
-            for(int i=results.Length-1;i>=0;i--)
+            for(int i=0;i<results.Length;i++)
             {
                 var result=results[i];string label=result==DialogResult.Yes?"Да":result==DialogResult.No?"Нет":result==DialogResult.Cancel?"Отмена":result==DialogResult.Retry?"Повторить":"Хорошо";
-                var button=new BrandButton{Text=label,DialogResult=result,Palette=colors,Primary=i==0,Size=new Size(134,44),Margin=new Padding(10,0,0,0),Font=Font};
-                row.Controls.Add(button);if(i==(int)defaultButton/256)selected=button;
+                var button=new BrandButton{Text=label,DialogResult=result,Palette=colors,Primary=i==0,Destructive=result==DialogResult.No,Size=new Size(134,44),Margin=new Padding(10,0,0,0),Font=Font};
+                footerButtons.Add(button);if(i==(int)defaultButton/256)selected=button;
                 if(result==DialogResult.Cancel||result==DialogResult.No)CancelButton=button;
             }
-            if(CancelButton==null){ControlBox=buttons==MessageBoxButtons.OK;CancelButton=row.Controls.OfType<Button>().First();}
+            if(CancelButton==null){ControlBox=buttons==MessageBoxButtons.OK;CancelButton=footerButtons.First();}
+            ModuleNavigation.StandardFooter(row, footerButtons.ToArray());
             AcceptButton=selected;layout.Controls.Add(row,0,1);Controls.Add(layout);
             Shown+=delegate{if(selected!=null)selected.Focus();};
             AutoScaleMode=AutoScaleMode.Dpi;PerformAutoScale();ResumeLayout(true);

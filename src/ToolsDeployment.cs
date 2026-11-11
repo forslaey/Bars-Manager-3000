@@ -286,7 +286,9 @@ namespace ServiceTool
         }
         internal static string FindSource()
         {
-            string root = LibrarySource.AutoDetect(AppDomain.CurrentDomain.BaseDirectory);
+            string root = BundleFolders.FindSibling("_tools");
+            if (root != null) return root;
+            root = LibrarySource.AutoDetect(BundleFolders.ExecutableDirectory);
             if (root == null) { string saved = ApplicationStorage.FilePath("library-source.txt"); if (File.Exists(saved)) root = File.ReadAllText(saved).Trim(); }
             return root == null ? null : Path.Combine(root, "_tools");
         }

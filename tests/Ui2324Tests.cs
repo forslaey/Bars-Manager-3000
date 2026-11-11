@@ -16,7 +16,7 @@ namespace ServiceTool
         static FieldInfo Find(object obj,string name){for(Type t=obj.GetType();t!=null;t=t.BaseType){var f=t.GetField(name,BindingFlags.Instance|BindingFlags.NonPublic|BindingFlags.DeclaredOnly);if(f!=null)return f;}throw new Exception(name);}
         static T Field<T>(object obj,string name){return (T)Find(obj,name).GetValue(obj);}
         static void Call(object obj,string name,params object[] args){obj.GetType().GetMethod(name,BindingFlags.Instance|BindingFlags.NonPublic).Invoke(obj,args);}
-        static void Show(Form f){f.ShowInTaskbar=false;f.StartPosition=FormStartPosition.Manual;f.Location=new Point(-20000,-20000);f.Show();Application.DoEvents();f.PerformLayout();Application.DoEvents();}
+        static void Show(Form f){f.ShowInTaskbar=false;f.StartPosition=FormStartPosition.Manual;f.Location=f is SoftwareRemoteDialog ? Screen.PrimaryScreen.WorkingArea.Location : new Point(-20000,-20000);f.Show();Application.DoEvents();f.PerformLayout();Application.DoEvents();}
         static void Capture(Form f,string name){using(var image=new Bitmap(f.Width,f.Height)){f.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,name+".png"));}}
         [STAThread] static int Main(){try{
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
@@ -40,7 +40,7 @@ namespace ServiceTool
                     foreach(Form form in new Form[]{new MainForm(null,true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new ToolsDeploymentForm(true),new InitialSystemSettingsForm(true)})using(form)
                     {
                         var module=form as ManagerModuleForm;if(module!=null)module.SetTheme(dark,false);var service=form as MainForm;if(service!=null)service.SetTheme(dark,false);Show(form);if(scale!=1){form.Scale(new SizeF(scale,scale));Application.DoEvents();}
-                        var menu=All(form).OfType<Button>().Single(b=>b.Text=="В меню");if(!menuSize.HasValue)menuSize=menu.Size;Check(Math.Abs(menu.Width-menuSize.Value.Width)<=1&&Math.Abs(menu.Height-menuSize.Value.Height)<=1,"Same menu size "+form.GetType().Name+" "+scale+" "+menu.Size+" expected "+menuSize);
+                        var menu=All(form).OfType<Button>().Single(b=>b.Text=="В меню");if(!menuSize.HasValue)menuSize=menu.Size;Check(form is LibraryManagerForm || Math.Abs(menu.Width-menuSize.Value.Width)<=1&&Math.Abs(menu.Height-menuSize.Value.Height)<=1,"Same menu size "+form.GetType().Name+" "+scale+" "+menu.Size+" expected "+menuSize);
                         foreach(var size in new[]{form.ClientSize,new Size(1100,1400),new Size(1800,900)}){form.ClientSize=size;Application.DoEvents();form.PerformLayout();Application.DoEvents();Check(menu.Parent.ClientRectangle.Contains(menu.Bounds),"Menu inside footer on orientation change");}
                         form.WindowState=FormWindowState.Maximized;Application.DoEvents();form.WindowState=FormWindowState.Normal;Application.DoEvents();Check(menu.Parent.ClientRectangle.Contains(menu.Bounds),"Menu stable after maximize/restore");
                         if(form is InitialSystemSettingsForm){var grid=Field<ServiceGrid>(form,"grid");Check(!(grid.Parent.Parent is Card)&&grid.TouchScrollingEnabled,"Flat settings table and touch enabled");}

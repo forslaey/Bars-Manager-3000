@@ -9,7 +9,7 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal sealed class ApplicationLogsForm : ManagerModuleForm
+    internal sealed class ApplicationLogsForm : ManagerModuleForm, IModuleOperation
     {
         private readonly ServiceGrid running = new ServiceGrid();
         private readonly LibraryGridScrollBar runningScroll = new LibraryGridScrollBar();
@@ -107,20 +107,20 @@ namespace ServiceTool
             file.Click += delegate
             {
                 using (var dialog = new OpenFileDialog { Filter = "Программы Windows (*.exe)|*.exe" })
-                    if (dialog.ShowDialog(this) == DialogResult.OK) Choose(dialog.FileName);
+                    if (ScopedDialogs.Show(this, dialog) == DialogResult.OK) Choose(dialog.FileName);
             };
             var folder = Button("Выбрать папку…", false);
             folder.Click += delegate
             {
                 using (var dialog = new FolderBrowserDialog { ShowNewFolderButton = false })
-                    if (dialog.ShowDialog(this) == DialogResult.OK) Choose(dialog.SelectedPath);
+                    if (ScopedDialogs.Show(this, dialog) == DialogResult.OK) Choose(dialog.SelectedPath);
             };
             pickers.Controls.Add(refresh, 0, 0); pickers.Controls.Add(file, 1, 0); pickers.Controls.Add(folder, 2, 0);
             body.Controls.Add(pickers, 0, 3);
             status = Label("Выбери запущенную программу или укажи путь вручную.", true);
             status.AutoEllipsis = true;
             body.Controls.Add(status, 0, 4);
-            var actions = Buttons(3);
+            var actions = Buttons(4);
             collect = Button("Собрать логи", true);
             collect.Enabled = false;
             collect.Click += async delegate { await Collect(); };
@@ -131,7 +131,11 @@ namespace ServiceTool
             back.Click += delegate { if (!ModuleNavigation.ReturnToHub()) Close(); };
             actions.Controls.Add(collect, 0, 0); actions.Controls.Add(cancel, 1, 0); actions.Controls.Add(back, 2, 0);
             body.Controls.Add(actions, 0, 5);
-            folder.Margin = back.Margin = Padding.Empty;
+            var close = Button("Закрыть", false);
+            close.Click += delegate { Close(); };
+            actions.Controls.Add(close, 3, 0);
+            folder.Margin = Padding.Empty;
+            ModuleNavigation.StandardFooter(actions, collect, cancel, back, close);
             Root.Controls.Add(body, 0, 1);
             AllowDrop = true;
             DragEnter += delegate(object sender, DragEventArgs e) { if (archive == null && e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effect = DragDropEffects.Copy; };
@@ -144,12 +148,18 @@ namespace ServiceTool
             {
                 if (archive == null) return;
                 e.Cancel = true;
+                if (closeAfterArchive) return;
+                if (!ModuleNavigation.ExitConfirmed && BrandMessageBox.ConfirmStop(this, "Отменить сбор логов и закрыть окно?") != DialogResult.Yes) return;
+                closeAfterArchive = true;
                 archive.Cancel();
                 status.Text = "Отменяем сбор логов…";
             };
             SetTheme(Colors.Dark, false);
             Shown += async delegate { await Scan(); };
         }
+
+        private bool closeAfterArchive;
+        string IModuleOperation.ActiveOperation { get { return archive != null ? "Логи программ BARS: сбор архива" : null; } }
 
         private static TableLayoutPanel Buttons(int count)
         {
@@ -284,7 +294,7 @@ namespace ServiceTool
                 LogArchiveSelection selection;
                 using (var scope = new LogArchiveDialog(Colors, name, folders, DateTime.Today, true))
                 {
-                    if (scope.ShowDialog(this) != DialogResult.OK) { status.Text = "Сбор логов отменён."; return; }
+                    if (await ModuleNavigation.ShowOwnedAsync(this, scope) != DialogResult.OK) { status.Text = "Сбор логов отменён."; return; }
                     selection = scope.Selection;
                 }
                 using (var save = new SaveFileDialog
@@ -294,7 +304,7 @@ namespace ServiceTool
                     CheckPathExists = true, FileName = ServiceLogArchive.BuildSuggestedFileName(name, selection, DateTime.Now)
                 })
                 {
-                    if (save.ShowDialog(this) != DialogResult.OK) { status.Text = "Сбор логов отменён."; return; }
+                    if (ScopedDialogs.Show(this, save) != DialogResult.OK) { status.Text = "Сбор логов отменён."; return; }
                     string destination = save.FileName;
                     status.Text = "Создаём ZIP…";
                     var result = await Task.Run(() => ServiceLogArchive.Create(input, name, destination, selection, token));
@@ -310,6 +320,7 @@ namespace ServiceTool
                 cancel.Enabled = false;
                 collect.Enabled = source != null && Directory.Exists(Path.Combine(sourceIsFolder ? source : Path.GetDirectoryName(source), "Logs"));
                 running.Enabled = true;
+                if (closeAfterArchive) BeginInvoke((MethodInvoker)Close);
             }
         }
     }

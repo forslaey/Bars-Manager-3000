@@ -8,14 +8,26 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal abstract class UtilityModuleForm : ManagerModuleForm
+    internal abstract class UtilityModuleForm : ManagerModuleForm, IModuleOperation
     {
         protected readonly BufferedLayoutPanel Body;
         protected readonly Label Activity;
         protected readonly BrandButton Back;
         protected DownloadProgressView OperationView;
-        protected bool Busy;
-        protected bool Scanning;
+        private bool busy, closeAfterOperation;
+        protected bool ClosingAfterOperation { get { return closeAfterOperation; } }
+        protected bool Busy
+        {
+            get { return busy; }
+            set
+            {
+                busy = value;
+                if (!busy && closeAfterOperation && IsHandleCreated && !IsDisposed)
+                    BeginInvoke((MethodInvoker)Close);
+            }
+        }
+        string IModuleOperation.ActiveOperation { get { return Busy && !Scanning ? Text : null; } }
+        protected bool Scanning, ReturnToParent;
         protected LibrarySession Session;
         protected volatile bool CancelRequested = false;
         internal bool MenuRequested { get; private set; }
@@ -35,14 +47,26 @@ namespace ServiceTool
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
             footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Activity = Label("Готово к работе", true); Activity.AutoEllipsis = false; Activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(Activity, 0, 0);
-            Back = Button("В меню", false); ModuleNavigation.Configure(Back); Back.Click += delegate { if (ModuleNavigation.ReturnToHub()) return; if (!Busy||Scanning) { if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;} MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 1, 0);
+            Back = Button("В меню", false); ModuleNavigation.Configure(Back); Back.Click += delegate { if (!ReturnToParent && ModuleNavigation.ReturnToHub()) return; if (!Busy||Scanning) { if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;} MenuRequested = true; Close(); } }; footer.Controls.Add(Back, 1, 0);
+            if (!(this is WindowsFeaturesForm)) ModuleNavigation.AddCloseButton(footer, Back, Button("Закрыть", false), 0);
+            if (this is WindowsFeaturesForm) ModuleNavigation.StandardFooter(footer, Back);
             Body.Controls.Add(footer, 0, 3); Root.Controls.Add(Body, 0, 1);
             FormClosing += delegate(object sender, FormClosingEventArgs e)
             {
                 if (!Busy) return;
                 if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;return;}
                 e.Cancel = true;
-                BrandMessageBox.Show(this, "Дождись завершения операции. Обслуживание компонентов Windows нельзя безопасно оборвать закрытием окна.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (closeAfterOperation) return;
+                bool canCancel = this is ToolsDeploymentForm;
+                string message = canCancel ? "Отменить операцию с утилитами и закрыть окно?" :
+                    "Действие Windows нужно завершить. Закрыть окно после завершения?";
+                if (!ModuleNavigation.ExitConfirmed && BrandMessageBox.ConfirmStop(this, message) != DialogResult.Yes) return;
+                closeAfterOperation = true;
+                if (canCancel)
+                {
+                    CancelRequested = true;
+                    if (Session != null) Session.Cancel();
+                }
             };
         }
         protected virtual void Progress(string text)
@@ -79,12 +103,13 @@ namespace ServiceTool
             }
             return results;
         }
-        Action<string> CaptureProgress(){long revision=OperationView==null?0:OperationView.OperationRevision;var report=OperationView==null?(Action<string>)(text=>{}):OperationView.OperationReporter;return text=>{if(OperationView!=null&&OperationView.OperationRevision!=revision)return;report(text);Progress(OperationView==null?text:OperationView.Snapshot.Stage);};}
+        protected virtual bool UseHelperProgress { get { return true; } }
+        Action<string> CaptureProgress(){if(!UseHelperProgress)return text=>{};long revision=OperationView==null?0:OperationView.OperationRevision;var report=OperationView==null?(Action<string>)(text=>{}):OperationView.OperationReporter;return text=>{if(OperationView!=null&&OperationView.OperationRevision!=revision)return;report(text);Progress(OperationView==null?text:OperationView.Snapshot.Stage);};}
         protected override void OnThemeChanged(){base.OnThemeChanged();if(OperationView!=null){OperationView.Palette=Colors;OperationView.Invalidate();}}
-        protected void Failure(Exception ex) { Activity.Text = "Не выполнено."; if(OperationView!=null)OperationView.FinishOperation("Не выполнено: "+ex.Message,failed:true);BrandMessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+        protected void Failure(Exception ex) { Activity.Text = "Не выполнено."; if(OperationView!=null)OperationView.FinishOperation("Не выполнено: "+ex.Message,failed:true);if (!ClosingAfterOperation) BrandMessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         protected async Task Restart()
         {
-            await RestartOffer.Show(this);
+            if (!ClosingAfterOperation) await RestartOffer.Show(this);
         }
     }
     internal sealed class WindowsFeaturesForm : UtilityModuleForm
@@ -116,7 +141,8 @@ namespace ServiceTool
         internal WindowsFeaturesForm(bool previewMode, bool returnToComponents = false) : base("Компоненты Windows", new Size(760, 590))
         {
             HideThemeSelector();Root.RowStyles[0].Height=60;MinimumSize=new Size(0,0);ClientSize=new Size(650,500);MinimumSize=SizeFromClientSize(ClientSize);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;
-            if(returnToComponents) Back.Text="Назад";
+            ReturnToParent = returnToComponents;
+            if (ReturnToParent) Back.Text = "Назад";
             preview = previewMode;
             // Telnet/TFTP first: they belong to the small fiLinn/piglet toolset and are checked
             // far more often than the large IIS profile.
@@ -190,10 +216,11 @@ namespace ServiceTool
         }
         private async Task Check()
         {
-            if (Busy || preview) return; Lock(true); Activity.Text = "Проверяем Windows…";
-            try { var result = await Execute("features-query", "", ""); RecordFeatureStates(result.Message); if (states.Count == 0) throw new IOException("Windows не вернула список компонентов"); Activity.Text = RestartRequired ? "Для завершения изменений нужна перезагрузка." : "Проверка завершена."; }
-            catch (Exception ex) { states.Clear(); Failure(ex); }
-            finally { Lock(false); }
+            if (Busy || preview) return;
+            Scanning = true; CancelRequested = false; Lock(true); Activity.Text = "Проверяем Windows…";
+            try { var result = await Execute("features-query", "", ""); if (IsDisposed || CancelRequested) return; RecordFeatureStates(result.Message); if (states.Count == 0) throw new IOException("Windows не вернула список компонентов"); Activity.Text = RestartRequired ? "Для завершения изменений нужна перезагрузка." : "Проверка завершена."; }
+            catch (Exception ex) { if (!IsDisposed && !CancelRequested) { states.Clear(); Failure(ex); } }
+            finally { Scanning = false; if (!IsDisposed) Lock(false); }
         }
         private async Task Apply()
         {
@@ -280,14 +307,14 @@ namespace ServiceTool
         {
             using(var dialog=new FolderBrowserDialog {Description="Выбери папку _tools или папку Библиотеки",ShowNewFolderButton=false})
             {
-                if(dialog.ShowDialog(this)!=DialogResult.OK)return false;string path=dialog.SelectedPath;if(Directory.Exists(Path.Combine(path,"_tools")))path=Path.Combine(path,"_tools");
+                if(ScopedDialogs.Show(this, dialog)!=DialogResult.OK)return false;string path=dialog.SelectedPath;if(Directory.Exists(Path.Combine(path,"_tools")))path=Path.Combine(path,"_tools");
                 try{ToolsDeployment.Discover(path);source=path;sourceLabel.Text=source;Activity.Text="Комплект утилит найден.";return true;}catch(Exception ex){Failure(ex);return false;}
             }
         }
         private void ChooseTarget()
         {
             using(var dialog=new FolderBrowserDialog {Description="Выбери папку для утилит",ShowNewFolderButton=true})
-            {if(dialog.ShowDialog(this)!=DialogResult.OK)return;string path=dialog.SelectedPath;destination.Text=Path.GetFileName(path).Equals("_tools",StringComparison.OrdinalIgnoreCase)?path:Path.Combine(path,"_tools");}
+            {if(ScopedDialogs.Show(this, dialog)!=DialogResult.OK)return;string path=dialog.SelectedPath;destination.Text=Path.GetFileName(path).Equals("_tools",StringComparison.OrdinalIgnoreCase)?path:Path.Combine(path,"_tools");}
         }
         private async Task Deploy()
         {

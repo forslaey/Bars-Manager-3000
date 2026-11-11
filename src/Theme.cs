@@ -630,15 +630,33 @@ namespace ServiceTool
             OnDropDown(EventArgs.Empty);
             int rowHeight = Math.Max(ItemHeight, Font.Height + 8);
             int width = Math.Max(Width, DropDownWidth);
-            var list = new ListBox
+            int visibleRows = Math.Min(Items.Count, Math.Max(1, MaxDropDownItems));
+            var list = new ServiceGrid
             {
-                Font = Font, BackColor = Palette.SurfaceAlt, ForeColor = Palette.Text,
-                BorderStyle = BorderStyle.None, IntegralHeight = false,
-                DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = rowHeight
+                Dock = DockStyle.Fill, Font = Font, BackgroundColor = Palette.SurfaceAlt,
+                BorderStyle = BorderStyle.None, ScrollBars = ScrollBars.None, ColumnHeadersVisible = false,
+                RowHeadersVisible = false, ReadOnly = true, MultiSelect = false,
+                AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
+                AllowUserToResizeColumns = false, CellBorderStyle = DataGridViewCellBorderStyle.None,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect, TouchScrollingEnabled = true,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             };
-            foreach (object item in Items) list.Items.Add(GetItemText(item));
-            list.SelectedIndex = SelectedIndex;
-            list.DrawItem += delegate(object sender, DrawItemEventArgs e) { OnDrawItem(e); };
+            list.RowTemplate.Height = rowHeight;
+            list.DefaultCellStyle.BackColor = Palette.SurfaceAlt;
+            list.DefaultCellStyle.ForeColor = Palette.Text;
+            list.DefaultCellStyle.SelectionBackColor = Palette.Selection;
+            list.DefaultCellStyle.SelectionForeColor = Palette.SelectionText;
+            list.DefaultCellStyle.Padding = new Padding(5, 0, 5, 0);
+            list.Columns.Add("item", "");
+            foreach (object item in Items) list.Rows.Add(GetItemText(item));
+            var viewport = new Panel { BackColor = Palette.SurfaceAlt };
+            viewport.Controls.Add(list);
+            if (Items.Count > visibleRows)
+            {
+                var scroll = new LibraryGridScrollBar { Palette = Palette, Dock = DockStyle.Right, Width = 14, UseCardBackground = true };
+                viewport.Controls.Add(scroll);
+                scroll.Bind(list);
+            }
 
             var popup = new ToolStripDropDown
             {
@@ -646,8 +664,8 @@ namespace ServiceTool
                 DropShadowEnabled = false, Renderer = new FlatPopupRenderer(),
                 LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow
             };
-            int height = Math.Min(Items.Count, Math.Max(1, MaxDropDownItems)) * rowHeight;
-            var host = new ToolStripControlHost(list)
+            int height = visibleRows * rowHeight;
+            var host = new ToolStripControlHost(viewport)
             {
                 AutoSize = false, Margin = Padding.Empty, Padding = Padding.Empty, Size = new Size(width - 2, height)
             };
@@ -657,16 +675,15 @@ namespace ServiceTool
 
             Action commit = delegate
             {
-                if (list.SelectedIndex < 0) return;
-                SelectedIndex = list.SelectedIndex;
+                if (list.CurrentCell == null) return;
+                SelectedIndex = list.CurrentCell.RowIndex;
                 OnSelectionChangeCommitted(EventArgs.Empty);
                 popup.Close();
                 if (CanFocus) Focus();
             };
-            list.MouseUp += delegate(object sender, MouseEventArgs e)
+            list.CellClick += delegate(object sender, DataGridViewCellEventArgs e)
             {
-                int index = list.IndexFromPoint(e.Location);
-                if (e.Button == MouseButtons.Left && index >= 0) { list.SelectedIndex = index; commit(); }
+                if (e.RowIndex >= 0) commit();
             };
             list.KeyDown += delegate(object sender, KeyEventArgs e)
             {
@@ -692,6 +709,12 @@ namespace ServiceTool
             Point below = PointToScreen(new Point(0, Height));
             Rectangle work = Screen.FromControl(this).WorkingArea;
             popup.Show(this, new Point(0, below.Y + popup.Height > work.Bottom ? -popup.Height : Height));
+            if (SelectedIndex >= 0)
+            {
+                list.CurrentCell = list.Rows[SelectedIndex].Cells[0];
+                list.FirstDisplayedScrollingRowIndex = Math.Min(SelectedIndex, Items.Count - visibleRows);
+            }
+            else list.ClearSelection();
             list.Focus();
         }
 

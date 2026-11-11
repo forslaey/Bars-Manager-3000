@@ -15,6 +15,8 @@ namespace ServiceTool
             if(!Regex.IsMatch(value,@"\A(?:[a-zA-Z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+(?:[\\/]|$))"))throw new IOException("Укажи полный путь к папке Библиотеки или _soft");
             string full=Path.GetFullPath(value);if(full.Length>Path.GetPathRoot(full).Length)full=full.TrimEnd('\\','/');
             if(Path.GetFileName(full).Equals("_soft",StringComparison.OrdinalIgnoreCase))return full;
+            if(Path.GetFileName(full).Equals("_libraries",StringComparison.OrdinalIgnoreCase))return Path.Combine(Path.GetDirectoryName(full),"_soft");
+            if(Directory.Exists(Path.Combine(full,"_libraries")))return Path.Combine(full,"_soft");
             string child=Path.Combine(full,"Библиотеки");if(Directory.Exists(child))full=child;
             return Path.Combine(full,"_soft");
         }

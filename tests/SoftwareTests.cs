@@ -15,7 +15,7 @@ namespace ServiceTool
         private static void Check(bool value,string message){if(!value)throw new Exception(message);count++;}
         private static void Reject(Action action,string message){try{action();}catch(Exception){count++;return;}throw new Exception(message);}
         private static IEnumerable<Control> Children(Control parent){foreach(Control child in parent.Controls){yield return child;foreach(var nested in Children(child))yield return nested;}}
-        private static void Show(Form form){form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.Show();Application.DoEvents();}
+        private static void Show(Form form){form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=form is SoftwareRemoteDialog ? Screen.PrimaryScreen.WorkingArea.Location : new Point(-20000,-20000);form.Show();Application.DoEvents();}
         [STAThread] public static int Main()
         {
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);

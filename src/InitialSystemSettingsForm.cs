@@ -19,7 +19,6 @@ namespace ServiceTool
             new[]{"passwords","Политика паролей системы Windows","Профиль BARS по согласованному списку. Существующие пароли не изменяются.","Применить политики","Вернуть стандартные политики"},
             new[]{"admin","Контроль учётных записей","Для существующих администраторов. После изменения требуется перезагрузка.","Применить политики","Вернуть стандартные политики"},
             new[]{"firewall","Брандмауэр Windows","Все профили: доменный, частный и общедоступный.","Отключить все профили","Включить все профили"},
-            new[]{"defender","Защитник Windows","Временно отключить защиту в реальном времени. Windows может включить её обратно.","Временно отключить защиту","Включить защиту"},
             new[]{"smartscreen","SmartScreen для приложений","Предупреждения при запуске загруженных приложений. Для всех пользователей компьютера.","Применить политики","Вернуть стандартные политики"},
             new[]{"folders","Права папок DataKrat и Bars","Полный доступ всем пользователям. Папки и файлы на локальных дисках и флешках.","Выдать полный доступ","Проверить папки"},
             new[]{"kiosk","Сенсорный режим КСО","Запрет краевых жестов и центра уведомлений для всех пользователей. Прокрутка внутри программ сохраняется.","Применить настройки КСО","Вернуть прежние настройки"}
@@ -34,23 +33,39 @@ namespace ServiceTool
             ConfigureGrid();
             var table=new Panel{Dock=DockStyle.Fill,Padding=Padding.Empty,Margin=Padding.Empty};
             var slot=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};gridScroll.Dock=DockStyle.Right;gridScroll.Width=14;gridScroll.AlignToRows=true;gridScroll.Bind(grid);slot.Controls.Add(grid);table.Controls.Add(slot);Body.Controls.Add(table,0,1);gridScroll.Dock=DockStyle.None;Controls.Add(gridScroll);Action alignScroll=()=>{if(!IsHandleCreated||table.IsDisposed)return;var point=PointToClient(table.PointToScreen(new Point(table.ClientSize.Width,0)));gridScroll.Bounds=new Rectangle(point.X,point.Y,Math.Max(1,(int)Math.Round(14F*Font.Height/16F)),grid.Height);gridScroll.BringToFront();};Layout+=delegate{alignScroll();};table.SizeChanged+=delegate{alignScroll();};table.LocationChanged+=delegate{alignScroll();};slot.LocationChanged+=delegate{alignScroll();};Root.Layout+=delegate{if(IsHandleCreated)BeginInvoke((MethodInvoker)delegate{if(!IsDisposed)alignScroll();});};grid.SizeChanged+=delegate{alignScroll();};Shown+=delegate{alignScroll();};
-            var actions=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=new Padding(0,12,0,12)};
-            for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var actions=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=5,RowCount=1,Margin=new Padding(0,12,0,12)};
+            for(int i=0;i<5;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,20));actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             applyButton=Button("Применить профиль",true);applyButton.Margin=new Padding(0,0,6,0);applyButton.Click+=async delegate{await Apply(SelectedGroup,false);};
-            standardButton=Button("Стандарт Windows",false);standardButton.Margin=new Padding(6,0,6,0);standardButton.Click+=async delegate{if(SelectedGroup=="folders")await Check(true);else await Apply(SelectedGroup,true);};
-            refresh=Button("Проверить настройки",false);refresh.Margin=new Padding(6,0,0,0);refresh.Click+=async delegate{await Check(true);};
-            actions.Controls.Add(applyButton,0,0);actions.Controls.Add(standardButton,1,0);actions.Controls.Add(refresh,2,0);Body.Controls.Add(actions,0,2);
+            standardButton=Button("Стандарт Windows",false);standardButton.Margin=new Padding(6,0,6,0);standardButton.Click+=async delegate{if(SelectedGroup=="folders")await Check();else await Apply(SelectedGroup,true);};
+            refresh=Button("Проверить настройки",false);refresh.Margin=new Padding(6,0,6,0);refresh.Click+=async delegate{await Check();};
+            actions.Controls.Add(applyButton,0,0);actions.Controls.Add(standardButton,1,0);actions.Controls.Add(refresh,2,0);var wallpaper=Button("Применить обои",false);wallpaper.Margin=new Padding(6,0,6,0);
+            wallpaper.Click+=delegate{using(var dialog=new WallpaperForm(Colors))ScopedDialogs.Show(this,dialog);};
+            actions.Controls.Add(wallpaper,3,0);
+            var timeZone=Button("Часовой пояс",false);
+            timeZone.Margin=new Padding(6,0,0,0);
+            timeZone.Click+=async delegate
+            {
+                if(preview || (Busy && !Scanning))return;
+                using(var dialog=new TimeZoneDialog(Colors))
+                {
+                    if(ScopedDialogs.Show(this,dialog)!=DialogResult.OK || IsDisposed)return;
+                    timeZone.Enabled=false;
+                    try
+                    {
+                        await Task.Run(()=>TimeZoneDialog.Apply(dialog.ZoneId));
+                        if(!IsDisposed)Log("Часовой пояс изменён.");
+                    }
+                    catch(Exception ex){if(!IsDisposed)Log("Не удалось изменить часовой пояс. "+ex.Message);}
+                    finally{if(!IsDisposed)timeZone.Enabled=true;}
+                }
+            };
+            actions.Controls.Add(timeZone,4,0);Body.Controls.Add(actions,0,2);
             var log=JournalPanel.Create(journal,"Журнал проверки и настройки",Colors);log.Margin=Padding.Empty;Body.Controls.Add(log,0,3);
             Body.Controls.Remove(log);Body.Controls.Remove(footer);Root.Controls.Remove(Body);
             Body.RowCount=3;while(Body.RowStyles.Count>3)Body.RowStyles.RemoveAt(Body.RowStyles.Count-1);
             OperationView=new DownloadProgressView { InlineDetails = true };
             var journalArea=(TableLayoutPanel)OperationView.WithJournal(log);journalArea.RowStyles[0].Height=62;
             var compact=new CompactJournalLayout(Body,1,grid,journalArea,footer,110,54){StableSettingsRows=true,IncludeStatusColumn=true};OperationView.Margin=new Padding(0,0,0,12);compact.RowCount=3;compact.RowStyles[1]=new RowStyle(SizeType.Percent,100);Root.Controls.Add(compact,0,1);
-            footer.Layout += delegate
-            {
-                int height = (int)Math.Round(40F * footer.ColumnStyles[1].Width / 140F);
-                if (height > 0 && Back.Height != height) Back.Height = height;
-            };
             Shown+=delegate{BeginInvoke((MethodInvoker)delegate{if(IsDisposed)return;int height=actions.Controls.Cast<Control>().Max(c=>c.Height);Body.RowStyles[2].Height=height+actions.Margin.Vertical;});};
             grid.SelectionChanged+=delegate{UpdateButtons();};grid.CurrentCellChanged+=delegate{UpdateButtons();};SetTheme(Colors.Dark,false);UpdateButtons();
             Shown+=async delegate{if(preview){foreach(DataGridViewRow row in grid.Rows)row.Cells[2].Value="Не проверено · демонстрация";}else await Check();};
@@ -83,8 +98,9 @@ namespace ServiceTool
             grid.DefaultCellStyle.BackColor=Colors.Surface;grid.DefaultCellStyle.ForeColor=Colors.Text;grid.DefaultCellStyle.SelectionBackColor=Colors.Selection;grid.DefaultCellStyle.SelectionForeColor=Colors.SelectionText;
             grid.ColumnHeadersDefaultCellStyle.BackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.ForeColor=Colors.Text;grid.ColumnHeadersDefaultCellStyle.SelectionBackColor=Colors.SurfaceAlt;grid.ColumnHeadersDefaultCellStyle.SelectionForeColor=Colors.Text;grid.Invalidate();
         }
-        private void Lock(bool value){if(value)CancelRequested=false;if(value)OperationView.BeginOperation(Scanning?"Проверяем настройки…":"Применяем настройки…",!Scanning);else if(OperationView.Snapshot.Active||Scanning)OperationView.FinishOperation(CancelRequested?"Проверка отменена.":Activity.Text,cancelled:CancelRequested);Busy=value;Back.Enabled=!value||Scanning||ManagerApplicationContext.ActiveContext!=null;refresh.Enabled=!value;UpdateButtons();}
-        protected override void Progress(string text){base.Progress("Windows проверяет или применяет настройки…");}
+        private void Lock(bool value){if(value)CancelRequested=false;if(value&&!Scanning)OperationView.BeginOperation("Применяем настройки…");else if(!value&&(OperationView.Snapshot.Active||Scanning))OperationView.FinishOperation(CancelRequested?"Проверка отменена.":Activity.Text,cancelled:CancelRequested);Busy=value;Back.Enabled=!value||Scanning||ManagerApplicationContext.ActiveContext!=null;refresh.Enabled=!value;UpdateButtons();}
+        protected override bool UseHelperProgress { get { return !Scanning; } }
+        protected override void Progress(string text){base.Progress("Применяем настройки Windows…");}
         private void Log(string text){journal.AppendText(DateTime.Now.ToString("HH:mm:ss")+"  "+OperationMessage.FinishSentence(text)+Environment.NewLine);journal.SelectionStart=journal.TextLength;journal.ScrollToCaret();}
         private void ShowState(string text)
         {
@@ -101,7 +117,68 @@ namespace ServiceTool
             }
             UpdateButtons();
         }
-        private async Task Check(bool userRequested=false){if(Busy||preview)return;Scanning=true;CancelRequested=false;Lock(true);if(userRequested)OperationView.BeginOperation("Проверяем настройки…",true,2);try{var result=await Execute("initial-settings","query:all","");if(IsDisposed||CancelRequested)return;if(!LibraryPlan.Success(result.ExitCode))throw new System.IO.IOException(result.Message);OperationView.CompleteStep();ShowState(result.Message);OperationView.CompleteStep();Activity.Text="Проверка завершена.";}catch(Exception ex){if(IsDisposed||CancelRequested)return;foreach(DataGridViewRow row in grid.Rows)row.Cells[2].Value="Проверка не выполнена";Log("Не удалось проверить настройки. "+SystemSettingsPresentation.Error(ex.Message));Activity.Text="Проверка не завершена.";}finally{OperationView.FinishOperation(CancelRequested?"Проверка отменена.":Activity.Text,success:userRequested&&!CancelRequested&&Activity.Text=="Проверка завершена.",failed:!CancelRequested&&Activity.Text=="Проверка не завершена.",cancelled:CancelRequested);Scanning=false;if(!IsDisposed)Lock(false);}}
+        private static void RecordSettingsTimings(string response)
+        {
+            var values = WindowsComponents.Parse(response);
+            long total = 0, groups = 0;
+            foreach (string group in new[] { "admin", "passwords", "firewall", "smartscreen", "folders", "powershell", "kiosk" })
+            {
+                string value;
+                long milliseconds;
+                if (!values.TryGetValue("BARS_PROFILE." + group, out value) || !Int64.TryParse(value, out milliseconds) || milliseconds < 0) continue;
+                PerformanceTrace.Duration("settings.scan." + group, milliseconds);
+                if (group == "powershell") total = milliseconds;
+                else if (group != "kiosk") groups += milliseconds;
+            }
+            if (total >= groups && total != 0)
+                PerformanceTrace.Duration("settings.scan.powershell-overhead", total - groups);
+        }
+
+        private async Task Check()
+        {
+            if (Busy || preview) return;
+            Scanning = true;
+            Lock(true);
+            const string checking = "Проверяем настройки Windows… Прошло ";
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            OperationView.BeginOperation(checking + "00:00:00", tasks: 0);
+            var report = OperationView.OperationReporter;
+            bool success = false;
+            using (var clock = new Timer { Interval = 250 })
+            {
+                clock.Tick += delegate { if (!IsDisposed) report(checking + elapsed.Elapsed.ToString(@"hh\:mm\:ss")); };
+                clock.Start();
+                try
+                {
+                    LibraryInstallResult result;
+                    using (PerformanceTrace.Begin("settings.scan.roundtrip"))
+                        result = await Execute("initial-settings", PerformanceTrace.Enabled ? "query:all-profile" : "query:all", "");
+                    if (PerformanceTrace.Enabled) RecordSettingsTimings(result.Message);
+                    if (IsDisposed || CancelRequested) return;
+                    if (!LibraryPlan.Success(result.ExitCode)) throw new System.IO.IOException(result.Message);
+                    ShowState(result.Message);
+                    Activity.Text = "Проверка завершена.";
+                    success = true;
+                }
+                catch (Exception ex)
+                {
+                    if (IsDisposed || CancelRequested) return;
+                    foreach (DataGridViewRow row in grid.Rows) row.Cells[2].Value = "Проверка не выполнена";
+                    Log("Не удалось проверить настройки. " + SystemSettingsPresentation.Error(ex.Message));
+                    Activity.Text = "Проверка не завершена.";
+                }
+                finally
+                {
+                    Scanning = false;
+                    if (!IsDisposed)
+                    {
+                        OperationView.FinishOperation(CancelRequested ? "Проверка отменена." : Activity.Text,
+                            success: success, failed: !success && !CancelRequested, cancelled: CancelRequested);
+                        Lock(false);
+                    }
+                }
+            }
+        }
         private static string DescribeAffectedServices()
         {
             var snapshot = ServiceCatalog.ReadSnapshot();
@@ -137,16 +214,16 @@ namespace ServiceTool
                 try { warning += await Task.Run(() => DescribeAffectedServices()); }
                 catch (Exception ex) { warning += "\r\nНе удалось проверить пути служб: " + ex.Message; }
                 finally { Lock(false); }
-                if (IsDisposed || CancelRequested) return;
+                if (IsDisposed || CancelRequested || ClosingAfterOperation) return;
             }
             if(group=="passwords")warning+="\r\nМеняются требования к локальным паролям, существующие пароли не меняются. Доменные политики имеют приоритет.";
-            if(group=="firewall"||group=="defender"||group=="smartscreen")warning+="\r\nОперация меняет защиту Windows. Действующие политики организации могут ограничить изменение.";
+            if(group=="firewall"||group=="smartscreen")warning+="\r\nОперация меняет защиту Windows. Действующие политики организации могут ограничить изменение.";
             if(BrandMessageBox.Show(this,warning,Text,MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             Lock(true);bool offer=false;
             try{Log(Settings.First(s=>s[0]==group)[1]+": "+(defaults?(group=="kiosk"?"восстанавливаем прежние настройки…":"возвращаем стандартные настройки…"):"применяем выбранные настройки…"));var results=await ExecuteAll(new[]{new[]{"initial-settings",(defaults?"defaults:":"apply:")+group,""},new[]{"initial-settings","query:all",""}},result=>{if(group=="kiosk"&&result.Reboot)offer=true;});var first=results.First();offer=LibraryPlan.Success(first.ExitCode)&&(group=="admin"||group=="passwords"||(group=="kiosk"&&first.Reboot));Log(LibraryPlan.Success(first.ExitCode)?"Настройки сохранены. Проверяем результат…":"Настройки применены не полностью. "+SystemSettingsPresentation.Error(first.Message));if(results.Count>1)ShowState(results.Last().Message);Activity.Text=LibraryPlan.Success(first.ExitCode)?"Операция завершена.":"Не выполнено полностью — проверь журнал.";bool confirmed=LibraryPlan.Success(first.ExitCode)&&LibraryPlan.Success(results.Last().ExitCode)&&!WindowsComponents.Parse(results.Last().Message).ContainsKey(group+".Error");if(!confirmed)Activity.Text="Результат не подтверждён полностью — проверь журнал.";OperationView.FinishOperation(Activity.Text,success:confirmed,failed:!confirmed);}
             catch(Exception ex){Log("Операция не подтверждена. "+SystemSettingsPresentation.Error(ex.Message));Activity.Text="Не выполнено полностью — проверь журнал.";OperationView.FinishOperation(Activity.Text,failed:true);}
             finally{Lock(false);}
-            if(offer)await Restart();
+            if(offer)Log("Для завершения изменений потребуется перезагрузка Windows.");
         }
         protected override void Dispose(bool disposing){base.Dispose(disposing);if(disposing)headerFont.Dispose();}
     }

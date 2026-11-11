@@ -36,7 +36,7 @@ namespace ServiceTool
                 {
                     Show(form);var notice=All(form).OfType<Label>().Single(l=>l.Name=="passwordNotice");var cancel=All(form).OfType<BrandButton>().Single(b=>b.Text=="Отмена");
                     Check(notice.TextAlign==ContentAlignment.MiddleLeft,"Notice aligned left");
-                    Check(ScreenBounds(notice).Left==ScreenBounds(cancel).Left,"Notice starts at Cancel left edge");
+                    Check(ScreenBounds(notice).Left==ScreenBounds(cancel).Left,"Notice starts at Cancel left edge: notice="+ScreenBounds(notice).Left+" cancel="+ScreenBounds(cancel).Left);
                     Check(All(form).OfType<BrandTextBox>().All(t=>t.BorderStyle==BorderStyle.FixedSingle),"Password fields use flat borders");
                     Capture(form,id+"-"+dark);
                 }

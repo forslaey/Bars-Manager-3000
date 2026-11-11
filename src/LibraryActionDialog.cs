@@ -34,7 +34,7 @@ namespace ServiceTool
             var cancel = new BrandButton { Text = "Отмена", Palette = colors, Dock = DockStyle.Fill, Margin = Padding.Empty, DialogResult = DialogResult.Cancel, Font = Font };
             reinstall.Click += delegate { Operation = LibraryOperation.Reinstall; DialogResult = DialogResult.OK; };
             remove.Click += delegate { Operation = LibraryOperation.Remove; DialogResult = DialogResult.OK; };
-            buttons.Controls.Add(recommended, 0, 0); buttons.Controls.Add(reinstall, 2, 0); buttons.Controls.Add(remove, 4, 0); buttons.Controls.Add(cancel, 6, 0); layout.Controls.Add(buttons, 0, 3); Controls.Add(layout); CancelButton = cancel;
+            buttons.Controls.Add(recommended, 0, 0); buttons.Controls.Add(reinstall, 2, 0); buttons.Controls.Add(remove, 4, 0); buttons.Controls.Add(cancel, 6, 0); ModuleNavigation.StandardFooter(buttons, recommended, reinstall, remove, cancel); layout.Controls.Add(buttons, 0, 3); Controls.Add(layout); CancelButton = cancel;
         }
     }
 }

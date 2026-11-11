@@ -22,10 +22,6 @@ namespace ServiceTool
             }
             if(group=="admin")return Capital(Enabled(Get(values,"admin.EnableLUA")));
             if(group=="firewall")return "Доменный: "+Enabled(Get(values,"firewall.Domain"))+"\nЧастный: "+Enabled(Get(values,"firewall.Private"))+"\nОбщедоступный: "+Enabled(Get(values,"firewall.Public"));
-            if(group=="defender"){
-                string v=Get(values,"defender.RealTimeProtection");
-                return v.Equals("True",StringComparison.OrdinalIgnoreCase)?"Защита в реальном времени включена":v.Equals("False",StringComparison.OrdinalIgnoreCase)?"Защита в реальном времени отключена":"Не удалось проверить защиту";
-            }
             if(group=="smartscreen")return Get(values,"smartscreen.Mode").Length>0?Get(values,"smartscreen.Mode"):"Не удалось проверить";
             if(group=="passwords")
             {

@@ -1,5 +1,5 @@
 ﻿Для этого выпуска используется прежний сертификат. Если signing.json отсутствует,
-к командам Build.ps1 -Sign и tests\SigningTests.ps1 добавь:
+к командам tools\Build-OneFileRust.ps1 -Sign и tests\SigningTests.ps1 добавь:
 -CertificateThumbprint 5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB
 Для подписи нужен его закрытый ключ в личном хранилище Windows; для проверки — не нужен.
 Новый сертификат для этого выпуска создавать не следует.
@@ -15,7 +15,7 @@
 
 ## 1. Что понадобится один раз
 
-1. Папка проекта C:\ServiceManager3000 со всеми исходниками, Build.ps1 и папкой tools.
+1. Папка проекта C:\ServiceManager3000 со всеми исходниками, tools\Build-OneFileRust.ps1 и папкой tools.
 2. Для подписи — прежний сертификат С ЗАКРЫТЫМ КЛЮЧОМ. На рабочем компьютере его пока нет. Обычный .cer из проекта не подходит.
 3. Интернет для получения метки времени DigiCert при подписании.
 4. Закрой экземпляр программы, файл которого собираешься заменять.
@@ -81,7 +81,7 @@ Get-Item 'Cert:\CurrentUser\My\5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB' | Forma
 После переноса ключа выполни в окне из раздела 2 одну строку:
 
 ```powershell
-.\Build.ps1 -Sign -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB' -OutputDirectory 'C:\ServiceManager3000\signed'
+.\tools\Build-OneFileRust.ps1 -Sign -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB' -OutputDirectory 'C:\ServiceManager3000\signed'
 ```
 
 Дождись завершения без красной ошибки.
@@ -126,13 +126,13 @@ C:\ServiceManager3000\signed\Bars Manager 3000 2.3.13.exe
 Выполни:
 
 ```powershell
-.\Build.ps1 -OutputDirectory 'C:\ServiceManager3000\bin'
+.\tools\Build-OneFileRust.ps1 -OutputDirectory 'C:\ServiceManager3000\bin'
 ```
 
 Результат:
 C:\ServiceManager3000\bin\Bars Manager 3000 2.3.13.exe
 
-Здесь заново собираются и внешний EXE, и оба встроенных установщика без подписания. Это новый файл из исходников, а не удаление подписи из прежнего EXE. Ничего добавлять к Build.ps1 не требуется: просто нет ключа -Sign.
+Здесь заново собираются и внешний EXE, и оба встроенных установщика без подписания. Это новый файл из исходников, а не удаление подписи из прежнего EXE. Ничего добавлять к tools\Build-OneFileRust.ps1 не требуется: просто нет ключа -Sign.
 
 Проверить:
 
@@ -248,7 +248,7 @@ $taskNewSigner | Format-List Subject,Thumbprint,HasPrivateKey,NotAfter
 2. Для пробного выпуска с новым издателем в том же окне выполни:
 
 ```powershell
-.\Build.ps1 -Sign -CertificateThumbprint $taskNewSigner.Thumbprint -OutputDirectory 'C:\ServiceManager3000\signed-new'
+.\tools\Build-OneFileRust.ps1 -Sign -CertificateThumbprint $taskNewSigner.Thumbprint -OutputDirectory 'C:\ServiceManager3000\signed-new'
 ```
 
 3. Запиши новый отпечаток. После закрытия PowerShell переменная taskNewSigner исчезнет, а сертификат останется в certmgr.msc → «Личное». В дальнейшем передавай новый отпечаток в -CertificateThumbprint явно.
@@ -261,8 +261,8 @@ https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificat
 ## 9. Короткая памятка
 
 - Изменил исходники или сведения об авторе → пересобери → подпиши заново, если нужен подписанный выпуск.
-- Наш менеджер целиком с подписями → Build.ps1 -Sign с правильным отпечатком.
-- Наш менеджер целиком без подписей → Build.ps1 без -Sign.
+- Наш менеджер целиком с подписями → tools\Build-OneFileRust.ps1 -Sign с правильным отпечатком.
+- Наш менеджер целиком без подписей → tools\Build-OneFileRust.ps1 без -Sign.
 - Подписать отдельный готовый EXE → tools\Sign-File.ps1.
 - Снять подпись с существующего EXE → SignTool remove /s, лучше на копии.
 - Переименование EXE не меняет автора, контакты и издателя.

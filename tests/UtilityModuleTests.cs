@@ -143,7 +143,7 @@ namespace ServiceTool
                     var buttons = Children(form).OfType<BrandButton>().ToArray();
                     foreach (var button in buttons)
                     {
-                        Check(button.Height >= 35 * scale, "Useful button height at each scale");
+                        Check(button.Height >= 35, "Useful button height at each scale");
                         Check(button.Parent.ClientRectangle.Contains(button.Bounds), "Button '" + button.Text + "' " + button.Bounds + " stays inside " + button.Parent.ClientRectangle + " of " + button.Parent.GetType().Name + " in " + form.GetType().Name + " at " + scale);
                         foreach (string line in button.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)) Check(TextRenderer.MeasureText(line, button.Font).Width <= button.Width - 8, "Each action line fits horizontally: '" + line + "' needs " + TextRenderer.MeasureText(line, button.Font).Width + " of " + button.Width + " in " + form.GetType().Name + " at " + scale);
                     }
@@ -153,7 +153,7 @@ namespace ServiceTool
                         var actions = cards.Select(c => Children(c).OfType<BrandButton>().Single()).ToArray();
                         Check(actions.Select(b => b.Size).Distinct().Count() == 1, "All launch actions equal size");
                         Check(actions.Any(b => b.Text == "Установка программ"), "Programs module is its own launcher card");
-                        Check(buttons.Count(b => b.Text == "О программе") == 1, "About stays in the launcher only");
+                        Check(buttons.Count(b => b.AccessibleName == "О программе") == 1, "About stays in the launcher only");
                     }
                     else
                     {

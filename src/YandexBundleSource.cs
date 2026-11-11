@@ -15,7 +15,7 @@ namespace ServiceTool
         internal string Path;
         internal long Size;
         internal string Sha256;
-        internal string Group { get { return Path.StartsWith("/_soft/",StringComparison.OrdinalIgnoreCase)?"Программы":Path.StartsWith("/_tools/",StringComparison.OrdinalIgnoreCase)?"Утилиты":"Библиотеки"; } }
+        internal string Group { get { return Path.StartsWith("/_wallpers/",StringComparison.OrdinalIgnoreCase)?"Обои":Path.StartsWith("/_soft/",StringComparison.OrdinalIgnoreCase)?"Программы":Path.StartsWith("/_tools/",StringComparison.OrdinalIgnoreCase)?"Утилиты":"Библиотеки"; } }
     }
 
     // Public metadata only. No OAuth, no execution of downloaded content.

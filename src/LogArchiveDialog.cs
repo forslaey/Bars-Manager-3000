@@ -114,6 +114,7 @@ namespace ServiceTool
             save.Click+=delegate{ConfirmSelection();};
             Button cancel=Button("Отмена");cancel.Margin=Padding.Empty;cancel.DialogResult=DialogResult.Cancel;
             actions.Controls.Add(cancel,0,0);actions.Controls.Add(save,2,0);
+            ModuleNavigation.StandardFooterWithGap(actions,12,cancel,save);
             content.Controls.Add(actions, 0, 5);
             Controls.Add(content);
             AcceptButton = save;

@@ -91,14 +91,13 @@ namespace ServiceTool
             error.Dock = DockStyle.Fill; error.ForeColor = colors.Danger; error.AutoEllipsis = true;
             error.Font = new Font("Segoe UI", 8.5F); error.Margin = Padding.Empty;
             layout.Controls.Add(error, 0, 11); layout.SetColumnSpan(error, 2);
-            var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft,
-                WrapContents = false, Margin = Padding.Empty };
+            var actions = new TableLayoutPanel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             var accept = new BrandButton { Text = installing ? "Установить" : "Сохранить", Palette = colors,
                 Primary = true, Size = new Size(144, 40), Margin = Padding.Empty };
             var cancel = new BrandButton { Text = "Отмена", Palette = colors, Size = new Size(144, 40),
                 Margin = new Padding(0, 0, 12, 0), DialogResult = DialogResult.Cancel };
             accept.Click += AcceptSettings;
-            actions.Controls.Add(accept); actions.Controls.Add(cancel);
+            ModuleNavigation.StandardFooter(actions, cancel, accept);
             layout.Controls.Add(actions, 0, 13); layout.SetColumnSpan(actions, 2);
             Controls.Add(layout); AcceptButton = accept; CancelButton = cancel;
             binding = true;

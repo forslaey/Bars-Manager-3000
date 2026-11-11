@@ -43,12 +43,12 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 Закрой запущенный экземпляр, если хочешь заменить именно его файл.
 
 ```powershell
-.\Build.ps1 -Sign -OutputDirectory C:\ServiceManager3000\signed
+.\tools\Build-OneFileRust.ps1 -Sign -OutputDirectory C:\ServiceManager3000\signed
 ```
 
-Скрипт сначала подписывает помощников x86/x64, затем встраивает их и подписывает основной файл. Поэтому после сборки достаточно одного .exe. Обычная команда `Build.ps1` без `-Sign` по-прежнему создаёт неподписанную сборку.
+Скрипт сначала подписывает помощников x86/x64, затем встраивает их, подписывает C#-менеджер и итоговый Rust-запускатель. Поэтому после сборки достаточно одного .exe. Обычная команда `tools\Build-OneFileRust.ps1` без `-Sign` по-прежнему создаёт неподписанную сборку.
 
-Нельзя подписывать извлечённые помощники отдельно после встраивания: изменится их содержимое, проверяемое менеджером. Правильный порядок уже реализован в `Build.ps1 -Sign`.
+Нельзя подписывать извлечённые помощники отдельно после встраивания: изменится их содержимое, проверяемое менеджером. Правильный порядок уже реализован в `tools\Build-OneFileRust.ps1 -Sign`.
 
 ## Подписать другой свой .exe
 
@@ -69,7 +69,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 ```powershell
 .\tools\Sign-File.ps1 -FilePath 'C:\Мои программы\Моя программа.exe' -TimestampServer ''
 # Или собрать нашу программу без меток времени:
-.\Build.ps1 -Sign -OutputDirectory C:\ServiceManager3000\signed -TimestampServer ''
+.\tools\Build-OneFileRust.ps1 -Sign -OutputDirectory C:\ServiceManager3000\signed -TimestampServer ''
 ```
 
 Без метки времени нельзя рассчитывать на сохранение действительности подписи после окончания срока сертификата. Даже с меткой остаются отдельными условия доверия к сертификату, его отзыв и политика Windows.
@@ -131,7 +131,7 @@ try {
 На новом компьютере можно явно указать прежний отпечаток, без создания другого сертификата:
 
 ```powershell
-.\Build.ps1 -Sign -OutputDirectory C:\ServiceManager3000\signed `
+.\tools\Build-OneFileRust.ps1 -Sign -OutputDirectory C:\ServiceManager3000\signed `
     -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB'
 .\tools\Sign-File.ps1 -FilePath 'C:\Мои программы\Моя программа.exe' `
     -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB'

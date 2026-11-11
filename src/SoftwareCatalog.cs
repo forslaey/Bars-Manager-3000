@@ -102,10 +102,10 @@ namespace ServiceTool
         }
         internal static string FindFolder()
         {
-            string adjacent = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "_soft"); if (Directory.Exists(adjacent)) return adjacent;
-            string root = LibrarySource.AutoDetect(AppDomain.CurrentDomain.BaseDirectory);
+            string adjacent = BundleFolders.FindSibling("_soft"); if (adjacent != null) return adjacent;
+            string root = LibrarySource.AutoDetect(BundleFolders.ExecutableDirectory);
             if (root == null) { string saved = ApplicationStorage.FilePath("library-source.txt"); if (File.Exists(saved)) root = File.ReadAllText(saved).Trim(); }
-            return root == null ? null : Path.Combine(root, "_soft");
+            return root == null ? null : SoftwarePackageStorage.Folder(root);
         }
         internal static List<SoftwarePackage> Local(string folder, Action<string> progress, string sourceLabel="Локальный _soft")
         { return Local(folder,progress,sourceLabel,true); }

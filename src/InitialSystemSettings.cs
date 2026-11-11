@@ -46,7 +46,7 @@ namespace ServiceTool
         {
             if(operation!="query"&&operation!="apply"&&operation!="defaults")throw new InvalidDataException("Неизвестная операция настроек");
             if(group=="folders"){if(operation=="defaults")throw new InvalidDataException("Для папок нет универсального стандарта разрешений Windows");return BarsFolderPermissions.Script(operation=="apply");}
-            if(group!="admin"&&group!="passwords"&&group!="firewall"&&group!="defender"&&group!="smartscreen")throw new InvalidDataException("Неизвестная группа настроек");
+            if(group!="admin"&&group!="passwords"&&group!="firewall"&&group!="smartscreen")throw new InvalidDataException("Неизвестная группа настроек");
             bool query=operation=="query",defaults=operation=="defaults";
             var s=new StringBuilder(@"$ErrorActionPreference='Stop';
 $os=Get-CimInstance Win32_OperatingSystem; $computer=Get-CimInstance Win32_ComputerSystem;
@@ -76,13 +76,6 @@ $policy='HKLM:\SOFTWARE\Policies\Microsoft\Windows\System';$explorer='HKLM:\SOFT
                 if(!query)s.AppendLine("Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled "+(defaults?"True":"False")+" -PolicyStore PersistentStore;");
                 s.AppendLine("$profiles=@(Get-NetFirewallProfile -PolicyStore ActiveStore);if($profiles.Count -ne 3){throw 'Windows не вернула все три профиля брандмауэра'};foreach($p in $profiles){$p.Name+'='+$p.Enabled}");
                 if(!query)s.AppendLine("if(@($profiles | Where-Object {[string]$_.Enabled -ne '"+(defaults?"True":"False")+"'}).Count -gt 0){throw 'Действующая политика брандмауэра отличается от запрошенной. Проверь GPO/MDM'}");
-            }
-            else if(group=="defender")
-            {
-                s.AppendLine("if(-not(Get-Command Get-MpComputerStatus -ErrorAction SilentlyContinue)){throw 'Microsoft Defender недоступен в этой Windows'}");
-                if(!query)s.AppendLine("Set-MpPreference -DisableRealtimeMonitoring $"+(defaults?"false":"true")+";");
-                s.AppendLine("$mp=Get-MpComputerStatus;'RealTimeProtection='+$mp.RealTimeProtectionEnabled;'TamperProtection='+$mp.IsTamperProtected;");
-                if(!query)s.AppendLine("if([bool]$mp.RealTimeProtectionEnabled -ne $"+(defaults?"true":"false")+"){throw 'Defender не подтвердил изменение. Возможны защита от изменений, политика организации или другой антивирус'}");
             }
             else if(group=="admin")
             {
@@ -120,17 +113,34 @@ function ReadPolicies($file){$values=@{};$section='';foreach($line in Get-Conten
             }
             return s.ToString();
         }
-        internal static string QueryScript(){var query=new StringBuilder();foreach(string group in new[]{"admin","passwords","firewall","defender","smartscreen","folders"})query.Append("try{$lines=& {"+Script("query",group)+"};foreach($line in $lines){'"+group+".'+$line}}catch{'"+group+".Error='+$_.Exception.Message};");return query.ToString();}
+        internal static string QueryScript(bool profile = false)
+        {
+            var query = new StringBuilder();
+            foreach (string group in new[] { "admin", "passwords", "firewall", "smartscreen", "folders" })
+            {
+                if (profile) query.Append("$barsGroupClock=[Diagnostics.Stopwatch]::StartNew();");
+                query.Append("try{$lines=& {" + Script("query",group) + "};foreach($line in $lines){'" +
+                    group + ".'+$line}}catch{'" + group + ".Error='+$_.Exception.Message}");
+                if (profile) query.Append("finally{'BARS_PROFILE." + group + "='+$barsGroupClock.ElapsedMilliseconds}");
+                query.Append(';');
+            }
+            return query.ToString();
+        }
         private static LibraryInstallResult RunScript(string script,Action<string> progress,bool cancellableRead=false){const string marker="BARS_SETTINGS_ERROR=";var result=WindowsComponents.Run("$ProgressPreference='SilentlyContinue';try{"+script+"}catch{[Console]::WriteLine('"+marker+"'+$_.Exception.Message)}",progress,cancellableRead);int error=result.Message.IndexOf(marker,StringComparison.Ordinal);if(error>=0)throw new InvalidOperationException(result.Message.Substring(error+marker.Length).Trim());return result;}
         internal static LibraryInstallResult Run(string data,Action<string> progress)
         {
             var parts=(data??"").Split(':');if(parts.Length!=2)throw new InvalidDataException("Неверный запрос настроек");
             if(parts[1]=="kiosk")return KioskTouchSettings.Run(parts[0],progress);
-            if(parts[0]=="query"&&parts[1]=="all")
+            if(parts[0]=="query"&&(parts[1]=="all"||parts[1]=="all-profile"))
             {
-                var result=RunScript(QueryScript(),progress,true);
+                bool profile = parts[1] == "all-profile";
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var result=RunScript(QueryScript(profile),progress,true);
+                if (profile) result.Message += Environment.NewLine + "BARS_PROFILE.powershell=" + clock.ElapsedMilliseconds;
+                clock.Restart();
                 try{result.Message+=Environment.NewLine+KioskTouchSettings.Run("query",null).Message;}
                 catch(Exception ex){result.Message+=Environment.NewLine+"kiosk.Error="+ex.Message.Replace("\r"," ").Replace("\n"," ");}
+                if (profile) result.Message += Environment.NewLine + "BARS_PROFILE.kiosk=" + clock.ElapsedMilliseconds;
                 return result;
             }
             return RunScript(Script(parts[0],parts[1]),progress);

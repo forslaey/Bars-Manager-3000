@@ -51,15 +51,20 @@ namespace ServiceTool
     {
         public static string AutoDetect(string executableDirectory)
         {
-            string candidate = Path.Combine(executableDirectory, "Библиотеки");
-            return Directory.Exists(candidate) ? Path.GetFullPath(candidate) : null;
+            string adjacent = Path.Combine(executableDirectory, "_libraries");
+            if (Directory.Exists(adjacent)) return adjacent;
+            string preferred = Path.Combine(BundlePreferences.Load(), "_libraries");
+            return Directory.Exists(preferred) ? preferred : BundleFolders.Find(executableDirectory, "_libraries");
         }
         public static string NormalizeRoot(string selected)
         {
             if (String.IsNullOrWhiteSpace(selected)) throw new ArgumentException("Выбери папку с библиотеками.");
             string full = Path.GetFullPath(selected);
-            string child = Path.Combine(full, "Библиотеки");
-            if (Directory.Exists(child)) full = child;
+            foreach (string name in new[] { "_libraries", "Библиотеки" })
+            {
+                string child = Path.Combine(full, name);
+                if (Directory.Exists(child)) { full = child; break; }
+            }
             if (!Directory.Exists(full)) throw new DirectoryNotFoundException("Папка библиотек недоступна.");
             return full.Length == Path.GetPathRoot(full).Length ? full : full.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         }

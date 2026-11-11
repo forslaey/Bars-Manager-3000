@@ -23,7 +23,7 @@ namespace ServiceTool
                     foreach(var form in forms) using(form)
                     {
                         var module=form as ManagerModuleForm;if(module!=null)module.SetTheme(dark,false);var services=form as MainForm;if(services!=null)services.SetTheme(dark,false);
-                        form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-22000,-22000);form.ShowInTaskbar=false;form.Show();Application.DoEvents();
+                        form.StartPosition=FormStartPosition.Manual;form.Location=form is SoftwareRemoteDialog ? Screen.PrimaryScreen.WorkingArea.Location : new Point(-22000,-22000);form.ShowInTaskbar=false;form.Show();Application.DoEvents();
                         if(form is SoftwareManagerForm)
                         {
                             var flags=BindingFlags.Instance|BindingFlags.NonPublic;
@@ -39,7 +39,7 @@ namespace ServiceTool
                         foreach(var button in Children(form).OfType<BrandButton>())
                         {
                             string context=form.GetType().Name+" / "+button.Text+" / "+scale;
-                            Check(button.Parent.ClientRectangle.Contains(button.Bounds),"Button outside parent: "+context);
+                            Check(button.Parent.ClientRectangle.Contains(button.Bounds),"Button outside parent: "+context+" / "+button.Bounds+" / "+button.Parent.ClientRectangle);
                             var size=TextRenderer.MeasureText(button.Text,button.Font,new Size(Math.Max(1,button.Width-16),Int32.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix);
                             Check(size.Width<=button.Width-16 && size.Height<=button.Height-6,"Painted text does not fit "+context+" requires "+size+" available "+button.Size);
                             if(button.Text=="Перезагрузка" || button.Text=="Компоненты")Check(TextRenderer.MeasureText(button.Text,button.Font).Width<=button.Width-16,"Single-line footer action: "+context);
@@ -102,24 +102,20 @@ namespace ServiceTool
                         }
                         if(form is LibraryManagerForm)
                         {
-                            var actions=Children(form).OfType<Button>().Where(b=>new[]{"Открыть журнал","Перезагрузка","Компоненты"}.Contains(b.Text)).ToArray();
-                            Check(actions.Length==3&&actions.Select(b=>b.Height).Distinct().Count()==1,"Footer actions have equal heights");
-                            Check(actions.Single(b=>b.Text=="Открыть журнал").Width>actions.Single(b=>b.Text=="Компоненты").Width,"Journal action remains wider for single-line text");
+                            var actions=Children(form).OfType<Button>().Where(b=>new[]{"Открыть журнал","Перезагрузка","Компоненты","В меню","Закрыть"}.Contains(b.Text)).OrderBy(b=>b.Left).ToArray();
+                            Check(actions.Length==5&&actions.Select(b=>b.Size).Distinct().Count()==1,"Footer actions have equal dimensions");
+                            int gap=actions[1].Left-actions[0].Right;
+                            Check(gap>0&&actions.Skip(1).Where((b,i)=>b.Left-actions[i].Right!=gap).Count()==0,"Footer actions have equal gaps");
                         }
                         if(form is LibraryManagerForm && scale==1F)
                         {
-                            Exception failure=null; bool opened=false;
-                            using(var timer=new Timer {Interval=25})
-                            {
-                                timer.Tick+=delegate {
-                                    var child=Application.OpenForms.OfType<WindowsFeaturesForm>().FirstOrDefault();if(child==null)return;
-                                    timer.Stop();opened=true;
-                                    try{Check(child.Owner==form&&child.Modal,"Windows components owned by component manager");var back=Children(child).OfType<Button>().Single(b=>b.Text=="Назад");back.PerformClick();}
-                                    catch(Exception ex){failure=ex;child.Close();}
-                                };
-                                timer.Start();Children(form).OfType<Button>().Single(b=>b.Text=="Компоненты").PerformClick();timer.Stop();
-                            }
-                            if(failure!=null)throw failure;Check(opened&&form.Visible&&!form.IsDisposed,"Nested return keeps component manager open");
+                            Children(form).OfType<Button>().Single(b=>b.Text=="Компоненты").PerformClick();
+                            Application.DoEvents();
+                            var child=form.OwnedForms.OfType<WindowsFeaturesForm>().Single();
+                            Check(child.Owner==form&&!child.Modal&&child.Enabled&&!form.Enabled,"Windows components lock only the owning module");
+                            Children(child).OfType<Button>().Single(b=>b.Text=="Назад").PerformClick();
+                            Application.DoEvents();
+                            Check(form.Visible&&!form.IsDisposed&&form.Enabled,"Nested return keeps component manager open");
                         }
                         form.Close();
                     }

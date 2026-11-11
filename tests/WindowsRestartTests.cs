@@ -58,8 +58,8 @@ namespace ServiceTool
                                 timer.Stop(); features.RecordRestartResults(new[] { new LibraryInstallResult { ExitCode = 3010 } });
                                 returned = true; features.Close();
                             };
-                            timer.Start(); Call(library, "OpenWindowsComponents");
-                            Check(returned, "Completed modal component window returned to library manager");
+                            timer.Start(); var task=(System.Threading.Tasks.Task)library.GetType().GetMethod("OpenWindowsComponents",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(library,null);var deadline=DateTime.UtcNow.AddSeconds(10);while(!task.IsCompleted&&DateTime.UtcNow<deadline){Application.DoEvents();System.Threading.Thread.Sleep(10);}Check(task.IsCompleted,"Component dialog task completed");task.GetAwaiter().GetResult();
+                            Check(returned, "Completed owned component window returned to library manager");
                         }
                         Check(Field<bool>(library, "pendingRestart"), "Request transferred from actual child dialog");
                         var button = Field<BrandButton>(library, "restart");

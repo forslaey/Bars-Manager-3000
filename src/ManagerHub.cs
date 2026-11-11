@@ -10,7 +10,7 @@ namespace ServiceTool
     {
         protected ThemePalette Colors;
         protected readonly TableLayoutPanel Root;
-        private readonly PictureBox logo = new PictureBox();
+        private readonly PictureBox logo;
         private readonly ThemeToggleButton theme = new ThemeToggleButton();
         private readonly Image lightLogo, darkLogo;
         private bool initialScaleApplied;
@@ -19,6 +19,7 @@ namespace ServiceTool
         {
             // Do not let Font/ClientSize trigger DPI scaling before the derived
             // module has added its controls, otherwise only the base header scales.
+            logo = new PictureBox();
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.None;
             Font = new Font("Segoe UI", 10F); Text = title; ClientSize = size;
@@ -76,6 +77,7 @@ namespace ServiceTool
             Controls.Remove(Root);
             Controls.Add(new BoundedContentPanel(Root, maximum));
         }
+        protected void Describe(Control control, string description) { tips.SetToolTip(control, description); }
         protected BrandButton Button(string text, bool primary)
         { return new BrandButton { Text = text, Primary = primary, Palette = Colors, Dock = DockStyle.Fill, Margin = new Padding(0, 0, 10, 0), Font = Font }; }
         protected Label Label(string text, bool muted)
@@ -123,7 +125,7 @@ namespace ServiceTool
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty, MinimumSize=new Size(0,670) };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 168)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
-            var title = Label("Инструменты BARS", false); title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleCenter; title.Margin = new Padding(0, 0, 0, 20); body.Controls.Add(title, 0, 0);
+            var title = new InheritedThemeLabel {Text="ИНСТРУМЕНТЫ BARS",Dock=DockStyle.Fill}; title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleCenter; title.Margin = new Padding(0, 0, 0, 20); body.Controls.Add(title, 0, 0);
             // Windows components are reached from the component manager.
             var modules = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
             modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -131,22 +133,69 @@ namespace ServiceTool
             // Percentages of an odd pixel count round to different heights, so the three rows are
             // sized explicitly to identical values whenever the panel is resized.
             // Let TableLayoutPanel distribute the viewport once, including DPI rounding.
-            modules.Controls.Add(ModuleCard("Менеджер служб", "Установка и управление службами,\r\nрежим запуска и сбор логов", "Менеджер служб", delegate { OpenModule(() => new MainForm(null, false)); }), 0, 0);
-            modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка и установка библиотек.\r\nВерсии и рекомендации по обновлению", "Менеджер библиотек", delegate { OpenModule(() => new LibraryManagerForm(false)); }), 1, 0);
-            modules.Controls.Add(ModuleCard("Установка программ", "Chrome, Notepad++, 7-Zip, AnyDesk, RuDesktop.\r\nУстановка, удаление и удалённый доступ", "Установка программ", delegate { OpenModule(() => new SoftwareManagerForm(false)); }), 0, 1);
-            modules.Controls.Add(ModuleCard("Распаковка утилит", "Копирование fiLinn, Piglet и WinSCP.\r\nЯрлыки на рабочем столе с иконками", "Распаковка утилит", delegate { OpenModule(() => new ToolsDeploymentForm(false)); }), 1, 1);
+            modules.Controls.Add(ModuleCard("Менеджер служб", "Установка служб и настройка их запуска.\r\nПроверка состояния и удобный сбор логов.", "Менеджер служб", delegate { OpenModule(() => new MainForm(null, false)); }), 0, 0);
+            modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка, установка и удаление библиотек.\r\nОбновления .NET и работа с компонентами Windows.", "Менеджер библиотек", delegate { OpenModule(() => new LibraryManagerForm(false)); }), 1, 0);
+            modules.Controls.Add(ModuleCard("Установка программ", "Установка, настройка и удаление программ.\r\nГорячая настройка неконтролируемого доступа.", "Установка программ", delegate { OpenModule(() => new SoftwareManagerForm(false)); }), 0, 1);
+            modules.Controls.Add(ModuleCard("Распаковка утилит", "Распаковка и удаление fiLinn, Piglet и WinSCP.", "Распаковка утилит", delegate { OpenModule(() => new ToolsDeploymentForm(false)); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
             var footer=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=new Padding(5,0,5,0),Padding=new Padding(0,12,0,12)};
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,190));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,190));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            var bundle=Button("Скачать комплект",false);bundle.Click+=delegate{OpenModule(()=>new BundleDownloadForm());};footer.Controls.Add(bundle,0,0);
-            var guide=Button("Инструкция",false);guide.AccessibleName="Открыть инструкцию";guide.Click+=delegate{ModuleNavigation.ShowDialog(this,()=>new UserGuideForm());SetTheme(ThemePreference.LoadDark(),false);};footer.Controls.Add(guide,2,0);
-            var about=Button("О программе",false);about.Margin=Padding.Empty;about.Click+=delegate{using(var dialog=new AboutDialog(Colors,Icon))dialog.ShowDialog(this);};footer.Controls.Add(about,3,0);
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,54));
+            for (int i = 0; i < 3; i++) footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));
+            footer.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+            var about=Button("ⓘ",false);about.AccessibleName="О программе";Describe(about,about.AccessibleName);
+            about.Font=new Font(Font.FontFamily,13,FontStyle.Bold);
+            about.Click += delegate { ModuleNavigation.ShowOwnedAsync(this, new AboutDialog(Colors, Icon)); };
+            footer.Controls.Add(about,0,0);
+            var guide=Button("Инструкция",false);
+            var bundle=Button("Скачать комплект",false);
+            var exit=Button("Закрыть программу",false);
+            bool layingOutFooter = false;
+            int lastFooterWidth = -1, lastButtonHeight = -1;
+            footer.Layout += delegate
+            {
+                if (layingOutFooter) return;
+                layingOutFooter = true;
+                try
+                {
+                    float scale = body.RowStyles[3].Height / 68F;
+                    int height = Math.Min(footer.DisplayRectangle.Height, (int)Math.Round(ModuleNavigation.FooterButtonHeight * scale));
+                    int footerWidth = footer.ClientSize.Width - footer.Padding.Horizontal;
+                    if (height <= 0 || (footerWidth == lastFooterWidth && height == lastButtonHeight)) return;
+                    lastFooterWidth = footerWidth; lastButtonHeight = height;
+                    int available = footerWidth - height;
+                    int gap = Math.Max(1, (int)Math.Round(10F * scale));
+                    int width = Math.Max(1, (available - gap * 3) / 3);
+                    int remainder = Math.Max(0, available - width * 3 - gap * 3);
+                    int[] widths = { height + gap + (remainder > 0 ? 1 : 0),
+                        width + gap + (remainder > 1 ? 1 : 0), width + gap, width };
+                    Button[] buttons = { about, guide, bundle, exit };
+                    for (int i = 0; i < widths.Length; i++)
+                    {
+                        var button = buttons[i];
+                        var size = new Size(i == 0 ? height : width, height);
+                        var margin = new Padding(0, 0, widths[i] - size.Width, 0);
+                        if (button.Dock != DockStyle.None) { button.Dock = DockStyle.None; button.Anchor = AnchorStyles.Left; }
+                        if (button.Margin != margin) button.Margin = margin;
+                        if (button.Size != size) button.Size = size;
+                        var column = footer.ColumnStyles[i];
+                        if (column.SizeType != SizeType.Absolute || column.Width != widths[i])
+                        {
+                            column.SizeType = SizeType.Absolute;
+                            column.Width = widths[i];
+                        }
+                    }
+                }
+                finally { layingOutFooter = false; }
+            };
+            guide.AccessibleName="Открыть инструкцию";guide.Click+=async delegate{using(var dialog=new UserGuideForm())await ModuleNavigation.ShowOwnedAsync(this,dialog,false);if(!IsDisposed)SetTheme(ThemePreference.LoadDark(),false);};footer.Controls.Add(guide,1,0);
+            bundle.Click+=delegate{OpenModule(()=>new BundleDownloadForm());};footer.Controls.Add(bundle,2,0);
+            exit.Margin=Padding.Empty;exit.Click+=delegate{Close();};footer.Controls.Add(exit,3,0);
             var lastRow = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             lastRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             lastRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             lastRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            lastRow.Controls.Add(ModuleCard("Первичные системные настройки", "Политики паролей, режим администратора, брандмауэр и Defender", "Открыть настройки", delegate { OpenModule(() => new InitialSystemSettingsForm()); }),0,0);
-            lastRow.Controls.Add(ModuleCard("Логи программ BARS", "Логи клиентских программ BARS.\r\nВыбор приложения или папки", "Логи программ BARS", delegate { OpenModule(() => new ApplicationLogsForm()); }), 1, 0);
+            lastRow.Controls.Add(ModuleCard("Первичные системные настройки", "Настройка политик и защиты Windows.\r\nПрава на папки и настройка режима киоска для КСО.", "Открыть настройки", delegate { OpenModule(() => new InitialSystemSettingsForm()); }),0,0);
+            lastRow.Controls.Add(ModuleCard("Логи программ BARS", "Удобный сбор логов для модулей Bars.", "Сбор логов", delegate { OpenModule(() => new ApplicationLogsForm()); }), 1, 0);
             body.Controls.Add(lastRow, 0, 2);
             body.Controls.Add(footer, 0, 3);
             Root.Controls.Add(body, 0, 1);
@@ -171,8 +220,8 @@ namespace ServiceTool
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             // Compact heading/action rows leave two full description lines visible.
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            var heading = new Label { Text = title, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = Padding.Empty }; heading.Font = new Font("Segoe UI", 13, FontStyle.Bold); layout.Controls.Add(heading, 0, 0);
-            var detail = new Label { Text = description, Tag = "muted", Dock = DockStyle.Fill, Margin = Padding.Empty }; detail.TextAlign = ContentAlignment.MiddleCenter; detail.AutoEllipsis = false; layout.Controls.Add(detail, 0, 1);
+            var heading = new InheritedThemeLabel { Text = title.ToUpperInvariant(), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = Padding.Empty }; heading.Font = new Font("Segoe UI", 13, FontStyle.Bold); layout.Controls.Add(heading, 0, 0);
+            var detail = new InheritedThemeLabel { Text = description, Tag = "muted", Dock = DockStyle.Fill, Margin = Padding.Empty }; detail.TextAlign = ContentAlignment.MiddleCenter; detail.AutoEllipsis = false; layout.Controls.Add(detail, 0, 1);
             BrandButton open = Button(action, true); open.Margin = new Padding(0, 0, 0, 0); open.Dock = DockStyle.None; open.Anchor = AnchorStyles.Bottom; open.Size = new Size(280, 50); open.Click += click;
             layout.Controls.Add(open, 0, 2);layout.Layout+=delegate{int width=Math.Max(1,Math.Min((int)Math.Round(280F*open.Height/50F),layout.ClientSize.Width));if(open.Width!=width)open.Width=width;}; card.Controls.Add(layout); return card;
         }

@@ -12,7 +12,7 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal sealed class LibraryManagerForm : ManagerModuleForm
+    internal sealed class LibraryManagerForm : ManagerModuleForm, IModuleOperation
     {
         private readonly LibraryGridScrollBar gridScroll = new LibraryGridScrollBar();
         private readonly ServiceGrid grid = new ServiceGrid();
@@ -52,22 +52,24 @@ namespace ServiceTool
             if (!preview)
             {
                 try { if (File.Exists(LibraryCatalog.CachePath)) LibraryCatalog.Load(LibraryCatalog.CachePath); } catch (Exception ex) { sourceError = "Не удалось прочитать сохранённый каталог: " + ex.Message; }
-                source = LibrarySource.AutoDetect(AppDomain.CurrentDomain.BaseDirectory);
+                source = LibrarySource.AutoDetect(BundleFolders.ExecutableDirectory);
                 if (source == null)
                 {
-                    try { string path = ApplicationStorage.FilePath("library-source.txt"); if (File.Exists(path) && Directory.Exists(File.ReadAllText(path).Trim())) source = File.ReadAllText(path).Trim(); } catch (Exception) { }
+                    try { string path = ApplicationStorage.FilePath("library-source.txt"); if (File.Exists(path)) { string saved = File.ReadAllText(path).Trim(); if (Directory.Exists(saved) && !Path.GetFileName(saved.TrimEnd(Path.DirectorySeparatorChar)).Equals("Библиотеки", StringComparison.OrdinalIgnoreCase)) source = LibrarySource.NormalizeRoot(saved); } } catch (Exception) { }
                 }
             }
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            body.RowStyles.Add(new RowStyle(SizeType.Absolute, 130)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-            var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(ModuleHeadingStyle.Left,ModuleHeadingStyle.Top,12,12), Margin = new Padding(0, 0, 0, 12) };
+            const int titleHeight = 32, monitorRowHeight = 38, sourceRowHeight = 36, cardBottom = 12, cardGap = 12;
+            int statusHeight = titleHeight + monitorRowHeight + sourceRowHeight + ModuleHeadingStyle.Top + cardBottom + cardGap;
+            body.RowStyles.Add(new RowStyle(SizeType.Absolute, statusHeight)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 112)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 88)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+            var status = new Card { Dock = DockStyle.Fill, Padding = new Padding(ModuleHeadingStyle.Left,ModuleHeadingStyle.Top,12,cardBottom), Margin = new Padding(0, 0, 0, cardGap) };
             var statusLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); statusLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
-            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
+            statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, titleHeight)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, monitorRowHeight)); statusLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, sourceRowHeight));
             Label title = ModuleHeading("Менеджер системных библиотек Windows"); statusLayout.Controls.Add(title, 0, 0); statusLayout.SetColumnSpan(title, 2);
-            monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.None; monitor.Anchor = AnchorStyles.Right | AnchorStyles.Bottom; monitor.Checked = true; monitor.Margin = Padding.Empty; monitor.Height = 28;
-            monitor.CheckedChanged += delegate { timer.Enabled = Visible && monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 2); statusLayout.SetRowSpan(monitor, 2);
+            monitor.Text = "Проверять каждый 30с."; monitor.AccessibleName = "Проверять каждые 30 секунд"; monitor.Dock = DockStyle.None; monitor.Anchor = AnchorStyles.Right | AnchorStyles.Bottom; monitor.Checked = true; monitor.Margin = new Padding(0, 0, 0, 10); monitor.Height = 28;
+            monitor.CheckedChanged += delegate { timer.Enabled = Visible && monitor.Checked && !preview; }; statusLayout.Controls.Add(monitor, 1, 2);
             statusLayout.Layout += delegate
             {
                 using (Graphics graphics = monitor.CreateGraphics())
@@ -80,7 +82,34 @@ namespace ServiceTool
                 }
             };
             summary = Label("Проверяем установленные компоненты…", true); ((FlushLabel)title).InkLeft=g=>TextInkMetrics.Left(summary.Text,summary.Font,g,false); statusLayout.Controls.Add(summary, 0, 2);
-            sourceLabel = new FlushLabel {Text="",Tag="muted",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true,InkLeft=g=>TextInkMetrics.Left(summary.Text,summary.Font,g,false)}; sourceLabel.Font = new Font("Segoe UI", 9); statusLayout.Controls.Add(sourceLabel, 0, 3); status.Controls.Add(statusLayout);
+            sourceLabel = new FlushLabel {Text="",Tag="muted",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty,AutoEllipsis=true,InkLeft=g=>TextInkMetrics.Left(summary.Text,summary.Font,g,false)}; sourceLabel.Font = new Font("Segoe UI", 9); statusLayout.Controls.Add(sourceLabel, 0, 3);
+            var chooseSource = Button("Выбрать папку…", false);
+            chooseSource.Margin = new Padding(0, 1, 0, 0);
+            chooseSource.Click += async delegate
+            {
+                if (checking || installing || preview) return;
+                using (var dialog = new FolderBrowserDialog { Description = "Выбери папку комплекта или папку с установщиками", ShowNewFolderButton = false })
+                {
+                    if (Directory.Exists(source)) dialog.SelectedPath = source;
+                    if (ScopedDialogs.Show(this, dialog) != DialogResult.OK) return;
+                    try
+                    {
+                        string selected = LibrarySource.NormalizeRoot(dialog.SelectedPath);
+                        Directory.CreateDirectory(ApplicationStorage.DirectoryPath);
+                        File.WriteAllText(ApplicationStorage.FilePath("library-source.txt"), selected, Encoding.UTF8);
+                        if (Path.GetFileName(selected).Equals("_libraries", StringComparison.OrdinalIgnoreCase))
+                            BundlePreferences.Save(BundleFolders.BundleRoot(selected));
+                        source = selected;
+                        UpdateSource();
+                    }
+                    catch (Exception ex) { Log("Не удалось выбрать папку установщиков. " + ex.Message); return; }
+                }
+                await RefreshAsync(true);
+            };
+
+
+            statusLayout.Controls.Add(chooseSource, 1, 3);
+            status.Controls.Add(statusLayout);
             body.Controls.Add(status, 0, 0);
             var tableCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 12), Margin = new Padding(0, 0, 0, 12) };
             var tableLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
@@ -95,7 +124,7 @@ namespace ServiceTool
             stop.Click += delegate { if (installing && !cancelRequested && ConfirmCancel(false)) RequestCancellation(false); };
             actions.Controls.Add(install, 0, 0); actions.Controls.Add(select, 1, 0); actions.Controls.Add(selectAll, 2, 0); actions.Controls.Add(refresh, 3, 0); actions.Controls.Add(stop, 5, 0); tableLayout.Controls.Add(actions, 0, 1);
             var network=Button("Проверить обновления .NET",false);network.Margin=new Padding(0,0,10,0);
-            network.Click+=async delegate{if(installing||checking)return;bool wasRunning=timer.Enabled;timer.Stop();try{using(var dialog=new DotNetUpdatesForm(()=>{if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){using(var folder=new FolderBrowserDialog()){folder.Description="Выбери папку Библиотеки";if(folder.ShowDialog(this)!=DialogResult.OK)return null;source=LibrarySource.NormalizeRoot(folder.SelectedPath);UpdateSource();}}return source;},source)){dialog.ShowDialog(this);if(dialog.FilesChanged)await RefreshAsync(true);}}finally{timer.Enabled=wasRunning&&Visible&&!preview&&!installing;}};
+            network.Click+=async delegate{if(installing||checking)return;bool wasRunning=timer.Enabled;timer.Stop();try{using(var dialog=new DotNetUpdatesForm(()=>{if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){using(var folder=new FolderBrowserDialog()){folder.Description="Выбери папку комплекта или папку с установщиками";if(ScopedDialogs.Show(Form.ActiveForm ?? this, folder)!=DialogResult.OK)return null;source=LibrarySource.NormalizeRoot(folder.SelectedPath);UpdateSource();}}return source;},source)){await ModuleNavigation.ShowOwnedAsync(this, dialog);if(dialog.FilesChanged && !ModuleNavigation.ExitConfirmed)await RefreshAsync(true);}}finally{if(!IsDisposed&&!Disposing)timer.Enabled=wasRunning&&Visible&&!preview&&!installing;}};
             actions.Controls.Add(network,4,0);ModuleNavigation.EqualButtons(actions,gridScroll);
             ConfigureGrid(); var gridSlot = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             gridScroll.LimitTrackToWholeRows=true;gridScroll.UseCardBackground=true; gridScroll.Dock = DockStyle.Right; gridScroll.Width = 14; gridScroll.Bind(grid); gridSlot.Controls.Add(grid); gridSlot.Controls.Add(gridScroll); tableLayout.Controls.Add(gridSlot, 0, 2); tableCard.Controls.Add(tableLayout); body.Controls.Add(tableCard, 0, 1);
@@ -110,7 +139,8 @@ namespace ServiceTool
             activity = Label("Папка установщиков не нужна для проверки системы", true); activity.Font = new Font("Segoe UI", 9); footer.Controls.Add(activity, 0, 0); footer.SetColumnSpan(activity, 1);footer.SetRow(activity,1);
             report = Button("Открыть журнал", false); ModuleNavigation.Configure(report); report.Width=180; report.Margin=new Padding(0,0,10,0); report.Click += delegate { OpenJournal(); }; footer.Controls.Add(report, 1, 1);
             BrandButton back = Button("В меню", false); ModuleNavigation.Configure(back); back.Click += delegate { if (ModuleNavigation.ReturnToHub()) return; MenuRequested = true; Close(); }; footer.Controls.Add(back, 4, 1);
-            windowsComponents = Button("Компоненты", false); ModuleNavigation.Configure(windowsComponents); windowsComponents.Margin=new Padding(0,0,10,0); windowsComponents.Click += delegate { OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
+            windowsComponents = Button("Компоненты", false); ModuleNavigation.Configure(windowsComponents); windowsComponents.Margin=new Padding(0,0,10,0); windowsComponents.Click += async delegate { await OpenWindowsComponents(); }; footer.Controls.Add(windowsComponents, 2, 1);
+            ModuleNavigation.AddCloseButton(footer, back, Button("Закрыть", false), 1);
             body.Controls.Add(footer, 0, 4);
             body.MinimumSize = new Size(0, 500);
             Root.AutoScroll = true;
@@ -120,7 +150,6 @@ namespace ServiceTool
             Shown += async delegate
             {
                 if (preview) { FillPreview(); return; }
-                if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){source=BundleDownloadForm.Offer(this,source);UpdateSource();}
                 if (!String.IsNullOrEmpty(sourceError)) Log(sourceError);
                 await RefreshAsync(true); if (!IsDisposed && !Disposing) timer.Enabled = Visible && monitor.Checked;
             };
@@ -132,14 +161,15 @@ namespace ServiceTool
                     if (closeAfterCancel && e.CloseReason != CloseReason.WindowsShutDown && e.CloseReason != CloseReason.TaskManagerClosing) return;
                     if (e.CloseReason == CloseReason.WindowsShutDown || e.CloseReason == CloseReason.TaskManagerClosing)
                     { RequestCancellation(true); e.Cancel = false; return; }
-                    if (cancelRequested || ConfirmCancel(true)) RequestCancellation(true); else MenuRequested = false;
+                    if (ModuleNavigation.ExitConfirmed || cancelRequested || ConfirmCancel(true)) RequestCancellation(true); else MenuRequested = false;
                 }
                 else timer.Stop();
             };
         }
+        string IModuleOperation.ActiveOperation { get { return installing ? "Системные библиотеки: операция с компонентами" : null; } }
         private bool ConfirmCancel(bool closing)
         {
-            return (confirmCancellation == null ? BrandMessageBox.Show(this, (closing ? (MenuRequested ? "Отменить операцию и вернуться в меню?\r\n\r\n" : "Отменить операцию и закрыть программу?\r\n\r\n") : "") + CancelWarning,
+            return (confirmCancellation == null ? BrandMessageBox.Show(this, (closing ? (MenuRequested ? "Отменить операцию и вернуться в меню?\r\n\r\n" : "Отменить операцию и закрыть окно?\r\n\r\n") : "") + CancelWarning,
                 "Отмена операции", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) : confirmCancellation(closing)) == DialogResult.Yes;
         }
         internal void RequestCancellation(bool closing)
@@ -161,15 +191,21 @@ namespace ServiceTool
             pendingRestart |= required;
             UpdateRestartAvailability();
         }
-        private void OpenWindowsComponents()
+        private async Task OpenWindowsComponents()
         {
             if(installing || checking) return;
             bool wasRunning=timer.Enabled; timer.Stop();
             try
             {
-                var form=ModuleNavigation.ShowDialog(this, () => new WindowsFeaturesForm(preview, true));
-                RememberWindowsRestart(form.RestartRequired);
-                SetTheme(ThemePreference.LoadDark(),false);
+                using (var form = new WindowsFeaturesForm(preview, true))
+                {
+                    await ModuleNavigation.ShowOwnedAsync(this, form);
+                    if (!IsDisposed && !ModuleNavigation.ExitConfirmed)
+                    {
+                        RememberWindowsRestart(form.RestartRequired);
+                        SetTheme(ThemePreference.LoadDark(), false);
+                    }
+                }
             }
             finally { if(!IsDisposed && !Disposing) { UpdateRestartAvailability(); timer.Enabled=wasRunning && monitor.Checked && !preview; } }
         }
@@ -241,7 +277,7 @@ namespace ServiceTool
         }
         private void UpdateSource()
         {
-            sourceLabel.Text = String.IsNullOrEmpty(source) ? "Папка не выбрана. Запросим её только при начале установки." : "Папка библиотек: " + source;
+            sourceLabel.Text = String.IsNullOrEmpty(source) ? "Папка установщиков не выбрана. Проверка Windows доступна." : "Папка библиотек: " + source;
         }
         private void Log(string text)
         {
@@ -322,10 +358,10 @@ namespace ServiceTool
             {
                 if (refreshSource && !String.IsNullOrEmpty(source) && Directory.Exists(source))
                 {
-                    try { await ReadSourceAsync(); }
+                    try { using (PerformanceTrace.Begin("libraries.source")) await ReadSourceAsync(); }
                     catch (Exception ex) { Log("Источник не обновлён; проверяем систему по сохранённому каталогу: " + ex.Message); }
                 }
-                List<LibraryCheck> found = await Task.Run(() => LibraryDetection.Scan((done,total,name)=>{if(showProgress){transfer.SetWork(total);transfer.OperationReporter("Проверен компонент: "+name);transfer.CompleteStep();}}));
+                List<LibraryCheck> found = await Task.Run(() => PerformanceTrace.Measure("libraries.scan.worker", () => LibraryDetection.Scan((done,total,name)=>{if(showProgress){transfer.SetWork(total);transfer.OperationReporter("Проверен компонент: "+name);transfer.CompleteStep();}})));
                 if (IsDisposed || Disposing) return;
                 checks.Clear(); foreach (LibraryCheck check in found) checks[check.Package.Id] = check;
                 if (firstScan) {
@@ -370,18 +406,18 @@ namespace ServiceTool
             if (targets.Any(LibraryVersions.CanRemove))
             {
                 using (var dialog = new LibraryActionDialog(Colors, Icon, targets))
-                { if (dialog.ShowDialog(this) != DialogResult.OK) return; operation = dialog.Operation; }
+                { if (await ModuleNavigation.ShowOwnedAsync(this, dialog) != DialogResult.OK) return; operation = dialog.Operation; }
                 if (operation == LibraryOperation.Reinstall && targets.Any(c => c.Relation == LibraryRelation.Newer || c.HasNewerParts))
                 { activity.Text = "Обнови файлы установщиков: переустановка более старой версией заблокирована"; return; }
             }
             var targetIds = new HashSet<string>(targets.Select(c => c.Package.Id));
             // A library root is also required for removal journals.
             {
-            if (String.IsNullOrEmpty(source) || !Directory.Exists(source)) source = LibrarySource.AutoDetect(AppDomain.CurrentDomain.BaseDirectory);
+            if (String.IsNullOrEmpty(source) || !Directory.Exists(source)) source = LibrarySource.AutoDetect(BundleFolders.ExecutableDirectory);
             if (String.IsNullOrEmpty(source) || !Directory.Exists(source))
             {
-                using (var dialog = new FolderBrowserDialog { Description = "Выбери папку «Библиотеки» с установщиками BARS", ShowNewFolderButton = false })
-                { if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                using (var dialog = new FolderBrowserDialog { Description = "Выбери папку комплекта или папку с установщиками BARS", ShowNewFolderButton = false })
+                { if (ScopedDialogs.Show(this, dialog) != DialogResult.OK) return;
                     try { source = LibrarySource.NormalizeRoot(dialog.SelectedPath); }
                     catch (Exception ex) { Log("Не удалось выбрать папку: " + ex.Message); return; } }
             }
@@ -495,7 +531,7 @@ namespace ServiceTool
                 if (String.IsNullOrEmpty(source) || !Directory.Exists(source))
                 {
                     using (var dialog = new FolderBrowserDialog { Description = "Выбери папку «Библиотеки», в которой хранятся журналы", ShowNewFolderButton = false })
-                    { if (dialog.ShowDialog(this) != DialogResult.OK) return; source = LibrarySource.NormalizeRoot(dialog.SelectedPath); UpdateSource(); }
+                    { if (ScopedDialogs.Show(this, dialog) != DialogResult.OK) return; source = LibrarySource.NormalizeRoot(dialog.SelectedPath); UpdateSource(); }
                 }
                 string folder = LibraryJournal.Folder(source); Directory.CreateDirectory(folder);
                 Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });

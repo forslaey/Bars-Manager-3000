@@ -175,7 +175,10 @@ namespace ServiceTool
                 Set(form, "confirmBusyClose", new Func<DialogResult>(delegate { questions++; return DialogResult.Yes; }));
                 args = new FormClosingEventArgs(CloseReason.UserClosing, false);
                 Call(form, "OnFormClosing", form, args);
-                Check(questions == 2 && !args.Cancel && Field<bool>(form, "closing"), "Yes permits immediate exit without stopping installer");
+                Check(questions == 2 && args.Cancel && Field<bool>(form, "closeAfterServiceAction") && !Field<bool>(form, "closing"), "Yes defers closing until the service operation completes");
+                args = new FormClosingEventArgs(CloseReason.UserClosing, false);
+                Call(form, "OnFormClosing", form, args);
+                Check(questions == 2 && args.Cancel, "Deferred close does not prompt again");
                 Check(MainForm.BusyCloseMessage.Contains("оснастке") && MainForm.BusyCloseMessage.Contains("установки, удаления"), "Prompt explicitly tells user to check service procedure in Windows");
                 Set(form, "operationRunning", false);
             }

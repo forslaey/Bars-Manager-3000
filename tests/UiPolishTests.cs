@@ -43,7 +43,7 @@ namespace ServiceTool
                 catch (Exception ex) { failure = ex; }
                 finally { dialog.Close(); }
             });
-            Button(owner, "О программе").PerformClick();
+            Children(owner).OfType<Button>().Single(b => b.AccessibleName == "О программе").PerformClick();
             if (failure != null) throw failure;
         }
         [STAThread] public static int Main()

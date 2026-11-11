@@ -84,6 +84,7 @@ namespace ServiceTool
                 AccessibleName = "Закрыть окно о программе"
             };
             actions.Controls.Add(close, 1, 0);
+            ModuleNavigation.StandardFooter(actions, close);
             content.Controls.Add(actions, 0, 5);
             Controls.Add(content);
             AcceptButton = close;

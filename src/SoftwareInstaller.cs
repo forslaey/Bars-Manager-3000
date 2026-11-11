@@ -156,6 +156,19 @@ namespace ServiceTool
             return null;
         }
 
+        internal static string RemoteAccessError(int code)
+        {
+            switch (code)
+            {
+                case 9010:
+                    return "Служба программы удалённого доступа не запущена. Запусти программу, проверь её службу в Windows и повтори настройку.";
+                case 9011:
+                    return "Программа отклонила пароль. Возможно, такой пароль уже настроен. Проверь подключение с текущим паролем или задай другой.";
+                default:
+                    return "Программа не подтвердила настройку удалённого доступа. Код " + code + ".";
+            }
+        }
+
         internal static void ConfigureRemote(string id,string password,Action<string,string> execute)
         {
             if(id!="anydesk" && id!="rudesktop") throw new InvalidDataException("Неизвестный клиент удалённого доступа");
@@ -186,7 +199,7 @@ namespace ServiceTool
                         if(LibraryCancellation.Requested || watch.ElapsedMilliseconds>30000) {try{process.Kill();}catch(InvalidOperationException){} LibraryCancellation.Check(); throw new TimeoutException("Настройка доступа превысила время ожидания. Проверь её вручную");}
                     }
                     try{process.CancelOutputRead();process.CancelErrorRead();}catch(InvalidOperationException){}
-                    if(process.ExitCode!=0) throw new InvalidOperationException("Клиент не подтвердил настройку доступа. Код "+process.ExitCode);
+                    if(process.ExitCode!=0) throw new InvalidOperationException(RemoteAccessError(process.ExitCode));
                 }
             }
             catch(OperationCanceledException){throw;}

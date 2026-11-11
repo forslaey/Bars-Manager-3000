@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -18,12 +18,11 @@ namespace ServiceTool {
    File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"query-all.ps1"),InitialSystemSettings.QueryScript(),new System.Text.UTF8Encoding(true));
    Check(InitialSystemSettings.AdminPolicies.Length==14,"All 14 screenshot policies");Check(InitialSystemSettings.PasswordPolicies.Length==8,"All 8 password policies");
    Check(InitialSystemSettings.AdminPolicies.Single(v=>v.Name=="TypeOfAdminApprovalMode").Bars==1,"Legacy mode has value 1, not 0");
-   foreach(string group in new[]{"admin","passwords","firewall","defender","smartscreen"})foreach(string mode in new[]{"query","apply","defaults"}){
+   foreach(string group in new[]{"admin","passwords","firewall","smartscreen"})foreach(string mode in new[]{"query","apply","defaults"}){
     string script=InitialSystemSettings.Script(mode,group);File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,mode+"-"+group+".ps1"),script,new System.Text.UTF8Encoding(true));
     Check(!script.Contains("Stop-Service")&&!script.Contains("shutdown")&&!script.Contains("Add-LocalGroupMember"),"No implicit service stopping, restart, membership changes");
     if(mode=="query")Check(!script.Contains("Set-MpPreference")&&!script.Contains("Set-NetFirewallProfile")&&!script.Contains("/configure"),"Query does not apply settings");
     if(group=="firewall"&&mode!="query")Check(script.Contains("Domain,Private,Public")&&script.Contains("ActiveStore"),"All profiles checked effectively");
-    if(group=="defender"&&mode!="query")Check(script.Contains("RealTimeProtectionEnabled -ne")&& !script.Contains("DisableTamperProtection"),"Defender verified without tamper bypass");
    }
    foreach(string mode in new[]{"query","apply"})File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,mode+"-folders.ps1"),InitialSystemSettings.Script(mode,"folders"),new System.Text.UTF8Encoding(true));
    string folderScript=InitialSystemSettings.Script("apply","folders");Check(folderScript.Contains("S-1-5-32-545")&&folderScript.Contains("FullControl")&&folderScript.Contains("ReparsePoint"),"Users full control and reparse point exclusion");

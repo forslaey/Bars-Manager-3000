@@ -34,7 +34,7 @@ ExecutionPolicy Bypass действует только на этот запус�
 ТЕКУЩАЯ ЛОКАЛЬНАЯ СБОРКА: 2.3.38 — без подписи. Подписанный опубликованный выпуск 2.3.13 остаётся отдельным.
 Новые функции, интерфейс и границы проверок: RELEASE-2.3.38.md.
 Из C:\ServiceManager3000:
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1 -OutputDirectory .\bin
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Build-OneFileRust.ps1 -OutputDirectory .\bin
 Результат: C:\ServiceManager3000\bin\Bars Manager 3000 2.3.38.exe
 Тесты не запускают реальные установщики. Дополнительный -UtilitySmoke требует уже повышенного сеанса и читает компоненты Windows, проверяет временные копии утилит.
 
@@ -43,7 +43,7 @@ BARS Manager 3000 — сборка 2.1.1
 1. Открой PowerShell в папке проекта (обычно C:\ServiceManager3000).
 2. Обычная сборка БЕЗ подписи:
 
-.\Build.ps1 -OutputDirectory .\bin
+.\tools\Build-OneFileRust.ps1 -OutputDirectory .\bin
 
 Результат: bin\Bars Manager 3000 2.3.38.exe. Это общий лаунчер с пятью карточками; Компоненты Windows открываются из менеджера библиотек.
 Встроенные помощники тоже будут без подписи. Не добавляй -Sign, если подпись не нужна.
@@ -64,7 +64,7 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
 4. ТОЛЬКО если решил подписать сборку прежним сертификатом с закрытым ключом:
 
-.\Build.ps1 -Sign -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB' -OutputDirectory '.\signed'
+.\tools\Build-OneFileRust.ps1 -Sign -CertificateThumbprint '5E05A9087A2BA3FF1186A72825CCA1B40B73B7EB' -OutputDirectory '.\signed'
 
 Результат: signed\Bars Manager 3000 2.3.38.exe. Сначала подписываются оба встроенных
 помощника, затем общий EXE. Без прежнего закрытого ключа эта команда не сработает.

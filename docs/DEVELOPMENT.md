@@ -11,7 +11,7 @@ C# / WinForms. Текущее экспериментальное направл�
 Из корня проекта в Windows PowerShell:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1 -OutputDirectory .\bin
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Build-OneFileRust.ps1 -OutputDirectory .\bin
 ```
 
 `Bypass` действует только на запускаемый процесс. Сборка по умолчанию без подписи. Reference assemblies подготавливаются скриптом автоматически; при первом запуске может требоваться сеть.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -17,8 +17,8 @@ namespace ServiceTool
         static void Capture(Form form,string name){using(var image=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,name+".png"));}}
         [STAThread] static int Main(){try{
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
-            var state=new Dictionary<string,string>{{"admin.EnableLUA","0"},{"firewall.Domain","True"},{"firewall.Private","False"},{"firewall.Public","True"},{"defender.RealTimeProtection","False"},{"folders.Count","1"},{"folders.Checked","7"},{"folders.Restricted","0"},{"folders.Errors","0"},{"folders.Skipped","0"}};
-            Check(SystemSettingsPresentation.Status("admin",state)=="Отключено","Exact UAC state");Check(SystemSettingsPresentation.Status("firewall",state).Contains("Частный: отключено"),"Russian firewall state");Check(SystemSettingsPresentation.Status("defender",state).EndsWith("отключена"),"Russian defender state");Check(SystemSettingsPresentation.Status("folders",state).StartsWith("Полные права на папки выданы\n"),"Verified recursive permissions status");state["folders.Restricted"]="1";Check(!SystemSettingsPresentation.Status("folders",state).StartsWith("Полные права на папки выданы\n"),"Partial grants never claim full access");state.Remove("folders.Errors");Check(!SystemSettingsPresentation.Status("folders",state).StartsWith("Полные права на папки выданы\n"),"Missing audit field never claims full access");
+            var state=new Dictionary<string,string>{{"admin.EnableLUA","0"},{"firewall.Domain","True"},{"firewall.Private","False"},{"firewall.Public","True"},{"folders.Count","1"},{"folders.Checked","7"},{"folders.Restricted","0"},{"folders.Errors","0"},{"folders.Skipped","0"}};
+            Check(SystemSettingsPresentation.Status("admin",state)=="Отключено","Exact UAC state");Check(SystemSettingsPresentation.Status("firewall",state).Contains("Частный: отключено"),"Russian firewall state");Check(SystemSettingsPresentation.Status("folders",state).StartsWith("Полные права на папки выданы\n"),"Verified recursive permissions status");state["folders.Restricted"]="1";Check(!SystemSettingsPresentation.Status("folders",state).StartsWith("Полные права на папки выданы\n"),"Partial grants never claim full access");state.Remove("folders.Errors");Check(!SystemSettingsPresentation.Status("folders",state).StartsWith("Полные права на папки выданы\n"),"Missing audit field never claims full access");
             foreach(var p in InitialSystemSettings.PasswordPolicies)state["passwords."+p.Name]=InitialSystemSettings.Value(p.Bars);
             Check(SystemSettingsPresentation.Status("passwords",state).StartsWith("Политики BARS применены"),"Password profile compared with actual values");state["passwords.MinimumPasswordLength"]="8";Check(SystemSettingsPresentation.Status("passwords",state).Contains("отличаются"),"Different password policy detected");
             Check(MainForm.ServiceActionMessage(new ServiceEntry{Name="Fixture",DisplayName="Тестовая служба"},"startup","auto-delayed").Contains("с задержкой"),"Russian service action");

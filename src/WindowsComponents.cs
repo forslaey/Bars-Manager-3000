@@ -72,7 +72,7 @@ namespace ServiceTool
         {
             // Only a small bootstrap goes on the command line. The real script
             // travels as ASCII base64 on stdin, without a temporary script file.
-            const string bootstrap = "$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false);$ErrorActionPreference='Stop';try{$s=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String([Console]::In.ReadToEnd())); & ([scriptblock]::Create($s))}catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}";
+            const string bootstrap = "$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false);$ErrorActionPreference='Stop';try{$inputReader=New-Object IO.StreamReader([Console]::OpenStandardInput(),[Text.Encoding]::UTF8,$true);$raw=$inputReader.ReadToEnd();$raw=$raw.Trim([char[]]@([char]0xFEFF,[char]0xFFFE,[char]0,[char]13,[char]10,[char]32));$bytes=[Convert]::FromBase64String($raw);$s=[Text.Encoding]::Unicode.GetString($bytes); & ([scriptblock]::Create($s))}catch{[Console]::Error.WriteLine($_.Exception.Message);exit 1}";
             var start = new ProcessStartInfo(PowerShellPath, "-NoLogo -NoProfile -NonInteractive -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(bootstrap))) {
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
                 RedirectStandardInput = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
@@ -81,7 +81,10 @@ namespace ServiceTool
             using (var process = Process.Start(start))
             {
                 var output = process.StandardOutput.ReadToEndAsync(); var errors = process.StandardError.ReadToEndAsync();
-                process.StandardInput.Write(Convert.ToBase64String(Encoding.Unicode.GetBytes("[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); $ProgressPreference='SilentlyContinue'; " + script)));
+                process.StandardInput.Flush();
+                byte[] payload=Encoding.ASCII.GetBytes(Convert.ToBase64String(Encoding.Unicode.GetBytes("[Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false); $ProgressPreference='SilentlyContinue'; " + script)));
+                process.StandardInput.BaseStream.Write(payload,0,payload.Length);
+                process.StandardInput.BaseStream.Flush();
                 process.StandardInput.Close();
                 while (!process.WaitForExit(cancellableRead?100:1000))
                 {

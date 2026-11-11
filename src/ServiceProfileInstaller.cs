@@ -1,4 +1,5 @@
-﻿using System;
+using System.Threading;
+using System;
 using System.Collections;
 using System.ComponentModel;
 using System.Configuration.Install;
@@ -38,7 +39,7 @@ namespace ServiceTool
 
         // Call on a background thread. The password and target path travel only inside the
         // ACL-restricted pipe, not command arguments, environment variables or a temp file.
-        public static ProfileInstallResult Execute(string managerExe, ServiceInstallProfile profile, string password, bool uninstall)
+        public static ProfileInstallResult Execute(string managerExe, ServiceInstallProfile profile, string password, bool uninstall, CancellationToken cancellation = default(CancellationToken))
         {
             if (profile == null) throw new ArgumentNullException("profile");
             ServiceInstallProfile copy = profile.Clone(); copy.Validate();
@@ -60,7 +61,7 @@ namespace ServiceTool
                     IAsyncResult connection = pipe.BeginWaitForConnection(null, null);
                     using (connection.AsyncWaitHandle)
                     {
-                        if (!connection.AsyncWaitHandle.WaitOne(ConnectTimeout))
+                        if (!WaitForHandle(connection.AsyncWaitHandle, ConnectTimeout, cancellation))
                             throw new TimeoutException("Не удалось подключиться к процессу установки за 45 секунд. Повтори установку.");
                         pipe.EndWaitForConnection(connection);
                     }
@@ -68,9 +69,9 @@ namespace ServiceTool
                     if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out client) || client != (uint)process.Id)
                         throw new SecurityException("Подключился посторонний процесс; учётные данные не переданы.");
                     byte[] request = SerializeRequest(copy, uninstall ? null : password, uninstall);
-                    try { WriteFrame(pipe, request, IoTimeout); }
+                    try { WriteFrame(pipe, request, IoTimeout, cancellation); }
                     finally { Array.Clear(request, 0, request.Length); }
-                    byte[] response = ReadFrame(pipe, InstallTimeout);
+                    byte[] response = ReadFrame(pipe, InstallTimeout, cancellation);
                     try
                     {
                         using (BinaryReader reader = new BinaryReader(new MemoryStream(response, false), StrictUtf8))
@@ -79,7 +80,13 @@ namespace ServiceTool
                             int code = reader.ReadInt32();
                             string message = ReadText(reader, 12000);
                             if (reader.BaseStream.Position != reader.BaseStream.Length) throw new IOException("Некорректный ответ установщика.");
-                            if (!process.WaitForExit(IoTimeout)) throw new TimeoutException("Процесс установки не завершился. Обнови статус службы.");
+                            var elapsed = Stopwatch.StartNew();
+                            while (!process.WaitForExit(200))
+                            {
+                                cancellation.ThrowIfCancellationRequested();
+                                if (elapsed.ElapsedMilliseconds >= IoTimeout)
+                                    throw new TimeoutException("Процесс установки не завершился. Обнови статус службы.");
+                            }
                             return new ProfileInstallResult { ExitCode = code, Message = message };
                         }
                     }
@@ -182,7 +189,7 @@ namespace ServiceTool
             public bool Uninstall;
         }
 
-        internal static byte[] SerializeRequest(ServiceInstallProfile profile, string password, bool uninstall)
+        internal static byte[] SerializeRequest(ServiceInstallProfile profile, string password, bool uninstall, CancellationToken cancellation = default(CancellationToken))
         {
             using (MemoryStream memory = new MemoryStream())
             {
@@ -239,18 +246,26 @@ namespace ServiceTool
             finally { Array.Clear(bytes, 0, bytes.Length); }
         }
 
-        internal static byte[] ReadFrame(PipeStream pipe, int milliseconds)
+        private static bool WaitForHandle(WaitHandle handle, int timeout, CancellationToken cancellation)
+        {
+            if (!cancellation.CanBeCanceled) return handle.WaitOne(timeout);
+            int result = WaitHandle.WaitAny(new[] { cancellation.WaitHandle, handle }, timeout);
+            cancellation.ThrowIfCancellationRequested();
+            return result == 1;
+        }
+
+        internal static byte[] ReadFrame(PipeStream pipe, int milliseconds, CancellationToken cancellation = default(CancellationToken))
         {
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(milliseconds);
-            byte[] size = new byte[4]; ReadExact(pipe, size, deadline);
+            byte[] size = new byte[4]; ReadExact(pipe, size, deadline, cancellation);
             int count = BitConverter.ToInt32(size, 0);
             if (count < 0 || count > MaxMessageBytes) throw new InvalidDataException("Недопустимый размер сообщения установщика.");
             byte[] content = new byte[count];
-            try { ReadExact(pipe, content, deadline); return content; }
+            try { ReadExact(pipe, content, deadline, cancellation); return content; }
             catch { Array.Clear(content, 0, content.Length); throw; }
         }
 
-        private static void ReadExact(PipeStream pipe, byte[] bytes, DateTime deadline)
+        private static void ReadExact(PipeStream pipe, byte[] bytes, DateTime deadline, CancellationToken cancellation)
         {
             int offset = 0;
             while (offset < bytes.Length)
@@ -259,7 +274,7 @@ namespace ServiceTool
                 using (read.AsyncWaitHandle)
                 {
                     int remaining = (int)Math.Max(0, (deadline - DateTime.UtcNow).TotalMilliseconds);
-                    if (!read.AsyncWaitHandle.WaitOne(remaining)) throw new TimeoutException("Истекло время ожидания установщика. Обнови статус службы.");
+                    if (!WaitForHandle(read.AsyncWaitHandle, remaining, cancellation)) throw new TimeoutException("Истекло время ожидания установщика. Обнови статус службы.");
                     int count = pipe.EndRead(read);
                     if (count == 0) throw new EndOfStreamException("Установщик закрыл канал связи.");
                     offset += count;
@@ -267,7 +282,7 @@ namespace ServiceTool
             }
         }
 
-        internal static void WriteFrame(PipeStream pipe, byte[] bytes, int milliseconds)
+        internal static void WriteFrame(PipeStream pipe, byte[] bytes, int milliseconds, CancellationToken cancellation = default(CancellationToken))
         {
             if (bytes.Length > MaxMessageBytes) throw new InvalidDataException("Слишком большое сообщение установщика.");
             byte[] frame = new byte[bytes.Length + 4];
@@ -277,7 +292,7 @@ namespace ServiceTool
                 IAsyncResult write = pipe.BeginWrite(frame, 0, frame.Length, null, null);
                 using (write.AsyncWaitHandle)
                 {
-                    if (!write.AsyncWaitHandle.WaitOne(milliseconds)) throw new TimeoutException("Не удалось передать данные установщику за отведённое время.");
+                    if (!WaitForHandle(write.AsyncWaitHandle, milliseconds, cancellation)) throw new TimeoutException("Не удалось передать данные установщику за отведённое время.");
                     pipe.EndWrite(write);
                 }
             }
@@ -328,7 +343,7 @@ namespace ServiceTool
             }
         }
 
-        private static void InstallAssembly(ServiceInstallProfile profile, string password, bool uninstall)
+        private static void InstallAssembly(ServiceInstallProfile profile, string password, bool uninstall, CancellationToken cancellation = default(CancellationToken))
         {
             ReadManagedArchitecture(profile.ExecutablePath);
             Directory.SetCurrentDirectory(Path.GetDirectoryName(profile.ExecutablePath));

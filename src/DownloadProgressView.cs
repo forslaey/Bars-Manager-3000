@@ -29,14 +29,14 @@ namespace ServiceTool
         internal long OperationRevision {get{lock(sync)return operationId;}}
         internal void BeginOperation(string text,bool animated=true,int tasks=1)
         {
-            lock(sync){operationId++;operationRunning=true;operationAnimated=animated;workTotal=animated?Math.Max(1,tasks):0;workDone=0;workFraction=0;snapshot=WorkSnapshot(text);}
+            lock(sync){operationId++;operationRunning=true;operationAnimated=animated;workTotal=animated?Math.Max(0,tasks):0;workDone=0;workFraction=0;snapshot=WorkSnapshot(text);}
         }
         internal Action<string> OperationReporter {
             get { long id;lock(sync)id=operationId;return text=>{lock(sync){if(!operationRunning||id!=operationId)return;UpdateWorkMessage(text);}}; }
         }
         internal void FinishOperation(string text,bool success=false,bool failed=false,bool cancelled=false)
         {
-            lock(sync){if(success)workDone=workTotal;var final=WorkSnapshot(OperationMessage.FinishSentence(text));operationRunning=false;operationId++;final.Complete=success;final.Failed=failed;final.Cancelled=cancelled;final.Active=false;snapshot=final;}
+            lock(sync){if(success)workDone=workTotal;var final=WorkSnapshot(OperationMessage.FinishSentence(text));if(success&&workTotal==0)final.Overall=1;operationRunning=false;operationId++;final.Complete=success;final.Failed=failed;final.Cancelled=cancelled;final.Active=false;snapshot=final;}
         }
         TransferProgress WorkSnapshot(string text){return new TransferProgress{Stage=text,Active=operationAnimated,Key="operation-"+operationId,Overall=workTotal>0?Math.Min(.999,(workDone+workFraction)/workTotal):-1,WorkText=workTotal>0?"Выполнено "+workDone+" из "+workTotal+" задач":""};}
         void UpdateWorkMessage(string text){
