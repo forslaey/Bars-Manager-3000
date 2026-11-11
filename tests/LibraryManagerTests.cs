@@ -156,9 +156,9 @@ namespace ServiceTool
                 Check(LibraryCatalog.All().Single(p => p.Kind == LibraryKind.VcBundle).Version == "14.99.99999.0", "External catalog updates versions without rebuild"); LibraryCatalog.Replace(original);
                 File.WriteAllText(Path.Combine(root, "bad.xml"), "<!DOCTYPE libraries [<!ENTITY x SYSTEM 'file:///c:/secret'>]><libraries>&x;</libraries>");
                 Reject(() => LibraryCatalog.Load(Path.Combine(root, "bad.xml")), "DTD/external entities rejected"); Check(LibraryCatalog.All().Count == 40, "Failed import preserves live catalog");
-                Directory.CreateDirectory(Path.Combine(root, "Библиотеки")); Check(LibrarySource.AutoDetect(root) == Path.Combine(root, "Библиотеки"), "Adjacent folder detected at any executable location");
-                Check(LibrarySource.AutoDetect(Path.Combine(root, "missing")) == null, "Missing folder does not prompt or block");
-                Check(LibrarySource.NormalizeRoot(root) == Path.Combine(root, "Библиотеки"), "Parent folder selection normalized");
+                Directory.CreateDirectory(Path.Combine(root, "_libraries")); Check(LibrarySource.AutoDetect(root) == Path.Combine(root, "_libraries"), "Adjacent folder detected at any executable location");
+                Check(LibrarySource.FindAdjacent(Path.Combine(root, "missing")) == null, "Absent adjacent fixture does not exist");
+                Check(LibrarySource.NormalizeRoot(root) == Path.Combine(root, "_libraries"), "Parent folder selection normalized");
                 LibraryPackage escape = LibraryCatalog.Deserialize(LibraryCatalog.Serialize(original[0])); escape.RelativePath = @"..\escape.exe";
                 Reject(() => LibrarySource.PackagePath(root, escape), "Traversal rejected before launch");
                 byte[] payload = new byte[] { 1, 2, 3, 4 }; using (var sha = SHA256.Create()) escape.Sha256 = BitConverter.ToString(sha.ComputeHash(payload)).Replace("-", "");

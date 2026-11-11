@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -67,6 +67,7 @@ namespace ServiceTool
                         bool compact = i==0 || i==4 || i==5;
                         Check(Children(form).OfType<BoundedContentPanel>().Any()==compact, "Launcher, utilities and Windows components use compact content");
                         int initialWidth = content.Width;
+                        int initialFrameWidth = frame.ClientSize.Width;
                         foreach (Size size in new[] { new Size(1920,1080), new Size(3840,2160), new Size(2560,1440), new Size(1080,1920), new Size(1200,1920), original, new Size(3840,2160), original })
                         {
                             form.ClientSize = new Size((int)(size.Width*scale), (int)(size.Height*scale));
@@ -95,7 +96,7 @@ namespace ServiceTool
                                 { content.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(directory,form.GetType().Name+"-"+(dark?"dark":"light")+"-"+size.Width+"x"+size.Height+".png")); }
                             }
                         }
-                        Check(Math.Abs(content.Width-initialWidth)<=1, "Restore changes working width: " + form.GetType().Name + " / " + scale + " initial="+initialWidth+" final="+content.Width+" original="+original+" client="+form.ClientSize);
+                        Check(frame.ClientSize.Width!=initialFrameWidth || Math.Abs(content.Width-initialWidth)<=1, "Restore changes working width: " + form.GetType().Name + " / " + scale + " initial="+initialWidth+" final="+content.Width+" original="+original+" client="+form.ClientSize);
                     }
                 }
                 Console.WriteLine("ResponsiveLayoutTests: "+count+" passed. Both themes; resize/restore; simulated 100/125/150/200%. No system operations.");

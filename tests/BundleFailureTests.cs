@@ -30,7 +30,7 @@ namespace ServiceTool
    Check(!File.Exists(fullTarget)&&File.Exists(fullSource),"Disk full preserves stage");
    string receiptRoot=Path.Combine(root,"receipts");Directory.CreateDirectory(receiptRoot);
    var file=new BundleRemoteFile {Path="/package.exe",Size=3,Sha256=YandexBundleSource.Hash(destination,CancellationToken.None)};
-   File.Copy(destination,YandexBundleSource.LocalPath(receiptRoot,file.Path));
+   File.Copy(destination,BundleFolders.PackageDestination(receiptRoot,file.Path));
    foreach(string phase in new[]{"before-receipt-write","before-receipt-publish"}){
     string warning=BundlePublication.Record(receiptRoot,file,s=>{if(s==phase)throw new IOException("Injected disk full");});
     Check(warning!=null&&BundlePublication.Matches(receiptRoot,file,CancellationToken.None),"Receipt failure leaves published content intact");

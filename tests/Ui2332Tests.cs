@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -35,9 +35,9 @@ namespace ServiceTool
                     root.Bounds=new Rectangle(0,0,(int)(logical.Width*factor),(int)(logical.Height*factor));root.PerformLayout();Pump();
                     Check(outer.ClientRectangle.Contains(footer.Bounds),"Footer within layout surface");Check(!viewport.Bounds.IntersectsWith(outer.GetControlFromPosition(0,1).Bounds),"Controls and journal do not overlap");Check(outer.GetControlFromPosition(0,1).Bottom<=footer.Top,"Journal above footer");
                     Check(journal.Height>0,"Journal has useful viewport");
-                    int fixedRows=(int)Math.Ceiling(Enumerable.Range(0,content.RowCount).Where(i=>i!=1).Sum(i=>content.RowStyles[i].Height));
+                    int fixedRows=(int)Math.Ceiling(content.Padding.Vertical+Enumerable.Range(0,content.RowCount).Where(i=>i!=1).Sum(i=>content.RowStyles[i].Height));
                     int fullTable=grid.ColumnHeadersHeight+grid.Rows.Cast<DataGridViewRow>().Sum(r=>r.Height);
-                    Check(viewport.Height<=fixedRows+fullTable+3,"Controls never stretch beyond actual contents");
+                    Check(viewport.Height<=fixedRows+Math.Max(fullTable,grid.ColumnHeadersHeight+grid.RowTemplate.Height)+3,"Controls never stretch beyond actual contents: software="+software+", DPI="+scale+", size="+logical+", viewport="+viewport.Height+", rows="+grid.RowCount+", fixed="+fixedRows+", table="+fullTable);
                     if(logical.Height>=1920)
                     {
                         Check(grid.DisplayedRowCount(false)==grid.RowCount,"All short-list rows fit on portrait surface");
@@ -54,7 +54,7 @@ namespace ServiceTool
             {
                 using(var services=new MainForm(null,true))
                 {
-                    services.SetTheme(dark,false);Show(services);var root=All(services).OfType<TableLayoutPanel>().First(p=>p.Parent is FillContentPanel);var host=root.Parent;host.Controls.Remove(root);services.Controls.Remove(host);host.Dispose();services.Controls.Add(root);root.Dock=DockStyle.None;root.Size=new Size(1350,1100);Pump();int before=Field<TextBox>(services,"log").Height;root.Size=new Size(1350,2400);Pump();Check(Field<TextBox>(services,"log").Height>before+900,"Services already give portrait space to journal: "+before+" / "+Field<TextBox>(services,"log").Height);services.Close();
+                    services.SetTheme(dark,false);Show(services);var root=All(services).OfType<TableLayoutPanel>().First(p=>p.Parent is FillContentPanel);var host=root.Parent;host.Controls.Remove(root);services.Controls.Remove(host);host.Dispose();services.Controls.Add(root);root.Dock=DockStyle.None;root.Size=new Size(1350,1100);Pump();var list=All(services).OfType<ServiceGrid>().First();int before=list.Height;int journalHeight=Field<TextBox>(services,"log").Height;root.Size=new Size(1350,2400);Pump();Check(list.Height>before+900,"Service table receives portrait space");Check(Field<TextBox>(services,"log").Height==journalHeight,"Service journal keeps its height");services.Close();
                 }
                 using(var libraries=new LibraryManagerForm(true))
                 {

@@ -19,7 +19,7 @@ namespace ServiceTool
                 foreach(bool dark in new[]{false,true}) foreach(float scale in new[]{1F,1.25F,1.5F,2F})
                 {
                     var palette=ThemePalette.Create(dark);
-                    var forms=new Form[]{new ManagerHub(),new InitialSystemSettingsForm(true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new ToolsDeploymentForm(true),new WindowsFeaturesForm(true,true),new MainForm(null,true),new AboutDialog(palette,null),new ServiceAccountDialog(palette,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false),new SoftwareRemoteDialog(palette,null,"anydesk",false),new SoftwareRemoteDialog(palette,null,"rudesktop",false),new LibraryActionDialog(palette,null,new LibraryCheck[0]),new LogArchiveDialog(palette,"Служба BARS",new List<LogDateFolder>(),DateTime.Today)};
+                    var forms=new Form[]{new ManagerHub(),new InitialSystemSettingsForm(true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new ToolsDeploymentForm(true),new WindowsFeaturesForm(true,true),new MainForm(null,true),new AboutDialog(palette,null),new ServiceAccountDialog(palette,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false),new SoftwareRemoteDialog(palette,null,"anydesk"),new SoftwareRemoteDialog(palette,null,"rudesktop"),new LibraryActionDialog(palette,null,new LibraryCheck[0]),new LogArchiveDialog(palette,"Служба BARS",new List<LogDateFolder>(),DateTime.Today)};
                     foreach(var form in forms) using(form)
                     {
                         var module=form as ManagerModuleForm;if(module!=null)module.SetTheme(dark,false);var services=form as MainForm;if(services!=null)services.SetTheme(dark,false);

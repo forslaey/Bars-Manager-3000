@@ -51,10 +51,12 @@ namespace ServiceTool
     {
         public static string AutoDetect(string executableDirectory)
         {
-            string adjacent = Path.Combine(executableDirectory, "_libraries");
-            if (Directory.Exists(adjacent)) return adjacent;
-            string preferred = Path.Combine(BundlePreferences.Load(), "_libraries");
-            return Directory.Exists(preferred) ? preferred : BundleFolders.Find(executableDirectory, "_libraries");
+            return FindAdjacent(executableDirectory) ?? FindAdjacent(BundlePreferences.Load()) ?? FindAdjacent(BundleFolders.DefaultRoot);
+        }
+        internal static string FindAdjacent(string root)
+        {
+            string path = Path.Combine(root, "_libraries");
+            return Directory.Exists(path) ? path : null;
         }
         public static string NormalizeRoot(string selected)
         {

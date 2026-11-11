@@ -63,7 +63,7 @@ namespace ServiceTool
      {
       form.SetTheme(dark,false);Show(form);var states=Field<Dictionary<string,string>>(form,"states");foreach(string key in states.Keys.ToArray())states[key]="Enabled";Call(form,"ApplyStates");var action=Field<BrandButton>(form,"action");Check(action.Text=="Удалить выбранные"&&!action.Enabled,"Installed Windows components show remove caption even without selection; no implicit removal");form.Close();
      }
-     foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id,false))
+     foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id))
      {
       Show(dialog);string previews=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"previews");Directory.CreateDirectory(previews);using(var bitmap=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(previews,"password-"+id+"-"+(dark?"dark":"light")+".png"));}dialog.Close();
      }

@@ -42,21 +42,26 @@ namespace ServiceTool
             new Policy("ClearTextPassword","Хранить с обратимым шифрованием",0,0)
         };
         internal static string Value(int? value){return value.HasValue?value.Value.ToString():"Не определено";}
-        internal static string Script(string operation,string group)
+        internal static string Script(string operation,string group,bool sharedMetadata = false)
         {
             if(operation!="query"&&operation!="apply"&&operation!="defaults")throw new InvalidDataException("Неизвестная операция настроек");
             if(group=="folders"){if(operation=="defaults")throw new InvalidDataException("Для папок нет универсального стандарта разрешений Windows");return BarsFolderPermissions.Script(operation=="apply");}
             if(group!="admin"&&group!="passwords"&&group!="firewall"&&group!="smartscreen")throw new InvalidDataException("Неизвестная группа настроек");
             bool query=operation=="query",defaults=operation=="defaults";
             var s=new StringBuilder(@"$ErrorActionPreference='Stop';
-$os=Get-CimInstance Win32_OperatingSystem; $computer=Get-CimInstance Win32_ComputerSystem;
 $system='HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'; $sam='HKLM:\SYSTEM\CurrentControlSet\Control\SAM';
 function ReadValue($path,$name){$key=Get-Item -LiteralPath $path -ErrorAction SilentlyContinue; if($key -and $key.GetValueNames() -contains $name){return [string]$key.GetValue($name)};return 'Не определено'}
 function Put($path,$name,$value){if($null -eq $value){Remove-ItemProperty -LiteralPath $path -Name $name -ErrorAction SilentlyContinue}else{if(-not(Test-Path -LiteralPath $path)){New-Item -Path $path -Force | Out-Null};New-ItemProperty -LiteralPath $path -Name $name -Value $value -PropertyType DWord -Force | Out-Null};$expected=if($null -eq $value){'Не определено'}else{[string]$value};if((ReadValue $path $name) -ne $expected){throw ('Windows не подтвердила параметр '+$name)}}
-$definitions=[Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes((Join-Path $env:windir 'System32\wsecedit.dll')))+(Get-Content -LiteralPath (Join-Path $env:windir 'inf\sceregvl.inf') -Raw);
-function Supported($name){return $definitions.Contains($name)}
 ");
-            if(query)s.AppendLine("'Windows='+$os.Caption; 'DomainJoined='+$computer.PartOfDomain;");
+            if (!sharedMetadata) s.AppendLine("$barsMetadata=@{};");
+            if (query)
+                s.AppendLine("if(-not $barsMetadata.ContainsKey('os')){$barsMetadata.os=Get-CimInstance Win32_OperatingSystem};'Windows='+$barsMetadata.os.Caption;");
+            if (query || group == "passwords")
+                s.AppendLine("if(-not $barsMetadata.ContainsKey('computer')){$barsMetadata.computer=Get-CimInstance Win32_ComputerSystem};$computer=$barsMetadata.computer;");
+            if (query) s.AppendLine("'DomainJoined='+$computer.PartOfDomain;");
+            if (group == "admin" || group == "passwords")
+                s.AppendLine(@"if(-not $barsMetadata.ContainsKey('definitions')){$barsMetadata.definitions=[Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes((Join-Path $env:windir 'System32\wsecedit.dll')))+(Get-Content -LiteralPath (Join-Path $env:windir 'inf\sceregvl.inf') -Raw)};
+function Supported($name){return $barsMetadata.definitions.Contains($name)}");
             if(group=="smartscreen")
             {
                 s.AppendLine(@"if(-not(Test-Path -LiteralPath (Join-Path $env:windir 'System32\smartscreen.exe'))){throw 'SmartScreen для приложений недоступен в этой Windows'}
@@ -115,11 +120,11 @@ function ReadPolicies($file){$values=@{};$section='';foreach($line in Get-Conten
         }
         internal static string QueryScript(bool profile = false)
         {
-            var query = new StringBuilder();
+            var query = new StringBuilder("$barsMetadata=@{};");
             foreach (string group in new[] { "admin", "passwords", "firewall", "smartscreen", "folders" })
             {
                 if (profile) query.Append("$barsGroupClock=[Diagnostics.Stopwatch]::StartNew();");
-                query.Append("try{$lines=& {" + Script("query",group) + "};foreach($line in $lines){'" +
+                query.Append("try{$lines=& {" + Script("query",group,true) + "};foreach($line in $lines){'" +
                     group + ".'+$line}}catch{'" + group + ".Error='+$_.Exception.Message}");
                 if (profile) query.Append("finally{'BARS_PROFILE." + group + "='+$barsGroupClock.ElapsedMilliseconds}");
                 query.Append(';');

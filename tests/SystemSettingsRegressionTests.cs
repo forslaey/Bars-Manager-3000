@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 namespace ServiceTool
@@ -26,7 +27,7 @@ namespace ServiceTool
                 foreach(bool dark in new[]{false,true})using(var form=new InitialSystemSettingsForm(true))
                 {
                     form.SetTheme(dark,false);form.ShowInTaskbar=false;form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.Show();Application.DoEvents();
-                    var grid=Field<ServiceGrid>(form,"grid");Check(grid.RowCount==7&&grid.TouchScrollingEnabled,"Seven settings, native touch scrolling");
+                    var grid=Field<ServiceGrid>(form,"grid");Check(grid.Rows.Cast<DataGridViewRow>().Select(item=>Convert.ToString(item.Tag)).SequenceEqual(new[]{"passwords","admin","firewall","smartscreen","folders","kiosk"})&&grid.TouchScrollingEnabled,"Supported settings and native touch scrolling");
                     for(int pass=0;pass<8;pass++)
                     {
                         form.WindowState=FormWindowState.Maximized;Application.DoEvents();form.WindowState=FormWindowState.Normal;form.ClientSize=pass%2==0?new Size(1000,740):new Size(1200,900);Application.DoEvents();
@@ -36,8 +37,9 @@ namespace ServiceTool
                         var cell=grid.GetCellDisplayRectangle(0,grid.FirstDisplayedScrollingRowIndex,false);var point=new Point(cell.Left+20,cell.Top+20);
                         grid.TouchPan(point,true,false);grid.TouchPan(new Point(point.X,point.Y-500),false,true);Check(grid.FirstDisplayedScrollingRowIndex>=0,"Swipe remains valid after resize");
                     }
-                    for(int row=0;row<6;row++){grid.CurrentCell=grid.Rows[row].Cells[0];Application.DoEvents();Check(Field<BrandButton>(form,"applyButton").Enabled,"Selected setting has action");Check(Field<BrandButton>(form,"standardButton").Text==(row==5?"Проверить папки":row==3?"Включить защиту":row==2?"Включить все профили":"Вернуть стандартные политики"),"Secondary action matches selected row");}
-                    Call(form,"ShowState","admin.EnableLUA=0\r\nfirewall.Domain=True\r\nfirewall.Private=False\r\nfirewall.Public=True\r\nsmartscreen.Mode=Включён");
+                    var secondaryCaptions=new[]{"Вернуть стандартные политики","Вернуть стандартные политики","Включить все профили","Вернуть стандартные политики","Проверить папки","Вернуть прежние настройки"};
+                    for(int row=0;row<secondaryCaptions.Length;row++){grid.CurrentCell=grid.Rows[row].Cells[0];Application.DoEvents();Check(Field<BrandButton>(form,"applyButton").Enabled==(row!=5||Field<bool>(form,"kioskAvailable")),"Selected setting respects availability");Check(Field<BrandButton>(form,"standardButton").Text==secondaryCaptions[row],"Secondary action matches selected row");}
+                    Call(form,"ShowState","admin.EnableLUA=0\r\nfirewall.Domain=True\r\nfirewall.Private=False\r\nfirewall.Public=True\r\nsmartscreen.Error=Тестовая ошибка");
                     Check(Convert.ToString(grid.Rows[1].Cells[2].Value).Contains("Отключено"),"UAC state updated in grid");Check(Convert.ToString(grid.Rows[3].Cells[2].Value).Contains("не выполнена"),"Query error not reported as disabled");
                     Call(form,"Lock",true);Check(!Field<BrandButton>(form,"applyButton").Enabled&&!Field<BrandButton>(form,"refresh").Enabled,"Busy blocks actions");Call(form,"Lock",false);
                     using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"settings-grid-"+dark+".png"));}

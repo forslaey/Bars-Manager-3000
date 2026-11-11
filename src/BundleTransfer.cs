@@ -59,7 +59,7 @@ namespace ServiceTool
         }
         void DownloadOnce(BundleRemoteFile file,string root,string originalHash,Action<long> progress,CancellationToken token,Action<long> received,Action<string> stage)
         {
-            string destination=YandexBundleSource.LocalPath(root,file.Path),part=PartPath(root,file);
+            string destination=BundleFolders.PackageDestination(root,file.Path),part=PartPath(root,file);
             Directory.CreateDirectory(Path.GetDirectoryName(part));
             if(file.Size==0&&!File.Exists(part))using(var empty=File.Create(part)){}
             if(File.Exists(part)&&(File.GetAttributes(part)&FileAttributes.ReparsePoint)!=0)throw new IOException("Временный файл является ссылкой");
@@ -120,7 +120,7 @@ namespace ServiceTool
             }
             // Recheck the destination immediately before publishing; never replace
             // a locally edited file or an unexpected newly created file.
-            destination=YandexBundleSource.LocalPath(root,file.Path);
+            destination=BundleFolders.PackageDestination(root,file.Path);
             Directory.CreateDirectory(Path.GetDirectoryName(destination));
             lock(BundlePublication.Gate)
             {

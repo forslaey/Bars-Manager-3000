@@ -1426,6 +1426,12 @@ namespace ServiceTool
                     "Установка виджета", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
 
+            if (install && FiscalAgentPrerequisites.AppliesTo(executable) &&
+                BrandMessageBox.Show(this, FiscalAgentPrerequisites.Warning(executable),
+                    "Проверка совместимости", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+
             string accountPassword = null;
             operationRunning = true;
             timer.Stop();
@@ -1456,7 +1462,13 @@ namespace ServiceTool
                         }
                     }
                 }
-                systemOperation = await WindowsOperationQueue.EnterAsync(() => activity.Text = WindowsOperationQueue.WaitingMessage, () => closing);
+                procedureWaitCancellation = new CancellationTokenSource();
+                if (closeAfterServiceAction) procedureWaitCancellation.Cancel();
+                CancellationToken waitCancellation = procedureWaitCancellation.Token;
+                waitCancellation.ThrowIfCancellationRequested();
+                UpdateActions();
+                systemOperation = await WindowsOperationQueue.EnterAsync(() => activity.Text = WindowsOperationQueue.WaitingMessage, () => closing || waitCancellation.IsCancellationRequested);
+                waitCancellation.ThrowIfCancellationRequested();
                 activity.Text = "Выполняется процедура…";
                 if (install && String.Equals(Path.GetFileName(executable), "Bars.PaymentProcessing.Service.exe", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1478,13 +1490,8 @@ namespace ServiceTool
                     if (!snapshot.Complete)
                         throw new InvalidOperationException("Не удалось проверить все регистрации Windows. Обнови статус и повтори установку.");
                 }
-                if (!install && !await PrepareServiceRemovalAsync(executable)) return;
-
-                procedureWaitCancellation = new CancellationTokenSource();
-                if (closeAfterServiceAction) procedureWaitCancellation.Cancel();
-                CancellationToken waitCancellation = procedureWaitCancellation.Token;
+                if (!install && !await PrepareServiceRemovalAsync(executable, waitCancellation)) return;
                 waitCancellation.ThrowIfCancellationRequested();
-                UpdateActions();
                 int exitCode;
                 bool processStillRunning = false;
                 int procedureProcessId = 0;
@@ -1639,9 +1646,11 @@ namespace ServiceTool
             }
         }
 
-        private async Task<bool> PrepareServiceRemovalAsync(string executable)
+        private async Task<bool> PrepareServiceRemovalAsync(string executable, CancellationToken cancellation)
         {
+            cancellation.ThrowIfCancellationRequested();
             ServiceSnapshot snapshot = await Task.Factory.StartNew<ServiceSnapshot>(readCatalog);
+            cancellation.ThrowIfCancellationRequested();
             if (closing) return false;
             AcceptSnapshot(snapshot);
             if (!snapshot.Complete)
@@ -1662,13 +1671,15 @@ namespace ServiceTool
                     using (Process process = Process.Start(startInfo))
                     {
                         if (process == null) throw new InvalidOperationException("Windows не запустила процедуру остановки службы.");
-                        return process.WaitForExit(120000) ? process.ExitCode : 1460;
+                        return WaitForServiceCommand(process, cancellation);
                     }
                 });
                 if (closing) return false;
 
+                cancellation.ThrowIfCancellationRequested();
                 snapshot = await Task.Factory.StartNew<ServiceSnapshot>(readCatalog);
                 if (closing) return false;
+                cancellation.ThrowIfCancellationRequested();
                 AcceptSnapshot(snapshot);
                 if (!snapshot.Complete || matches.Exists(entry => entry.State != "Stopped") ||
                     (matches.Count > 0 && (result != 0 || matches.Count != 1 || matches[0].Name != name)))

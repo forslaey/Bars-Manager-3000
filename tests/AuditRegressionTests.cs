@@ -54,7 +54,7 @@ namespace ServiceTool
                     scan.GetAwaiter().GetResult();
                     Check(!Get<bool>(form, "busy"), "Invalid path must not lock the dialog.");
                 }
-                using (var dialog = new SoftwareRemoteDialog(ThemePalette.Create(false), null, "anydesk", false))
+                using (var dialog = new SoftwareRemoteDialog(ThemePalette.Create(false), null, "anydesk"))
                 {
                     Check(!dialog.Controls.OfType<TableLayoutPanel>().SelectMany(p => p.Controls.OfType<CheckBox>()).Any(c => c.Text.Contains("стандартный пароль")),
                         "Remote dialog must not offer an embedded password.");

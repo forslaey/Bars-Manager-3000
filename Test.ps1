@@ -118,6 +118,9 @@ Invoke-TaskTests 'TouchGridTests' 'ServiceTool.TouchGridTests' ($taskUiSources +
 Invoke-TaskTests 'BundleTests' 'ServiceTool.BundleTests' ($taskUiSources + (Join-Path $taskTests 'BundleTests.cs'))
 Invoke-TaskTests 'OpeningProgressTests' 'ServiceTool.OpeningProgressTests' ($taskUiSources + (Join-Path $taskTests 'OpeningProgressTests.cs'))
 Invoke-TaskTests 'DownloadProgressTests' 'ServiceTool.DownloadProgressTests' ($taskUiSources + (Join-Path $taskTests 'DownloadProgressTests.cs'))
+foreach ($name in @('BundleResultsTests','ServiceRemovalCancellationTests','FooterLiveTests','LauncherFooterVisualTests','UserScreenshotRegressionTests','ServiceEndpointTests')) {
+    Invoke-TaskTests $name ("ServiceTool." + $name) ($taskUiSources + (Join-Path $taskTests ($name + '.cs')))
+}
 Invoke-TaskTests 'BundleTransportTests' 'ServiceTool.BundleTransportTests' ($taskUiSources + (Join-Path $taskTests 'BundleTransportTests.cs'))
 Invoke-TaskTests 'ScrollAuditTests' 'ServiceTool.ScrollAuditTests' ($taskUiSources + (Join-Path $taskTests 'ScrollAuditTests.cs'))
 Invoke-TaskTests 'TouchTextTests' 'ServiceTool.TouchTextTests' ($taskUiSources + (Join-Path $taskTests 'TouchTextTests.cs'))

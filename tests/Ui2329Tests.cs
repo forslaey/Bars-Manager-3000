@@ -56,7 +56,7 @@ namespace ServiceTool
                     ((ManagerModuleForm)f).SetTheme(dark,false);Show(f);
                     var captions=All(f).OfType<InputCaptionLabel>().ToArray();Check(captions.Length>0&&captions.All(c=>c.Text.EndsWith(":")),"Shared caption rendering and colons");
                 }
-                foreach(string id in new[]{"anydesk","rudesktop"})using(var f=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id,false))
+                foreach(string id in new[]{"anydesk","rudesktop"})using(var f=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id))
                 {Show(f);Check(All(f).OfType<InputCaptionLabel>().Count(c=>c.Text.EndsWith(":"))==2,"Password labels use common caption style");}
             }
             Console.WriteLine("Ui2329Tests: "+count+" passed; both themes, offline/preview rows, portrait and simulated DPI; scrollbar bounds and final page. No system operations.");return 0;

@@ -351,16 +351,7 @@ namespace ServiceTool
     }
     internal static class SoftwarePasswordStore
     {
-        internal static void Save(string id,string password)
-        {
-            SoftwareCatalog.Find(id); Directory.CreateDirectory(ApplicationStorage.DirectoryPath); byte[] clear=Encoding.UTF8.GetBytes(password);
-            try { File.WriteAllBytes(ApplicationStorage.FilePath("software-password-"+id+".bin"),ProtectedData.Protect(clear,null,DataProtectionScope.CurrentUser)); } finally{Array.Clear(clear,0,clear.Length);}
-        }
         internal static void Forget(string id) {SoftwareCatalog.Find(id);string path=ApplicationStorage.FilePath("software-password-"+id+".bin");if(File.Exists(path))File.Delete(path);}
-        internal static string Load(string id)
-        {
-            SoftwareCatalog.Find(id); string path=ApplicationStorage.FilePath("software-password-"+id+".bin"); if(!File.Exists(path)) return "";
-            byte[] clear=ProtectedData.Unprotect(File.ReadAllBytes(path),null,DataProtectionScope.CurrentUser);try{return Encoding.UTF8.GetString(clear);}finally{Array.Clear(clear,0,clear.Length);}
-        }
+
     }
 }

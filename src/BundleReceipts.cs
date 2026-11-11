@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -16,10 +16,10 @@ namespace ServiceTool
         static readonly object gate=new object();
         internal BundleReceipts(string root):this(root,null){}
         internal BundleReceipts(string root,Action<string> checkpoint){this.root=root;this.checkpoint=checkpoint;}
-        string Receipt(BundleRemoteFile file)
+        string Receipt(string relative)
         {
             string key;
-            using(var hash=System.Security.Cryptography.SHA256.Create())key=BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(file.Path.ToLowerInvariant()))).Replace("-","");
+            using(var hash=System.Security.Cryptography.SHA256.Create())key=BitConverter.ToString(hash.ComputeHash(System.Text.Encoding.UTF8.GetBytes(relative.ToLowerInvariant()))).Replace("-","");
             return YandexBundleSource.LocalPath(root,"/.bars-download/receipts/"+key+".xml");
         }
         internal bool CanReplace(BundleRemoteFile file,string currentHash)
@@ -31,7 +31,14 @@ namespace ServiceTool
             if(file.Group=="Утилиты")return false;
             lock(gate)
             {
-                string path=Receipt(file);if(!File.Exists(path))return false;
+                string relative = BundleFolders.DownloadPath(file.Path);
+                string path = Receipt(relative);
+                if (!File.Exists(path) && !String.Equals(file.Path, relative, StringComparison.OrdinalIgnoreCase))
+                {
+                    relative = file.Path;
+                    path = Receipt(relative);
+                }
+                if (!File.Exists(path)) return false;
                 try
                 {
                     if(new FileInfo(path).Length>4096)return false;
@@ -39,7 +46,7 @@ namespace ServiceTool
                     using(var reader=System.Xml.XmlReader.Create(path,settings))
                     {
                         var doc=new XmlDocument {XmlResolver=null};doc.Load(reader);var node=doc.DocumentElement;
-                        return node!=null&&node.Name=="file"&&node.GetAttribute("path")==file.Path&&String.Equals(node.GetAttribute("sha256"),currentHash,StringComparison.OrdinalIgnoreCase);
+                        return node!=null&&node.Name=="file"&&String.Equals(node.GetAttribute("path"),relative,StringComparison.OrdinalIgnoreCase)&&String.Equals(node.GetAttribute("sha256"),currentHash,StringComparison.OrdinalIgnoreCase);
                     }
                 }
                 catch(System.Xml.XmlException){return false;}
@@ -50,9 +57,9 @@ namespace ServiceTool
         {
             lock(gate)
             {
-                string path=Receipt(file);Directory.CreateDirectory(Path.GetDirectoryName(path));
+                string path=Receipt(BundleFolders.DownloadPath(file.Path));Directory.CreateDirectory(Path.GetDirectoryName(path));
                 string temp=Path.Combine(Path.GetDirectoryName(path),"receipt-"+Guid.NewGuid().ToString("N")+".tmp");
-                var doc=new XmlDocument();var node=doc.CreateElement("file");node.SetAttribute("path",file.Path);node.SetAttribute("sha256",file.Sha256);doc.AppendChild(node);try
+                var doc=new XmlDocument();var node=doc.CreateElement("file");node.SetAttribute("path",BundleFolders.DownloadPath(file.Path));node.SetAttribute("sha256",file.Sha256);doc.AppendChild(node);try
                 {
                     if(checkpoint!=null)checkpoint("before-receipt-write");doc.Save(temp);
                     if(checkpoint!=null)checkpoint("before-receipt-publish");

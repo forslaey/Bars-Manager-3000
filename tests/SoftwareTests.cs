@@ -54,7 +54,7 @@ namespace ServiceTool
                     foreach(var checkbox in boxes)Check(checkbox.Width>250*scale,"Large checkbox click area");using(var image=new Bitmap(form.Width,form.Height))form.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
                     controls.OfType<Button>().Single(b=>b.Text=="В меню").PerformClick();Check(form.MenuRequested&&!form.Visible,"New module returns to menu");
                 }
-                foreach(bool dark in new[]{false,true})foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id,false))
+                foreach(bool dark in new[]{false,true})foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id))
                 {
                     Show(dialog);var inputs=Children(dialog).OfType<BrandTextBox>().ToArray();Check(inputs.Length==2&&inputs.All(b=>b.UseSystemPasswordChar&&b.MaxLength==128),"Both password fields masked; no live saved credentials read");
                     var next=Children(dialog).OfType<Button>().Single(b=>b.Text=="Продолжить");Check(!next.Enabled,"Empty confirmation blocks continuation");inputs[0].Text="FixturePassword!";Check(!next.Enabled,"First entry alone cannot continue");inputs[1].Text="FixturePassword?";Check(!next.Enabled,"Different confirmation cannot continue");inputs[1].Text=inputs[0].Text;Check(next.Enabled,"Matching confirmation enables continuation immediately");inputs[0].Text="fixturePassword!";Check(!next.Enabled,"Changing original invalidates confirmation; comparison is case sensitive");

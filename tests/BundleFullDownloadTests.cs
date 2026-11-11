@@ -15,7 +15,7 @@ namespace ServiceTool
     string root=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"full-download");Directory.CreateDirectory(root);
     var errors=new System.Collections.Concurrent.ConcurrentBag<string>();long bytes=0;
     Parallel.ForEach(files,new ParallelOptions {MaxDegreeOfParallelism=3},file=>{
-     try{string target=YandexBundleSource.LocalPath(root,file.Path);
+     try{string target=BundleFolders.PackageDestination(root,file.Path);
       if(!File.Exists(target)||YandexBundleSource.Hash(target,CancellationToken.None)!=file.Sha256)new BundleTransfer(source).Download(file,root,null,x=>{},CancellationToken.None);
       new BundleReceipts(root).Record(file);Interlocked.Add(ref bytes,file.Size);
      }catch(Exception ex){errors.Add(file.Path+": "+ex.Message);}

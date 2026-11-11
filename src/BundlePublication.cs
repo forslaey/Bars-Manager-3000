@@ -41,7 +41,7 @@ namespace ServiceTool
         }
         internal static bool Matches(string root,BundleRemoteFile file,CancellationToken token)
         {
-            string path=YandexBundleSource.LocalPath(root,file.Path);
+            string path=BundleFolders.PackageDestination(root,file.Path);
             return File.Exists(path)&&new FileInfo(path).Length==file.Size&&String.Equals(YandexBundleSource.Hash(path,token),file.Sha256,StringComparison.OrdinalIgnoreCase);
         }
         internal static string Record(string root,BundleRemoteFile file,Action<string> checkpoint)

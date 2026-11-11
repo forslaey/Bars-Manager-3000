@@ -143,7 +143,7 @@ namespace ServiceTool
                 VerifyNativeDialog(hub, services, libraries, new OpenFileDialog { Title = "BARS audit: open" });
                 VerifyNativeDialog(hub, services, libraries, new SaveFileDialog { Title = "BARS audit: save" });
                 VerifyNativeDialog(hub, services, libraries, new FolderBrowserDialog { Description = "BARS audit: folder" });
-                using (var remote = new SoftwareRemoteDialog(ThemePalette.Create(false), hub.Icon, "rudesktop", false))
+                using (var remote = new SoftwareRemoteDialog(ThemePalette.Create(false), hub.Icon, "rudesktop"))
                 {
                     var completion = ModuleNavigation.ShowOwnedAsync(libraries, remote);
                     var area = Screen.FromControl(libraries).WorkingArea;

@@ -61,7 +61,7 @@ namespace ServiceTool
                         Caption(form,dark);
                     }
                     var colors=ThemePalette.Create(dark);
-                    Form[] dialogs={new AboutDialog(colors,null),new LibraryActionDialog(colors,null,new LibraryCheck[0]),new ServiceAccountDialog(colors,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false),new LogArchiveDialog(colors,"BARS",new List<LogDateFolder>(),DateTime.Today),new SoftwareRemoteDialog(colors,null,"anydesk",false)};
+                    Form[] dialogs={new AboutDialog(colors,null),new LibraryActionDialog(colors,null,new LibraryCheck[0]),new ServiceAccountDialog(colors,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false),new LogArchiveDialog(colors,"BARS",new List<LogDateFolder>(),DateTime.Today),new SoftwareRemoteDialog(colors,null,"anydesk")};
                     foreach(var form in dialogs)using(form){form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.ShowInTaskbar=false;form.Show();Application.DoEvents();Caption(form,dark);}
                 }
                 Console.WriteLine("HeaderStyleTests: "+count+" passed; "+captions+" supported native caption checks. No system changes.");return 0;

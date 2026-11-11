@@ -107,7 +107,7 @@ namespace ServiceTool
                 bool selectLibraries=libraries.Checked,selectTools=tools.Checked;
                 var result=await Task.Run(()=>{
                     var files=cloudSource.Scan(cloud,token,Log);var list=new List<Entry>();total.SetWork(files.Count(f=>f.Group=="Утилиты"?selectTools:f.Group=="Библиотеки"&&selectLibraries));
-                    foreach(var file in files.Where(f=>f.Group=="Утилиты"?selectTools:f.Group=="Библиотеки"&&selectLibraries)){token.ThrowIfCancellationRequested();string local=YandexBundleSource.LocalPath(root,BundleFolders.DownloadPath(root,file.Path));var entry=new Entry {File=file};
+                    foreach(var file in files.Where(f=>f.Group=="Утилиты"?selectTools:f.Group=="Библиотеки"&&selectLibraries)){token.ThrowIfCancellationRequested();string local=BundleFolders.PackageDestination(root,file.Path);var entry=new Entry {File=file};
                         if(!File.Exists(local)){entry.Allowed=entry.Selected=true;entry.State="Отсутствует - будет скачано";}
                         else{entry.OriginalHash=YandexBundleSource.Hash(local,token);entry.Done=entry.OriginalHash==file.Sha256;entry.Allowed=!entry.Done&&new BundleReceipts(root).CanReplace(file,entry.OriginalHash);entry.Selected=entry.Allowed;entry.State=entry.Done?"Обновление не требуется":entry.Allowed?"Изменён в источнике — обновить":"Отличается — сохранить локальный файл";}
                         list.Add(entry);total.OperationReporter("Проверен файл: "+file.Path.TrimStart('/'));total.CompleteStep();
@@ -163,7 +163,6 @@ namespace ServiceTool
                     var tasks=Enumerable.Range(0,workers).Select(worker=>Task.Run(()=>{
                         while(true){Entry entry;lock(sync){if(queue.Count==0||token.IsCancellationRequested||worker>=workerLimit)return;entry=queue.Dequeue();entry.State="Скачивание";}
                             try{
-                                string destination=YandexBundleSource.LocalPath(scannedRoot,BundleFolders.DownloadPath(scannedRoot,entry.File.Path));
                                 bool published=BundlePublication.Matches(scannedRoot,entry.File,token);
                                 if(!cloudSource.Contains(downloadCloud,entry.File))throw new IOException("Выбранное облако не содержит подтверждённую копию файла");
                                 if(!published)cloudSource.Transfer(downloadCloud).Download(entry.File,scannedRoot,entry.OriginalHash,bytes=>{lock(sync)entry.Bytes=bytes;},token,bytes=>Interlocked.Add(ref receivedBytes,bytes),state=>{lock(sync){entry.State=state;if(state=="Ожидание повтора")workerLimit=Math.Max(1,workerLimit-1);}BundleSession.Log(scannedRoot,entry.File.Path+": "+state);});

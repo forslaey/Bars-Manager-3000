@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Threading;
 using System.Linq;
@@ -15,10 +15,13 @@ namespace ServiceTool
    {
     foreach(string bad in new[]{"/../escape.exe","/a/../../escape.exe","/a:stream","/CON.exe","/a./b","/a//b","relative.exe","/LPT1.txt"})
     {bool denied=false;try{YandexBundleSource.LocalPath(root,bad);}catch(InvalidDataException){denied=true;}Check(denied,"Unsafe path accepted: "+bad);}
-    string local=YandexBundleSource.LocalPath(root,"/Microsoft .NET/test.exe");Check(local.StartsWith(root,StringComparison.OrdinalIgnoreCase),"Path containment");Directory.CreateDirectory(Path.GetDirectoryName(local));File.WriteAllText(local,"fixture only");
+    string local=BundleFolders.PackageDestination(root,"/Microsoft .NET/test.exe");Check(local.StartsWith(root,StringComparison.OrdinalIgnoreCase),"Path containment");Directory.CreateDirectory(Path.GetDirectoryName(local));File.WriteAllText(local,"fixture only");
     string hash=YandexBundleSource.Hash(local,CancellationToken.None);Check(hash.Length==64,"SHA256");
     var file=new BundleRemoteFile {Path="/Microsoft .NET/test.exe",Sha256=hash,Size=new FileInfo(local).Length};var receipts=new BundleReceipts(root);
     Check(!receipts.CanReplace(file,hash),"Unknown file must not be replaceable");receipts.Record(file);Check(receipts.CanReplace(file,hash),"Unchanged managed installer");
+    Check(BundlePublication.Matches(root,file,CancellationToken.None),"Legacy cloud path checks the published library copy");
+    var canonical=new BundleRemoteFile {Path="/_libraries"+file.Path,Sha256=hash,Size=file.Size};
+    Check(BundlePublication.Matches(root,canonical,CancellationToken.None)&&receipts.CanReplace(canonical,hash),"Canonical and legacy cloud paths share destination and receipt");
     Check(!receipts.CanReplace(file,new string('0',64)),"Edited managed installer protected");
     var config=new BundleRemoteFile {Path="/_tools/test.ini",Sha256=hash};receipts.Record(config);Check(!receipts.CanReplace(config,hash),"Configuration protected");
     var utility=new BundleRemoteFile {Path="/_tools/tool.exe",Sha256=hash};receipts.Record(utility);Check(!receipts.CanReplace(utility,hash),"Utility tree protected");
@@ -27,9 +30,9 @@ namespace ServiceTool
     Check(BundleTransfer.PartPath(root,file)!=BundleTransfer.PartPath(root,same),"Identical content independent parts");
     string part=BundleTransfer.PartPath(root,same);Directory.CreateDirectory(Path.GetDirectoryName(part));File.Copy(local,part);
     new BundleTransfer(new YandexBundleSource()).Download(same,root,null,bytes=>{},CancellationToken.None);
-    Check(File.Exists(YandexBundleSource.LocalPath(root,same.Path)),"Verified part published without network");
+    Check(File.Exists(BundleFolders.PackageDestination(root,same.Path)),"Verified part published without network");
     var conflict=new BundleRemoteFile {Path="/conflict.exe",Sha256=hash,Size=file.Size};
-    string target=YandexBundleSource.LocalPath(root,conflict.Path);File.WriteAllText(target,"user changed");
+    string target=BundleFolders.PackageDestination(root,conflict.Path);File.WriteAllText(target,"user changed");
     string conflictPart=BundleTransfer.PartPath(root,conflict);Directory.CreateDirectory(Path.GetDirectoryName(conflictPart));File.Copy(local,conflictPart);
     bool blocked=false;try{new BundleTransfer(new YandexBundleSource()).Download(conflict,root,hash,bytes=>{},CancellationToken.None);}catch(IOException){blocked=true;}
     Check(blocked&&File.ReadAllText(target)=="user changed","Destination conflict preserves original");

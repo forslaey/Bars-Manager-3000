@@ -36,13 +36,15 @@ namespace ServiceTool {
    Check(SoftwareMaintenance.MachineSettings("chrome").Length==0,"Chrome never cleans RuDesktop settings");
    Check(!SoftwareDetection.ShouldInstall(new SoftwareCheck{State=LibraryState.Installed,Version=chrome.Version},chrome),"Equal Chrome skipped");
    string msi=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,chrome.File);if(File.Exists(msi)){var actual=SoftwareCatalog.Describe("chrome",msi,"fixture read only");Check(actual.Architecture=="x64"&&actual.Version==chrome.Version,"Actual Google MSI metadata");SoftwareTrust.Verify(actual,false);Check(true,"Actual Google signature verified");}
-   foreach(bool dark in new[]{false,true})foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id,false)){
+   foreach(bool dark in new[]{false,true})foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id)){
     Show(dialog);var input=Field<BrandTextBox>(dialog,"input");var confirmation=Field<BrandTextBox>(dialog,"confirmation");
+    Check(input.Text.Length==0&&confirmation.Text.Length==0&&dialog.Password==null,"Password starts empty");
     input.Text="custom123";confirmation.Text="custom123";
-    Check(input.Enabled&&confirmation.Enabled&&SoftwareRemoteDialog.PasswordsMatch(dialog.Password,confirmation.Text),"Manual password entry and confirmation");
+    Check(input.Enabled&&confirmation.Enabled&&SoftwareRemoteDialog.PasswordsMatch(input.Text,confirmation.Text)&&((Control)dialog.AcceptButton).Enabled,"Manual password entry and confirmation");
     Check(!All(dialog).OfType<BrandCheckBox>().Any(c=>c.Text.Contains("стандартный пароль")),"No embedded password option");
     foreach(var eye in All(dialog).OfType<PasswordEyeButton>()){eye.PerformClick();Check(eye.Revealed,"Eye reveals independently");eye.PerformClick();Check(!eye.Revealed,"Eye hides");}
     dialog.UpdateKeyboardState("en",true);Check(Field<List<Label>>(dialog,"caps").All(l=>l.Visible),"Caps Lock warnings visible for both fields");Check(Field<List<Label>>(dialog,"languages").All(l=>l.Text=="ENG"),"English indicator updates");dialog.UpdateKeyboardState("ru",false);Check(Field<List<Label>>(dialog,"caps").All(l=>!l.Visible),"Caps Lock warning clears");Check(Field<List<Label>>(dialog,"languages").All(l=>l.Text=="РУС"),"Russian indicator updates");
+    ((Button)dialog.AcceptButton).PerformClick();Check(dialog.Password=="custom123","Confirmed password returned");
     Check(All(dialog).OfType<PasswordEyeButton>().Count()==2,"Two eyes");Check(SoftwareRemoteDialog.LanguageLabel("ru")=="РУС"&&SoftwareRemoteDialog.LanguageLabel("en")=="ENG","Layout labels");
     foreach(var button in All(dialog).OfType<Button>())Check(button.Parent.ClientRectangle.Contains(button.Bounds),"Dialog button fits");
     Capture(dialog,"password-"+id+"-"+dark);dialog.Close();

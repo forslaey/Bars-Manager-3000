@@ -32,7 +32,7 @@ namespace ServiceTool
                     Check(caption.Font.Bold&&caption.ForeColor==(dark?Color.Yellow:Color.Black),"Search caption preserves requested style");
                     Capture(form,"guide-"+dark);
                 }
-                foreach(string id in new[]{"anydesk","rudesktop"})using(var form=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id,false))
+                foreach(string id in new[]{"anydesk","rudesktop"})using(var form=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id))
                 {
                     Show(form);var notice=All(form).OfType<Label>().Single(l=>l.Name=="passwordNotice");var cancel=All(form).OfType<BrandButton>().Single(b=>b.Text=="Отмена");
                     Check(notice.TextAlign==ContentAlignment.MiddleLeft,"Notice aligned left");

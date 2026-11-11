@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -66,7 +66,30 @@ namespace ServiceTool
             OperationView=new DownloadProgressView { InlineDetails = true };
             var journalArea=(TableLayoutPanel)OperationView.WithJournal(log);journalArea.RowStyles[0].Height=62;
             var compact=new CompactJournalLayout(Body,1,grid,journalArea,footer,110,54){StableSettingsRows=true,IncludeStatusColumn=true};OperationView.Margin=new Padding(0,0,0,12);compact.RowCount=3;compact.RowStyles[1]=new RowStyle(SizeType.Percent,100);Root.Controls.Add(compact,0,1);
-            Shown+=delegate{BeginInvoke((MethodInvoker)delegate{if(IsDisposed)return;int height=actions.Controls.Cast<Control>().Max(c=>c.Height);Body.RowStyles[2].Height=height+actions.Margin.Vertical;});};
+            bool actionLayoutPending = false;
+            Action fitActions = delegate
+            {
+                if (actionLayoutPending || !IsHandleCreated || IsDisposed) return;
+                actionLayoutPending = true;
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    actionLayoutPending = false;
+                    if (IsDisposed) return;
+                    int height = actions.Controls.Cast<Control>().Max(button =>
+                    {
+                        int width = Math.Max(1, button.Width - 12);
+                        return TextRenderer.MeasureText(button.Text, button.Font, new Size(width, Int32.MaxValue),
+                            TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + 8;
+                    });
+                    int requested = Math.Max(66, height + actions.Margin.Vertical);
+                    if (Math.Abs(Body.RowStyles[2].Height - requested) <= 1) return;
+                    Body.RowStyles[2].Height = requested;
+                    compact.PerformLayout();
+                });
+            };
+            actions.SizeChanged += delegate { fitActions(); };
+            foreach (Control button in actions.Controls) button.TextChanged += delegate { fitActions(); };
+            Shown += delegate { fitActions(); };
             grid.SelectionChanged+=delegate{UpdateButtons();};grid.CurrentCellChanged+=delegate{UpdateButtons();};SetTheme(Colors.Dark,false);UpdateButtons();
             Shown+=async delegate{if(preview){foreach(DataGridViewRow row in grid.Rows)row.Cells[2].Value="Не проверено · демонстрация";}else await Check();};
         }

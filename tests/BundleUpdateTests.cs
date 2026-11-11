@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,7 +9,7 @@ namespace ServiceTool
   static int count;static string root,fixtures;
   static void Check(bool ok,string name){if(!ok)throw new Exception(name);count++;}
   static void Reject(Action action,string name){bool fail=false;try{action();}catch(IOException){fail=true;}Check(fail,name);}
-  static string Copy(string fixture,string relative){string path=YandexBundleSource.LocalPath(root,relative);Directory.CreateDirectory(Path.GetDirectoryName(path));File.Copy(Path.Combine(fixtures,fixture),path,true);return path;}
+  static string Copy(string fixture,string relative){string path=BundleFolders.PackageDestination(root,relative);Directory.CreateDirectory(Path.GetDirectoryName(path));File.Copy(Path.Combine(fixtures,fixture),path,true);return path;}
   static BundleRemoteFile Remote(string fixture,string relative){string source=Path.Combine(fixtures,fixture);return new BundleRemoteFile {Path=relative,Size=new FileInfo(source).Length,Sha256=YandexBundleSource.Hash(source,CancellationToken.None)};}
   static void Stage(string fixture,BundleRemoteFile file){string path=BundleTransfer.PartPath(root,file);Directory.CreateDirectory(Path.GetDirectoryName(path));File.Copy(Path.Combine(fixtures,fixture),path,true);}
   [STAThread] static int Main(){fixtures=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"package-fixtures");try{
@@ -22,7 +22,7 @@ namespace ServiceTool
     new BundleReceipts(root).Record(update);
     var downgrade=Remote("old"+ext,"/elsewhere/renamed"+ext);Stage("old"+ext,downgrade);
     Reject(()=>new BundleTransfer((f,t)=>{throw new Exception("Network not expected");}).Download(downgrade,root,null,x=>{},CancellationToken.None),"Cross-directory downgrade denied "+ext);
-    Check(!File.Exists(YandexBundleSource.LocalPath(root,downgrade.Path)),"No downgrade destination "+ext);
+    Check(!File.Exists(BundleFolders.PackageDestination(root,downgrade.Path)),"No downgrade destination "+ext);
     string old=Copy("old"+ext,"/archive/old"+ext);var oldFile=Remote("old"+ext,"/archive/old"+ext);new BundleReceipts(root).Record(oldFile);
     var candidates=BundleMaintenance.OldFiles(root,new[]{update},CancellationToken.None);Check(candidates.Any(c=>c.Path==oldFile.Path),"Cross-directory old managed file recognized "+ext);
     File.AppendAllText(old,"edited");Check(!BundleMaintenance.OldFiles(root,new[]{update},CancellationToken.None).Any(c=>c.Path==oldFile.Path),"Edited old file protected "+ext);

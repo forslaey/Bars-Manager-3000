@@ -97,7 +97,7 @@ namespace ServiceTool
             var current=source.ToList();var known=new System.Collections.Generic.Dictionary<string,System.Collections.Generic.List<BundlePackageIdentity>>();
             foreach(var file in current.Where(f=>f.Group!="Утилиты"))
             {
-                token.ThrowIfCancellationRequested();string path=YandexBundleSource.LocalPath(root,file.Path);
+                token.ThrowIfCancellationRequested();string path=BundleFolders.PackageDestination(root,file.Path);
                 if(!File.Exists(path)||YandexBundleSource.Hash(path,token)!=file.Sha256)continue;
                 var identity=BundlePackageIdentity.Read(path,file.Path);if(identity==null)continue;
                 System.Collections.Generic.List<BundlePackageIdentity> list;if(!known.TryGetValue(identity.Key,out list))known[identity.Key]=list=new System.Collections.Generic.List<BundlePackageIdentity>();list.Add(identity);
@@ -106,7 +106,7 @@ namespace ServiceTool
             foreach(string path in PackageFiles(root,token))
             {
                     string relative="/"+path.Substring(Path.GetFullPath(root).TrimEnd('\\','/').Length).TrimStart('\\','/').Replace('\\','/');
-                    if(current.Any(f=>String.Equals(f.Path,relative,StringComparison.OrdinalIgnoreCase))||(File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0)continue;
+                    if(current.Any(f=>String.Equals(BundleFolders.DownloadPath(f.Path),relative,StringComparison.OrdinalIgnoreCase))||(File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0)continue;
                     string ext=Path.GetExtension(path);if(!ext.Equals(".exe",StringComparison.OrdinalIgnoreCase)&&!ext.Equals(".msi",StringComparison.OrdinalIgnoreCase))continue;
                     string hash=YandexBundleSource.Hash(path,token);var remote=new BundleRemoteFile {Path=relative,Sha256=hash};
                     if(!new BundleReceipts(root).CanReplace(remote,hash))continue;

@@ -22,7 +22,7 @@ namespace ServiceTool
             Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
             foreach(bool dark in new[]{false,true})
             {
-                foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id,false))
+                foreach(string id in new[]{"anydesk","rudesktop"})using(var dialog=new SoftwareRemoteDialog(ThemePalette.Create(dark),null,id))
                 {
                     Show(dialog);var confirmation=Field<BrandTextBox>(dialog,"confirmation");var languages=Field<List<Label>>(dialog,"languages");var language=languages.Single();
                     Check(languages.Count==1&&language.Font.Bold,"One bold keyboard indicator");dialog.UpdateKeyboardState("ru",false);Check(language.Text=="РУС","Russian state");dialog.UpdateKeyboardState("en",false);Check(language.Text=="ENG","English state");

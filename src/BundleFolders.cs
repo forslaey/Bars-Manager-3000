@@ -34,10 +34,17 @@ namespace ServiceTool
                 ? Path.GetDirectoryName(libraries) : libraries;
         }
 
-        internal static string DownloadPath(string root, string path)
+        internal static string DownloadPath(string path)
         {
+            if (String.IsNullOrEmpty(path) || !path.StartsWith("/", StringComparison.Ordinal))
+                throw new InvalidDataException("Неверный путь файла комплекта.");
             if (path.StartsWith("/_", StringComparison.OrdinalIgnoreCase)) return path;
             return "/_libraries" + path;
+        }
+
+        internal static string PackageDestination(string root, string remotePath)
+        {
+            return YandexBundleSource.LocalPath(root, DownloadPath(remotePath));
         }
 
         internal static string FindSibling(string section)
