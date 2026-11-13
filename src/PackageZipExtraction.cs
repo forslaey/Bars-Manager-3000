@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -19,6 +19,27 @@ namespace ServiceTool
             catch(IOException){return false;}
             catch(UnauthorizedAccessException){return false;}
         }
+        internal static void CleanupPrevious(string previous,Action<TransferProgress> report)
+        {
+            CleanupFolder(previous,"Комплект распакован. Не удалось удалить прежнюю папку: ",report);
+        }
+
+        internal static void CleanupFolder(string path,string message,Action<TransferProgress> report)
+        {
+            try { if(Directory.Exists(path))Directory.Delete(path,true); }
+            catch(IOException ex){ReportCleanup(path,message,report,ex);}
+            catch(UnauthorizedAccessException ex){ReportCleanup(path,message,report,ex);}
+        }
+
+        private static void ReportCleanup(string path,string message,Action<TransferProgress> report,Exception error)
+        {
+            string detail=message+path+". "+error.Message;
+            System.Diagnostics.Trace.TraceWarning(detail);
+            if(report==null)return;
+            try { report(new TransferProgress{CleanupWarning=true,Stage=detail}); }
+            catch(Exception ex){System.Diagnostics.Trace.TraceWarning(ex.Message);}
+        }
+
         internal static string Extract(string path,System.Threading.CancellationToken token=default(System.Threading.CancellationToken),Action<TransferProgress> report=null,bool replace=false)
         {
             string parent = Path.GetDirectoryName(path);
@@ -71,11 +92,11 @@ namespace ServiceTool
                     Directory.Move(target,previous);
                     try{Directory.Move(staging,target);}
                     catch{Directory.Move(previous,target);throw;}
-                    Directory.Delete(previous,true);
+                    CleanupPrevious(previous,report);
                 }
                 return target;
             }
-            finally { if (Directory.Exists(staging)) Directory.Delete(staging, true); }
+            finally { CleanupFolder(staging,"Не удалось удалить временную папку: ",report); }
         }
 
     }

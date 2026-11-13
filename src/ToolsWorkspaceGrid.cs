@@ -89,25 +89,63 @@ namespace ServiceTool
             }
             finally{fitting=false;}
         }
-        internal void LoadRows(string local,Dictionary<string,Tuple<string,bool,bool>> catalog)
+        internal sealed class LocalPackage
+        {
+            internal string Name;
+            internal bool Exists;
+            internal ToolArchives.ReadState State;
+            internal string[] Executables;
+        }
+
+        internal static LocalPackage[] ReadPackages(string local,IEnumerable<string> online,System.Threading.CancellationToken token)
+        {
+            var names=(Directory.Exists(local)?ToolsDeploymentForm.LocalPackages(local):new string[0]).Concat(online)
+                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name=>name,StringComparer.CurrentCultureIgnoreCase);
+            return names.Select(name=>
+            {
+                token.ThrowIfCancellationRequested();
+                string path=Path.Combine(local,name);
+                string expected=ToolsDeployment.ShortcutExecutable(name);
+                var result=new LocalPackage{Name=name,Exists=Directory.Exists(path)||File.Exists(path),Executables=new string[0]};
+                if(!result.Exists)return result;
+                try
+                {
+                    if(File.Exists(path)&&ToolArchives.Supports(path))
+                    {
+                        string[] contents;
+                        result.State=ToolArchives.Inspect(path,token,out contents);
+                        if(expected!=null)
+                            result.Executables=ToolArchives.NormalizeEntries(path,contents)
+                                .Where(entry=>System.IO.Path.GetFileName(entry).Equals(expected,StringComparison.OrdinalIgnoreCase))
+                                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(entry=>entry,StringComparer.CurrentCultureIgnoreCase).ToArray();
+                    }
+                    else if(expected!=null)
+                        result.Executables=ToolsDeployment.ShortcutCandidates(path,expected).Select(entry=>entry.Replace('\\','/')).ToArray();
+                }
+                catch(InvalidDataException){result.State=ToolArchives.ReadState.Damaged;}
+                catch(IOException){result.State=ToolArchives.ReadState.Unavailable;}
+                catch(UnauthorizedAccessException){result.State=ToolArchives.ReadState.Unavailable;}
+                return result;
+            }).ToArray();
+        }
+
+        internal void LoadRows(LocalPackage[] local,Dictionary<string,Tuple<string,bool,bool>> catalog)
         {
             var old=grid.Rows.Cast<DataGridViewRow>().Select(row=>(Row)row.Tag)
                 .Where(row=>row!=null).ToDictionary(row=>row.Package+"|"+row.Path,StringComparer.OrdinalIgnoreCase);
             grid.Rows.Clear();
             packages.Clear();
-            var names=(Directory.Exists(local)?ToolsDeploymentForm.LocalPackages(local):new string[0])
-                .Concat(catalog.Keys).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name=>name,StringComparer.CurrentCultureIgnoreCase);
-            foreach(string name in names)
+            foreach(var package in local)
             {
+                string name=package.Name;
                 Tuple<string,bool,bool> item;
                 bool online=catalog.TryGetValue(name,out item);
-                string path=Path.Combine(local,name);
-                bool exists=Directory.Exists(path)||File.Exists(path);
-                bool damaged=File.Exists(path)&&ToolArchives.Supports(path)&&!ToolArchives.HasReadableDirectory(path); bool ready=!damaged&&(exists||online&&item.Item2);
+                bool damaged=package.State==ToolArchives.ReadState.Damaged;
+                bool ready=package.Exists&&package.State==ToolArchives.ReadState.Ready;
                 var row=new Row{Package=name,Ready=ready,Damaged=damaged,CanDownload=online&&item.Item3,Selected=online&&item.Item3};
                 Row saved;
                 if(old.TryGetValue(name+"|",out saved)){row.Selected=(row.CanDownload||row.Ready)&&saved.Selected;row.Expanded=saved.Expanded;}
-                var executables=ready?Executables(path,name).ToArray():new string[0];
+                var executables=ready?package.Executables:new string[0];
                 if(executables.Length==1)
                 {
                     row.SingleExecutable=executables[0];
@@ -115,7 +153,7 @@ namespace ServiceTool
                 }
                 packages.Add(name,row);
                 row.HasVariants=executables.Length>1;
-                Add(row,row.HasVariants?(row.Expanded?"▾  ":"▸  ")+name:name,damaged?(online?"ZIP повреждён — "+item.Item1:"ZIP повреждён"):online?item.Item1:"Локальная папка");
+                Add(row,row.HasVariants?(row.Expanded?"▾  ":"▸  ")+name:name,package.State!=ToolArchives.ReadState.Ready?ToolArchives.ReadStatus(package.State):online?item.Item1:"Локальная папка");
                 if(executables.Length<2)continue;
                 foreach(string executable in executables)
                 {
@@ -132,29 +170,6 @@ namespace ServiceTool
             rendered.Tag=row;
             rendered.Cells[1].ToolTipText=name.Trim();
             return rendered;
-        }
-        private static IEnumerable<string> Executables(string path,string package)
-        {
-            string expected=ToolsDeployment.ShortcutExecutable(package);
-            if(expected==null)return new string[0];
-            try
-            {
-                if(Directory.Exists(path))return ToolsDeployment.ShortcutCandidates(path,expected).Select(name=>name.Replace(Path.DirectorySeparatorChar,(char)47)).ToArray();
-                if(!ToolArchives.IsZip(path))
-                    return ToolArchives.Entries(path).Where(entry=>System.IO.Path.GetFileName(entry).Equals(expected,StringComparison.OrdinalIgnoreCase)).ToArray();
-                using(var input=File.OpenRead(path))
-                using(var archive=new ZipArchive(input,ZipArchiveMode.Read))
-                {
-                    string prefix=System.IO.Path.GetFileNameWithoutExtension(path)+"/";
-                    bool wrapped=archive.Entries.All(entry=>entry.FullName.Replace('\\','/').StartsWith(prefix,StringComparison.OrdinalIgnoreCase));
-                    return archive.Entries.Where(entry=>entry.Name.Equals(expected,StringComparison.OrdinalIgnoreCase))
-                        .Select(entry=>entry.FullName.Replace('\\','/')).Select(name=>wrapped?name.Substring(prefix.Length):name)
-                        .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name=>name,StringComparer.CurrentCultureIgnoreCase).ToArray();
-                }
-            }
-            catch(InvalidDataException){return new string[0];}
-            catch(IOException){return new string[0];}
-            catch(UnauthorizedAccessException){return new string[0];}
         }
         internal bool WantsDownload(string package){Row row;return package!=null&&packages.TryGetValue(package,out row)&&row.Selected;}
         internal string[] DamagedPackages { get { return packages.Values.Where(row=>row.Damaged).Select(row=>row.Package).ToArray(); } }

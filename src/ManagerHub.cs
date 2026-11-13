@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -12,14 +12,14 @@ namespace ServiceTool
         protected readonly TableLayoutPanel Root;
         private readonly PictureBox logo;
         private readonly ThemeToggleButton theme = new ThemeToggleButton();
-        private readonly Image lightLogo, darkLogo;
+        private readonly Image lightLogo;
         private bool initialScaleApplied;
         private readonly ToolTip tips = new ToolTip();
         protected ManagerModuleForm(string title, Size size)
         {
             // Do not let Font/ClientSize trigger DPI scaling before the derived
             // module has added its controls, otherwise only the base header scales.
-            logo = new PictureBox();
+            logo = new SnowBanner();
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.None;
             Font = new Font("Segoe UI", 10F); Text = title; ClientSize = size;
@@ -27,7 +27,7 @@ namespace ServiceTool
             DoubleBuffered = true; Icon = BrandAssets.LoadIcon();
             Colors = ThemePalette.Create(ThemePreference.LoadDark());
             NativeWindowTheme.Bind(this,()=>Colors.Dark);
-            lightLogo = BrandAssets.LoadLogo(false); darkLogo = BrandAssets.LoadLogo(true);
+            lightLogo = BrandAssets.LoadLogoResource("BARS.NewYear.png") ?? BrandAssets.LoadLogo(false);
             Root = new BufferedLayoutPanel { Size = size, Dock = DockStyle.Fill, Padding = new Padding(26, 12, 26, 12), ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
             Root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             Root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96)); Root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -89,7 +89,7 @@ namespace ServiceTool
         public void SetTheme(bool dark, bool persist)
         {
             Colors = ThemePalette.Create(dark); BackColor = Colors.Canvas; ForeColor = Colors.Text;
-            logo.Image = dark ? darkLogo : lightLogo; theme.Palette = Colors; theme.Dark = dark;
+            logo.Image = lightLogo; theme.Palette = Colors; theme.Dark = dark;
             ApplyTree(this, Colors.Canvas); NativeWindowTheme.Apply(this, dark); OnThemeChanged(); Invalidate(true);
             if (persist) ThemePreference.TrySave(dark);
         }
@@ -109,7 +109,7 @@ namespace ServiceTool
         protected virtual void OnThemeChanged() { }
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { logo.Image = null; if (lightLogo != null) lightLogo.Dispose(); if (darkLogo != null) darkLogo.Dispose(); tips.Dispose(); }
+            if (disposing) { logo.Image = null; if (lightLogo != null) lightLogo.Dispose(); tips.Dispose(); }
             base.Dispose(disposing);
         }
     }
@@ -118,8 +118,8 @@ namespace ServiceTool
         public ManagerHub() : base("BARS Manager 3000", new Size(900, 770))
         {
             FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false; MinimumSize = new Size(860, 740); ClientSize = new Size(900, 770);
-            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 84;
-            var launcherHeader=(TableLayoutPanel)Root.GetControlFromPosition(0,0);launcherHeader.Padding=new Padding(0,18,0,0);
+            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 108;
+            var launcherHeader=(TableLayoutPanel)Root.GetControlFromPosition(0,0);launcherHeader.Padding=new Padding(0,4,0,0);
             Root.AutoScroll=true;
             // Four modules in an even 2x2 grid, plus a full-width settings card.
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty, MinimumSize=new Size(0,670) };

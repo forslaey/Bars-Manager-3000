@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -316,7 +316,7 @@ namespace ServiceTool
                     {
                         extracting=true;UpdateActions();
                         Log("Распаковываем комплект: "+item.Step.label+"…");
-                        string target=await Task.Run(()=>PackageZipExtraction.Extract(path,token,progress=>{progress.Key=progressKey;extractionProgress.Report(progress);},replace:true));
+                        string target=await Task.Run(()=>PackageZipExtraction.Extract(path,token,progress=>{progress.Key=progressKey;extractionProgress.Report(progress);if(progress.CleanupWarning)BeginInvoke((MethodInvoker)delegate{Log(progress.Stage);});},replace:true));
                         FinishExtraction("Комплект распакован.",success:true);
                         Log("Распаковано в "+target+".");
                     }

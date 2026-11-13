@@ -121,11 +121,17 @@ namespace ServiceTool
         public static List<LibraryCheck> Scan(Action<int,int,string> progress=null)
         {
             List<LibraryRegisteredProduct> inventory = null;
-            try { inventory = LibraryMaintenance.Inventory(); } catch { }
-            var packages=LibraryCatalog.All().ToList();var result=new List<LibraryCheck>();foreach(var package in packages){result.Add(Check(package,inventory));if(progress!=null)progress(result.Count,packages.Count,package.Name);}return result;
+            string inventoryError=null;
+            try { inventory = LibraryMaintenance.Inventory(); } catch(Exception ex) { inventoryError=ex.Message; }
+            var packages=LibraryCatalog.All().ToList();var result=new List<LibraryCheck>();foreach(var package in packages){result.Add(Check(package,inventory,inventoryError));if(progress!=null)progress(result.Count,packages.Count,package.Name);}return result;
+        }
+        private static List<LibraryRegisteredProduct> InventoryOrThrow(List<LibraryRegisteredProduct> inventory,string error)
+        {
+            if(error!=null)throw new InvalidOperationException("Не удалось прочитать список установленных программ: "+error);
+            return inventory??LibraryMaintenance.Inventory();
         }
         public static LibraryCheck Check(LibraryPackage package) { return Check(package, null); }
-        private static LibraryCheck Check(LibraryPackage package, List<LibraryRegisteredProduct> inventory)
+        private static LibraryCheck Check(LibraryPackage package, List<LibraryRegisteredProduct> inventory,string inventoryError=null)
         {
             LibraryCheck result = new LibraryCheck { Package = package, State = LibraryState.Missing, Detail = "Компонент не найден" };
             try
@@ -181,7 +187,7 @@ namespace ServiceTool
                 }
                 else if (package.Kind == LibraryKind.DotNet)
                 {
-                    return ProbeRuntime(package, RuntimeDirectories(package.Architecture, package.RuntimeFamily), inventory ?? LibraryMaintenance.Inventory(), LibraryMaintenance.StillRegistered);
+                    return ProbeRuntime(package, RuntimeDirectories(package.Architecture, package.RuntimeFamily), InventoryOrThrow(inventory,inventoryError), LibraryMaintenance.StillRegistered);
                 }
                 else if (package.Kind == LibraryKind.Inno)
                 {
@@ -214,7 +220,7 @@ namespace ServiceTool
                     string references = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"Reference Assemblies\Microsoft\Framework\.NETFramework\v" + package.FrameworkVersion + @"\RedistList\FrameworkList.xml");
                     if (runtime && sdk && File.Exists(references))
                     {
-                        var registered = (inventory ?? LibraryMaintenance.Inventory()).Where(p => LibraryMaintenance.Matches(package, p) && LibraryMaintenance.StillRegistered(p)).ToList();
+                        var registered = (InventoryOrThrow(inventory,inventoryError)).Where(p => LibraryMaintenance.Matches(package, p) && LibraryMaintenance.StillRegistered(p)).ToList();
                         if (registered.Any(p => p.Name.IndexOf("SDK", StringComparison.OrdinalIgnoreCase) >= 0) && registered.Any(p => p.Name.IndexOf("Targeting Pack", StringComparison.OrdinalIgnoreCase) >= 0))
                             return Found(result, "Runtime " + package.FrameworkVersion + ", файлы SDK/targeting pack и действующая регистрация обоих компонентов найдены");
                         result.State = LibraryState.Unknown; result.Detail = "Runtime и файлы SDK/targeting pack есть, но действующая регистрация Developer Pack не подтверждена"; return result;
@@ -232,7 +238,7 @@ namespace ServiceTool
                             string path = server == null ? null : Convert.ToString(server.GetValue(null));
                             if (File.Exists(path))
                             {
-                                var standalone = (inventory ?? LibraryMaintenance.Inventory()).Where(p => LibraryMaintenance.Matches(package, p) && LibraryMaintenance.StillRegistered(p) && LibraryVersions.Number(p.Version) != null).OrderByDescending(p => LibraryVersions.Number(p.Version)).FirstOrDefault();
+                                var standalone = (InventoryOrThrow(inventory,inventoryError)).Where(p => LibraryMaintenance.Matches(package, p) && LibraryMaintenance.StillRegistered(p) && LibraryVersions.Number(p.Version) != null).OrderByDescending(p => LibraryVersions.Number(p.Version)).FirstOrDefault();
                                 if (standalone != null) return LibraryVersions.Known(package, standalone.Version, "Microsoft.ACE.OLEDB.16.0, разрядность " + package.Architecture + "; DLL и регистрация Access Database Engine найдены");
                                 result.State = LibraryState.Unknown; result.Detail = "Провайдер ACE доступен, но отдельная установка Access Database Engine не подтверждена; он может входить в Office или остаться после удаления"; return result;
                             }
@@ -241,7 +247,7 @@ namespace ServiceTool
                     result.Detail = "Провайдер ACE x64 не найден. Перед установкой проверь разрядность Office";
                 }
                 else if (package.Kind == LibraryKind.VcBundle || package.Kind == LibraryKind.VcLegacy)
-                    return LibraryVcProfiles.Check(package, inventory ?? LibraryMaintenance.Inventory(), Environment.Is64BitOperatingSystem, LibraryMaintenance.StillRegistered);
+                    return LibraryVcProfiles.Check(package, InventoryOrThrow(inventory,inventoryError), Environment.Is64BitOperatingSystem, LibraryMaintenance.StillRegistered);
                 else
                 {
                     result.State = LibraryState.Unknown;

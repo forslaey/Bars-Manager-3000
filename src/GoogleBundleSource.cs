@@ -39,7 +39,10 @@ namespace ServiceTool
    while(pending.Count>0){token.ThrowIfCancellationRequested();var batch=new List<string[]>();while(batch.Count<4&&pending.Count>0)batch.Add(pending.Dequeue());
     var pages=batch.Select(directory=>System.Threading.Tasks.Task.Run(()=>ReadText("https://drive.google.com/drive/folders/"+directory[0],token),token)).ToArray();System.Threading.Tasks.Task.WaitAll(pages);
     for(int page=0;page<batch.Count;page++){var directory=batch[page];if(!seen.Add(directory[0]))throw new InvalidDataException("Повтор папки Google");
-    foreach(object value in Parse(pages[page].Result)){
+    object[] rows;
+    try { rows=Parse(pages[page].Result); }
+    catch(InvalidDataException ex){throw new IOException("Не удалось прочитать папку Google Диска "+(directory[1].Length==0?"/":directory[1])+". "+ex.Message,ex);}
+    foreach(object value in rows){
      var row=value as object[];if(row==null||row.Length<14)throw new InvalidDataException("Неизвестный формат каталога Google");
      string id=row[0] as string,name=row[2] as string,type=row[3] as string;if(id==null||!Regex.IsMatch(id,@"^[a-zA-Z0-9_-]+$")||String.IsNullOrEmpty(name)||name.Contains("/"))throw new InvalidDataException("Некорректное имя Google");
      string path=directory[1]+"/"+name;YandexBundleSource.LocalPath(Path.Combine(Path.GetTempPath(),"bars-google-check"),path);

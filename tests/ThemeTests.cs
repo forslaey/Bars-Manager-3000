@@ -201,7 +201,7 @@ namespace ServiceTool
             string lightPixels = HashPixels(image.Image);
             SetTheme(form, true);
             VerifyTransparentCorners(image.Image, "Dark logo");
-            Assert(HashPixels(image.Image) != lightPixels, "Dark theme uses a distinct logo pixel variant");
+            Assert(image is SnowBanner && HashPixels(image.Image) == lightPixels, "Seasonal banner keeps the same artwork in both themes");
             SetTheme(form, false);
             Assert(HashPixels(image.Image) == lightPixels, "Returning to light theme restores the original logo pixels");
 

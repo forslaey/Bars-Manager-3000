@@ -313,6 +313,7 @@ namespace ServiceTool
                 var exclusions=new List<string>();
                 var launchers=new List<BarsTool>();
                 var missingShortcuts=new List<string>();
+                var cleanupWarnings=new List<string>();
                 foreach(string package in packages)
                 {
                     string path=YandexBundleSource.LocalPath(packageSource,"/"+package);
@@ -321,8 +322,10 @@ namespace ServiceTool
                         string folder=Path.Combine(packageSource,Path.GetFileNameWithoutExtension(path));
                         var report=ToolProgress.OperationReporter;
                         folder=await Task.Run(()=>ToolArchives.Extract(path,archiveCancellation.Token,p=>{
+                            if(p.CleanupWarning){cleanupWarnings.Add(p.Stage);return;}
                             LibraryCancellation.Check(()=>CancelRequested);
-                            if(p.Total>0)report("BARS_FRACTION|"+p.Bytes+"|"+p.Total+"|Распаковываем "+package+"…");
+                            if(p.Total<=0)report(p.Stage);
+                            else report("BARS_FRACTION|"+p.Bytes+"|"+p.Total+"|Распаковываем "+package+"…");
                         },replace:true));
                         folders.Add(Path.GetFileName(folder));ToolProgress.CompleteStep();
                     }
@@ -363,11 +366,10 @@ namespace ServiceTool
                 string request=new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new ToolCopyRequest{Source=packageSource,Packages=folders.ToArray(),ExcludedDirectories=exclusions.ToArray()});
                 var result=await Execute("tools-deploy-selected",request,target);
 
-                if(result.ExitCode==1602)throw new OperationCanceledException();
                 if(result.ExitCode==1602)throw new OperationCanceledException();if(result.ExitCode!=0)throw new IOException(result.Message);
                 ToolProgress.CompleteStep();ToolsDeployment.EnableAdministratorLaunch(packageSource,target,folders);ToolProgress.CompleteStep();
                 ToolsDeployment.ShortcutsAt(packageSource,target,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),true,folders,launchers);
-                ToolProgress.CompleteStep();ToolProgress.FinishOperation(missingShortcuts.Count>0?"Утилиты распакованы. Без ярлыков: "+String.Join(", ",missingShortcuts)+".":launchers.Count>0?"Утилиты распакованы. Ярлыки созданы.":"Утилиты распакованы без создания ярлыков.",success:true);
+                ToolProgress.CompleteStep();ToolProgress.FinishOperation(cleanupWarnings.Count>0?String.Join(" ",cleanupWarnings):missingShortcuts.Count>0?"Утилиты распакованы. Без ярлыков: "+String.Join(", ",missingShortcuts)+".":launchers.Count>0?"Утилиты распакованы. Ярлыки созданы.":"Утилиты распакованы без создания ярлыков.",success:true);
             }
             catch(OperationCanceledException)
             {

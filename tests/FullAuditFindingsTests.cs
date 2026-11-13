@@ -39,12 +39,73 @@ namespace ServiceTool
             Directory.CreateDirectory(root);
             try
             {
+                Probe("archive inspection separates corruption, access and cancellation",delegate
+                {
+                    var token=System.Threading.CancellationToken.None;
+                    string path=Path.Combine(root,"broken.7z");
+                    File.WriteAllText(path,"broken");
+                    string[] entries;
+                    Require(ToolArchives.Inspect(path,token,out entries)==ToolArchives.ReadState.Damaged,"Broken 7z was not classified per file.");
+                    using(var locked=new FileStream(path,FileMode.Open,FileAccess.ReadWrite,FileShare.None))
+                        Require(ToolArchives.Inspect(path,token,out entries)==ToolArchives.ReadState.Unavailable,"Locked archive was classified as damaged.");
+                    using(var cancel=new System.Threading.CancellationTokenSource())
+                    {
+                        cancel.Cancel();
+                        bool cancelled=false;
+                        try{ToolsWorkspaceGrid.ReadPackages(root,new string[0],cancel.Token);}
+                        catch(OperationCanceledException){cancelled=true;}
+                        Require(cancelled,"Cancelled package scan completed.");
+                    }
+                    using(var form=new ToolsDeploymentForm(true))
+                    {
+                        var recheck=ControlsUnder(form).OfType<Button>().Single(button=>button.Text=="Перепроверить файлы");
+                        Require(!recheck.Enabled,"Recheck was enabled without a remote catalog.");
+                    }
+                });
                 Probe("archive failure dialog lists names without repeated errors",delegate
                 {
                     var names=new[]{"Termite.zip","WinSCP 6.6.2.zip"};
                     string message=BundleDownloadForm.FailedArchiveMessage(names,true);
                     Require(message=="Выбранные архивы скачаны не будут — они повреждены.\r\n\r\nTermite.zip\r\nWinSCP 6.6.2.zip\r\n\r\nПосмотреть наборы в другом облаке?","Damaged archive dialog text differs.");
                     Require(!BundleDownloadForm.FailedArchiveMessage(names,false).Contains("повреждены"),"Download failure was reported as corruption.");
+                });
+                Probe("archive payload validation and wrapper paths",delegate
+                {
+                    var token=System.Threading.CancellationToken.None;
+                    string path=Path.Combine(root,"sample.zip");
+                    using(var archive=new System.IO.Compression.ZipArchive(File.Create(path),System.IO.Compression.ZipArchiveMode.Create))
+                    using(var writer=new StreamWriter(archive.CreateEntry("sample/file.txt",System.IO.Compression.CompressionLevel.NoCompression).Open()))
+                        writer.Write("unique-archive-payload");
+                    ToolArchives.ValidateDownload(path,path,token);
+                    Require(ToolArchives.NormalizeEntries(path,ToolArchives.Entries(path,token)).SequenceEqual(new[]{"file.txt"}),"Wrapper paths do not agree with extraction.");
+                    byte[] bytes=File.ReadAllBytes(path);
+                    byte[] payload=System.Text.Encoding.ASCII.GetBytes("unique-archive-payload");
+                    int offset=Enumerable.Range(0,bytes.Length-payload.Length).First(index=>bytes.Skip(index).Take(payload.Length).SequenceEqual(payload));
+                    bytes[offset]^=1;
+                    File.WriteAllBytes(path,bytes);
+                    Require(PackageZipExtraction.HasReadableDirectory(path),"Fixture no longer has a readable ZIP directory.");
+                    bool rejected=false;
+                    try{ToolArchives.ValidateDownload(path,path,token);}catch(InvalidDataException){rejected=true;}
+                    Require(rejected,"Damaged ZIP payload with valid directory was accepted.");
+                });
+                Probe("7z validation, wrapper and replacement",delegate
+                {
+                    var token=System.Threading.CancellationToken.None;
+                    string folder=Directory.CreateDirectory(Path.Combine(root,"Seven")).FullName;
+                    File.WriteAllText(Path.Combine(folder,"file.txt"),"new payload");
+                    string path=Path.Combine(root,"Seven.7z");
+                    var start=new System.Diagnostics.ProcessStartInfo("tar.exe","-a -cf \""+path+"\" -C \""+root+"\" Seven")
+                    {UseShellExecute=false,CreateNoWindow=true};
+                    using(var process=System.Diagnostics.Process.Start(start))
+                    {
+                        if(!process.WaitForExit(10000)){process.Kill();throw new IOException("Fixture creation timed out.");}
+                        Require(process.ExitCode==0,"7z fixture creation failed.");
+                    }
+                    File.WriteAllText(Path.Combine(folder,"file.txt"),"old payload");
+                    ToolArchives.ValidateDownload(path,path,token);
+                    Require(ToolArchives.NormalizeEntries(path,ToolArchives.Entries(path,token)).Contains("file.txt"),"7z wrapper did not normalize.");
+                    string output=ToolArchives.Extract(path,token,null,true);
+                    Require(File.ReadAllText(Path.Combine(output,"file.txt"))=="new payload","7z replacement did not publish the extracted payload.");
                 });
                 Probe("mixed Google archive rescan",delegate
                 {
@@ -61,7 +122,7 @@ namespace ServiceTool
                         var entry=method.Invoke(null,new object[]{root,file,System.Threading.CancellationToken.None});
                         bool done=(bool)entry.GetType().GetField("Done",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Public).GetValue(entry);
                         bool selected=(bool)entry.GetType().GetField("Selected",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Public).GetValue(entry);
-                        Require(done==(path==good)&&selected==(path==bad),"Rescan did not distinguish the readable archive from the damaged one.");
+                        Require(!done&&selected==(path==bad),"Rescan did not distinguish the readable archive from the damaged one.");
                     }
                 });
                 foreach(bool dark in new[]{false,true})
@@ -160,7 +221,7 @@ namespace ServiceTool
                             workspace.SetPalette(ThemePalette.Create(dark));
                             window.Controls.Add(workspace);
                             window.Show();
-                            workspace.LoadRows(root,new Dictionary<string,Tuple<string,bool,bool>>(StringComparer.OrdinalIgnoreCase));
+                            workspace.LoadRows(ToolsWorkspaceGrid.ReadPackages(root,new string[0],System.Threading.CancellationToken.None),new Dictionary<string,Tuple<string,bool,bool>>(StringComparer.OrdinalIgnoreCase));
                             Application.DoEvents();
                             var grid=workspace.Controls.OfType<ServiceGrid>().Single();
                             int row=grid.Rows.Cast<DataGridViewRow>().Single(item=>Convert.ToString(item.Cells[1].Value)=="Termite.zip").Index;

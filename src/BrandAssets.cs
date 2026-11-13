@@ -33,7 +33,12 @@ namespace ServiceTool
 
         public static Image LoadLogo(bool dark)
         {
-            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(dark ? "BARS.Logo.Dark.png" : "BARS.Logo.png"))
+            return LoadLogoResource(dark ? "BARS.Logo.Dark.png" : "BARS.Logo.png");
+        }
+
+        internal static Image LoadLogoResource(string resource)
+        {
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource))
             {
                 if (stream == null) return null;
                 using (var image = new Bitmap(stream))

@@ -5,6 +5,8 @@ using System.Threading;
 
 namespace ServiceTool
 {
+    internal sealed class BundleArchiveException : IOException
+    { internal BundleArchiveException(string message,Exception inner=null):base(message,inner){} }
     internal sealed class BundleTransientException : IOException
     { internal BundleTransientException(string message,Exception inner):base(message,inner){} }
     internal sealed class BundleTransfer
@@ -116,15 +118,22 @@ namespace ServiceTool
             if(file.Sha256!=null&&!String.Equals(YandexBundleSource.Hash(part,token),file.Sha256,StringComparison.OrdinalIgnoreCase))
             {
                 File.Move(part,part+".invalid-"+Guid.NewGuid().ToString("N"));
+                if(file.Group=="Утилиты"&&ToolArchives.Supports(file.Path))throw new BundleArchiveException("SHA-256 архива не совпадает.");
                 throw new BundleTransientException("SHA-256 не совпадает; повреждённая копия сохранена в карантине",null);
             }
+            if(file.Group=="Утилиты"&&ToolArchives.Supports(file.Path))
+            {
+                try { ToolArchives.ValidateDownload(part,file.Path,token); }
+                catch(InvalidDataException ex){throw new BundleArchiveException("Скачанный архив не удалось прочитать.",ex);}
+            }
+
             // Recheck the destination immediately before publishing; never replace
             // a locally edited file or an unexpected newly created file.
             destination=BundleFolders.PackageDestination(root,file.Path);
             Directory.CreateDirectory(Path.GetDirectoryName(destination));
             lock(BundlePublication.Gate)
             {
-                if(file.Group=="Утилиты"&&ToolArchives.Supports(file.Path)&&!ToolArchives.HasReadableDirectory(part,file.Path,token))throw new InvalidDataException("Скачанный архив не удалось прочитать."); BundleMaintenance.ValidateAgainstLocal(root,part,file,token);
+                BundleMaintenance.ValidateAgainstLocal(root,part,file,token);
                 if(originalHash!=null&&!(file.Group=="Утилиты"&&ToolArchives.Supports(file.Path)))BundlePackageIdentity.ValidateUpgrade(destination,part,file.Path);
                 if(stage!=null)stage("Публикация");
                 BundlePublication.Publish(part,destination,originalHash,token,null);

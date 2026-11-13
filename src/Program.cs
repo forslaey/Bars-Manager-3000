@@ -223,9 +223,9 @@ namespace ServiceTool
         private readonly Button applyStartupButton;
         private readonly Button collectLogsButton;
         private readonly ComboBox startupCombo = new BrandComboBox { UseManagedPopup = true };
-        private readonly PictureBox brandImage = new PictureBox();
+        private readonly PictureBox brandImage = new SnowBanner();
         private readonly Image lightBrandLogo;
-        private readonly Image darkBrandLogo;
+
         private ThemePalette palette = ThemePalette.Create(false);
         private string statusTone = "neutral";
         private bool bindingServices;
@@ -270,7 +270,7 @@ namespace ServiceTool
                 closing = true;
                 brandImage.Image = null;
                 if (lightBrandLogo != null) lightBrandLogo.Dispose();
-                if (darkBrandLogo != null) darkBrandLogo.Dispose();
+
                 timer.Dispose();
                 toolTips.Dispose();
             }
@@ -335,8 +335,8 @@ namespace ServiceTool
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Panel brandSlot = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0), Padding = new Padding(0, 6, 0, 6) };
-            lightBrandLogo = BrandAssets.LoadLogo(false);
-            darkBrandLogo = BrandAssets.LoadLogo(true);
+            lightBrandLogo = BrandAssets.LoadLogoResource("BARS.NewYear.png") ?? BrandAssets.LoadLogo(false);
+
             brandImage.Image = lightBrandLogo;
             brandImage.SizeMode = PictureBoxSizeMode.Zoom;
             brandImage.SetBounds(0, 0, 310, 76);
@@ -566,7 +566,7 @@ namespace ServiceTool
             servicesGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 236, 255);
             servicesGrid.DefaultCellStyle.SelectionForeColor = ink;
             servicesGrid.GridColor = Color.FromArgb(235, 239, 245);
-            
+
             servicesGrid.Columns.Add("DisplayName", "Название службы");
             servicesGrid.Columns.Add("Name", "Системное имя службы");
             servicesGrid.Columns.Add("State", "Состояние");
@@ -801,6 +801,7 @@ namespace ServiceTool
                 width = slot.ClientSize.Width - slot.Padding.Horizontal;
                 height = Math.Max(1, (int)Math.Round(width / aspect));
             }
+            width = Math.Min(slot.ClientSize.Width - slot.Padding.Horizontal, width + height * 3);
             Rectangle bounds = new Rectangle((slot.ClientSize.Width - width) / 2,
                 (slot.ClientSize.Height - height) / 2, width, height);
             if (brandImage.Bounds != bounds) brandImage.Bounds = bounds;
@@ -812,7 +813,7 @@ namespace ServiceTool
             serviceScroll.Palette=palette;serviceScroll.BackColor=palette.Surface;
             SuspendLayout();
             ApplyThemeTree(this, palette.Canvas);
-            brandImage.Image = dark ? darkBrandLogo : lightBrandLogo;
+            brandImage.Image = lightBrandLogo;
             ((ThemeToggleButton)themeToggleButton).Dark = dark;
             ((ThemeToggleButton)themeToggleButton).Palette = palette;
             themeToggleButton.AccessibleDescription = dark ? "Сейчас тёмная тема. Нажми, чтобы включить светлую." : "Сейчас светлая тема. Нажми, чтобы включить тёмную.";

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -13,7 +13,7 @@ namespace ServiceTool
         internal long Bytes, Total;
         internal double Overall=-1;
         internal string WorkText;
-        internal bool Complete, Paused, Failed, Cancelled;
+        internal bool Complete, Paused, Failed, Cancelled, CleanupWarning;
         internal bool Active = true;
     }
 
