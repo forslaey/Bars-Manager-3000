@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal sealed class AboutDialog : Form
+    internal sealed class AboutDialog : BrandWindow
     {
         private readonly Font bodyFont = new Font("Segoe UI", 10F);
         private readonly Font titleFont = new Font("Segoe UI", 20F, FontStyle.Bold);
@@ -17,6 +17,7 @@ namespace ServiceTool
             SuspendLayout();
             ThemePalette colors = palette ?? ThemePalette.Create(false);
             NativeWindowTheme.Bind(this,()=>colors.Dark);
+            if(applicationIcon==null)Icon=BrandAssets.LoadIcon();
             Text = "О софтине";
             Font = bodyFont;
             BackColor = colors.Canvas;

@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal sealed class LogArchiveDialog : Form
+    internal sealed class LogArchiveDialog : BrandWindow
     {
         private const int PageSize = 12;
         private readonly ThemePalette palette;

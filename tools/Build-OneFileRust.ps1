@@ -15,7 +15,7 @@ $useLocalRust = $Cargo -eq 'cargo.exe' -and !(Get-Command $Cargo -ErrorAction Si
 if ($useLocalRust) { $Cargo = $localCargo }
 if (!(Get-Command $Cargo -ErrorAction SilentlyContinue)) { throw 'Установи Rust с целью x86_64-pc-windows-gnu или укажи путь через -Cargo.' }
 if ($ResourceCompiler -eq 'rsrc.exe' -and !(Get-Command $ResourceCompiler -ErrorAction SilentlyContinue)) {
-    $localResourceCompiler = Join-Path $localTools 'bars-go-toolchain\bin\rsrc.exe'
+    $localResourceCompiler = Join-Path $localRust 'bin\rsrc.exe'
     if (Test-Path -LiteralPath $localResourceCompiler) { $ResourceCompiler = $localResourceCompiler }
 }
 if (!(Get-Command $ResourceCompiler -ErrorAction SilentlyContinue)) { throw 'Укажи путь к rsrc.exe через -ResourceCompiler.' }

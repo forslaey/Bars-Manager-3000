@@ -77,6 +77,9 @@ namespace ServiceTool
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
                 RedirectStandardInput = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
             };
+            // A Windows PowerShell child may inherit a PowerShell 7 module path.
+            string windowsModules = Path.Combine(Path.GetDirectoryName(PowerShellPath), "Modules");
+            start.EnvironmentVariables["PSModulePath"] = windowsModules + Path.PathSeparator + start.EnvironmentVariables["PSModulePath"];
             // Explicit UTF-8 on the child streams, independent of the machine's ANSI/OEM code page.
             using (var process = Process.Start(start))
             {
@@ -131,7 +134,7 @@ namespace ServiceTool
     }
     internal static class ManagerSystemActions
     {
-        internal static bool Known(string action) { return action == "initial-settings" || action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "tools-remove" || action == "system-restart" || action == "software-install" || action == "software-query" || action == "software-remove" || action == "software-access"; }
+        internal static bool Known(string action) { return action == "initial-settings" || action == "features-query" || action == "features-enable" || action == "features-disable" || action == "tools-deploy" || action == "tools-deploy-selected" || action == "tools-remove" || action == "system-restart" || action == "software-install" || action == "software-query" || action == "software-remove" || action == "software-access"; }
         internal static LibraryInstallResult Execute(string action, string data, string path, Action<string> progress)
         {
             if (!Known(action)) throw new InvalidDataException("Неизвестное действие менеджера");
@@ -151,6 +154,13 @@ namespace ServiceTool
                     if (action == "features-enable") return WindowsComponents.Run(WindowsComponents.EnableScript(data), progress);
                     if (action == "features-disable") return WindowsComponents.Run(WindowsComponents.DisableScript(data), progress);
                     if (action == "tools-remove") {ToolsDeployment.Remove(path,data,progress);return new LibraryInstallResult {ExitCode=0,State=LibraryState.Missing,Message="Утилиты удалены"};}
+                    if(action=="tools-deploy-selected")
+                    {
+                        var request=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<ToolCopyRequest>(data);
+                        if(request==null||request.Packages==null||request.Packages.Length==0)throw new IOException("Не выбраны наборы утилит.");
+                        ToolsDeployment.CopyToTarget(request.Source,path,progress,()=>LibraryCancellation.Requested,new HashSet<string>(request.Packages,StringComparer.OrdinalIgnoreCase),request.ExcludedDirectories);
+                        return new LibraryInstallResult{ExitCode=0,Message="Утилиты скопированы",State=LibraryState.Installed};
+                    }
                     if (action == "tools-deploy") { ToolsDeployment.CopyToTarget(data, path, progress, () => LibraryCancellation.Requested); return new LibraryInstallResult { ExitCode = 0, Message = "Утилиты скопированы", State = LibraryState.Installed }; }
                     if (data != "restart-confirmed" || path != "") throw new InvalidDataException("Перезагрузка не подтверждена");
                     var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "shutdown.exe"), "/r /t 0") { UseShellExecute = false, CreateNoWindow = true };

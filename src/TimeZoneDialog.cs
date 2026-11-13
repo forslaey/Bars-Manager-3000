@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal sealed class TimeZoneDialog : Form
+    internal sealed class TimeZoneDialog : BrandWindow
     {
         internal string ZoneId { get; private set; }
 

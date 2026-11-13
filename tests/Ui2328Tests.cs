@@ -24,10 +24,10 @@ namespace ServiceTool
                 {
                     form.SetTheme(dark,false);Show(form);
                     var search=All(form).OfType<BrandTextBox>().Single();
-                    Check(search.BorderStyle==BorderStyle.FixedSingle,"Search uses flat border");
+                    var searchFrame=(PathFieldFrame)search.Parent; Check(search.BorderStyle==BorderStyle.None,"Search uses one shared outer border");
                     Check(search.Palette.InputBorder.GetBrightness()<0.5F||dark,"Light input has contrasting edge");
-                    if(!dark)using(var bitmap=new Bitmap(search.Width,search.Height))
-                    { search.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));Check(bitmap.GetPixel(0,0).ToArgb()==search.Palette.Accent.ToArgb(),"Light input border is painted brand green"); }
+                    if(!dark)using(var bitmap=new Bitmap(searchFrame.Width,searchFrame.Height))
+                    { searchFrame.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));Check(bitmap.GetPixel(0,0).ToArgb()==search.Palette.Accent.ToArgb(),"Light input border is painted brand green"); }
                     var caption=All(form).OfType<Label>().Single(l=>l.Text=="Поиск по всей инструкции:");
                     Check(caption.Font.Bold&&caption.ForeColor==(dark?Color.Yellow:Color.Black),"Search caption preserves requested style");
                     Capture(form,"guide-"+dark);
@@ -37,7 +37,7 @@ namespace ServiceTool
                     Show(form);var notice=All(form).OfType<Label>().Single(l=>l.Name=="passwordNotice");var cancel=All(form).OfType<BrandButton>().Single(b=>b.Text=="Отмена");
                     Check(notice.TextAlign==ContentAlignment.MiddleLeft,"Notice aligned left");
                     Check(ScreenBounds(notice).Left==ScreenBounds(cancel).Left,"Notice starts at Cancel left edge: notice="+ScreenBounds(notice).Left+" cancel="+ScreenBounds(cancel).Left);
-                    Check(All(form).OfType<BrandTextBox>().All(t=>t.BorderStyle==BorderStyle.FixedSingle),"Password fields use flat borders");
+                    Check(All(form).OfType<BrandTextBox>().All(t=>t.BorderStyle==BorderStyle.None&&t.Parent is PathFieldFrame),"Password fields use flat borders");
                     Capture(form,id+"-"+dark);
                 }
                 foreach(float scale in new[]{1F,1.25F,1.5F,2F})using(var form=new SoftwareManagerForm(true))
@@ -49,7 +49,7 @@ namespace ServiceTool
                     float factor=choices[0].Height/36F;
                     Check(choices[0].Height>=choices[0].Font.Height+6,"Remote-access option fits its text");
                     var field=All(form).OfType<BrandTextBox>().Single();var caption=All(form).OfType<Label>().Single(l=>l.Text=="Папка установщиков:");
-                    Check(ScreenBounds(field).Top-ScreenBounds(caption).Bottom>=6*factor-1,"Folder caption separated from input");
+                    Check(ScreenBounds(field.Parent).Top-ScreenBounds(caption).Bottom>=6*factor-1,"Folder caption separated from input");
                     foreach(var size in new[]{new Size(1000,700),new Size(1120,780),new Size(1080,1920),new Size(1800,900)})
                     {
                         form.ClientSize=new Size((int)(size.Width*scale),(int)(size.Height*scale));form.PerformLayout();Pump();

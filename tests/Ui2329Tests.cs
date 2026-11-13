@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -26,7 +26,7 @@ namespace ServiceTool
                     var grid=Field<ServiceGrid>(f,"grid");var bar=Field<LibraryGridScrollBar>(f,"gridScroll");
                     var field=Field<BrandTextBox>(f,"sourceLabel");var caption=All(f).OfType<InputCaptionLabel>().Single();
                     Check(caption.Text=="Папка установщиков:","Colon and flush caption");
-                    Check(caption.PointToScreen(Point.Empty).X==field.PointToScreen(Point.Empty).X,"Folder caption starts exactly at field edge");
+                    Check(caption.PointToScreen(Point.Empty).X==field.Parent.PointToScreen(Point.Empty).X,"Folder caption starts exactly at field edge");
                     foreach(bool offline in new[]{false,true})
                     {
                         if(offline){Field<Dictionary<string,SoftwarePackage>>(f,"packages").Clear();foreach(var check in Field<Dictionary<string,SoftwareCheck>>(f,"checks").Values){check.State=LibraryState.Installed;check.Version="155.0.8059.85";check.Detail="Установлена, x64";}typeof(SoftwareManagerForm).GetMethod("UpdateRows",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(f,null);}

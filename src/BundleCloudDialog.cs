@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
@@ -19,5 +19,6 @@ namespace ServiceTool
   }
  }
  internal sealed class BundleDifferenceItem
- {internal string Path,State;internal bool Allowed,Selected;}
+ {
+  internal bool ShortcutAvailable, Shortcut;internal string Path,State;internal bool Allowed,Selected;}
 }

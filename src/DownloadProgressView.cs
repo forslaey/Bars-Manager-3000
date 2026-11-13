@@ -124,7 +124,8 @@ namespace ServiceTool
             var flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
             int percentWidth = percent.Length == 0 ? 0 : TextRenderer.MeasureText(e.Graphics, "100%", Font, Size.Empty, flags).Width + px(12);
             string stage = p.Stage ?? "";
-            if (InlineDetails && !String.IsNullOrEmpty(p.WorkText)) stage += " · " + p.WorkText;
+            if (InlineDetails && !String.IsNullOrEmpty(p.WorkText))
+                stage = stage.TrimEnd('.','…') + " · " + p.WorkText + (p.Active ? "…" : ".");
             TextRenderer.DrawText(e.Graphics, stage, Font, new Rectangle(1,0,Math.Max(1,Width-percentWidth-2),line), colors.Text, flags | TextFormatFlags.EndEllipsis);
             TextRenderer.DrawText(e.Graphics, percent, Font, new Rectangle(Width-percentWidth,0,percentWidth,line), colors.Text, flags | TextFormatFlags.Right);
             bool interrupted = p.Failed || p.Cancelled;

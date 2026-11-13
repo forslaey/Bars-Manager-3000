@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,21 +10,20 @@ namespace ServiceTool
     {
         internal static string Folder(string selected)
         {
-            if(String.IsNullOrWhiteSpace(selected))throw new IOException("Выбери папку Библиотеки или _soft");
+            if(String.IsNullOrWhiteSpace(selected))throw new IOException("Выбери папку комплекта BarsManager3000 или папку _soft");
             string value=selected.Trim().Trim('"');
             if(!Regex.IsMatch(value,@"\A(?:[a-zA-Z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+(?:[\\/]|$))"))throw new IOException("Укажи полный путь к папке Библиотеки или _soft");
             string full=Path.GetFullPath(value);if(full.Length>Path.GetPathRoot(full).Length)full=full.TrimEnd('\\','/');
             if(Path.GetFileName(full).Equals("_soft",StringComparison.OrdinalIgnoreCase))return full;
             if(Path.GetFileName(full).Equals("_libraries",StringComparison.OrdinalIgnoreCase))return Path.Combine(Path.GetDirectoryName(full),"_soft");
             if(Directory.Exists(Path.Combine(full,"_libraries")))return Path.Combine(full,"_soft");
-            string child=Path.Combine(full,"Библиотеки");if(Directory.Exists(child))full=child;
             return Path.Combine(full,"_soft");
         }
         internal static SoftwarePackage Download(SoftwarePackage remote,string selected,Action<string> progress,Func<bool> cancelled,Action<TransferProgress> transfer=null)
         {
             SoftwareCatalog.Find(remote.Id);
             string folder=Folder(selected);ToolsDeployment.SafePath(folder);
-            if(!Directory.Exists(Path.GetDirectoryName(folder)))throw new DirectoryNotFoundException("Папка библиотек недоступна: "+Path.GetDirectoryName(folder));
+            if(!Directory.Exists(Path.GetDirectoryName(folder)))throw new DirectoryNotFoundException("Папка комплекта недоступна: "+Path.GetDirectoryName(folder));
             Directory.CreateDirectory(folder);ToolsDeployment.SafePath(folder);
             string stage=Path.Combine(folder,".bars-download-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(stage);
             try

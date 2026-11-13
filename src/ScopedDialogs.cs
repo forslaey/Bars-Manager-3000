@@ -14,7 +14,24 @@ namespace ServiceTool
 
         internal static DialogResult Show(Form owner, CommonDialog dialog)
         {
-            return Run(owner, () => dialog.ShowDialog(owner));
+            var folders=dialog as FolderBrowserDialog;
+            var file=dialog as FileDialog;
+            if(folders==null&&file==null)return Run(owner,()=>dialog.ShowDialog(owner));
+            string title=folders!=null?folders.Description:file.Title;
+            if(String.IsNullOrWhiteSpace(title))title=folders!=null?"Выбор папки":file is SaveFileDialog?"Сохранение файла":"Выбор файла";
+            string start=folders!=null?folders.SelectedPath:file.InitialDirectory;
+            using(var picker=new BrandPathDialog(title,start,file==null?null:file.FileName,file==null?null:file.Filter,
+                file==null?null:file.DefaultExt,folders!=null,file is SaveFileDialog,folders!=null&&folders.ShowNewFolderButton||file is SaveFileDialog))
+            {
+                if(owner!=null)picker.SetTheme(owner.BackColor.GetBrightness()<.5F,false);
+                var result=Show(owner,picker);
+                if(result==DialogResult.OK)
+                {
+                    if(folders!=null)folders.SelectedPath=picker.SelectedPath;
+                    else file.FileName=picker.SelectedPath;
+                }
+                return result;
+            }
         }
 
         internal static DialogResult Show(Form owner, Form dialog)

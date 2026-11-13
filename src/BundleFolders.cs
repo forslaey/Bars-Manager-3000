@@ -17,6 +17,16 @@ namespace ServiceTool
 
         internal const string DefaultRoot = @"C:\BarsManager3000";
 
+        internal static string PickerStart(string preferred=null)
+        {
+            if(!String.IsNullOrWhiteSpace(preferred)&&Path.IsPathRooted(preferred))
+            {
+                for(string folder=Path.GetFullPath(preferred);!String.IsNullOrEmpty(folder);folder=Path.GetDirectoryName(folder))
+                    if(Directory.Exists(folder))return folder;
+            }
+            string saved=BundlePreferences.Load();
+            return Directory.Exists(saved)?saved:Directory.Exists(DefaultRoot)?DefaultRoot:ExecutableDirectory;
+        }
         internal static string Find(string executableDirectory, string section)
         {
             foreach (string root in new[] { executableDirectory, DefaultRoot })
@@ -38,7 +48,7 @@ namespace ServiceTool
         {
             if (String.IsNullOrEmpty(path) || !path.StartsWith("/", StringComparison.Ordinal))
                 throw new InvalidDataException("Неверный путь файла комплекта.");
-            if (path.StartsWith("/_", StringComparison.OrdinalIgnoreCase)) return path;
+            if (path.StartsWith("/_", StringComparison.OrdinalIgnoreCase) || path.StartsWith("/SQL/", StringComparison.OrdinalIgnoreCase)) return path;
             return "/_libraries" + path;
         }
 

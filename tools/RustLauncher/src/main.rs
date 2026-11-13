@@ -1,6 +1,7 @@
 #![windows_subsystem = "windows"]
 
 mod setup;
+mod framework_cloud;
 mod protected_cache;
 
 use sha2::{Digest, Sha256};
@@ -13,7 +14,9 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 use windows_sys::Win32::{
-    Foundation::HWND,
+    Foundation::{HWND, CloseHandle},
+    System::Threading::{WaitForSingleObject, GetExitCodeProcess},
+    UI::Shell::{ShellExecuteExW, SHELLEXECUTEINFOW, SEE_MASK_NOCLOSEPROCESS},
     System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE},
     UI::{Shell::{IsUserAnAdmin, ShellExecuteW}, WindowsAndMessaging::AllowSetForegroundWindow},
 };
@@ -21,7 +24,7 @@ use windows_sys::Win32::{
 const MANAGER: &[u8] = include_bytes!(env!("BARS_EMBEDDED_MANAGER"));
 const INSTALLER: &str = "NDP48-x86-x64-AllOS-ENU.exe";
 const PACKAGE_FOLDER: &str = "_barsmanager3000";
-const MICROSOFT_PAGE: &str = "https://dotnet.microsoft.com/download/dotnet-framework/net48";
+const MICROSOFT_PAGE: &str = "https://dotnet.microsoft.com/ru-ru/download/dotnet-framework/thank-you/net48-offline-installer";
 const SHA256: &str = "0a3a390c47e639d0f7fc65b21195fee6b7f65b066f80f70c60fab191d14b7e40";
 
 fn wide(value: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
@@ -63,22 +66,29 @@ fn open(owner: HWND, verb: &str, target: impl AsRef<std::ffi::OsStr>) -> bool {
     }
 }
 
-fn install(owner: HWND, file: &Path) -> io::Result<()> {
-    let mut input = fs::OpenOptions::new().read(true).share_mode(1).open(file)?;
-    let mut hash = Sha256::new();
-    let mut buffer = [0; 64 * 1024];
-    loop {
-        let count = input.read(&mut buffer)?;
-        if count == 0 { break; }
-        hash.update(&buffer[..count]);
+fn install(file: &Path) -> io::Result<u32> {
+    let input = fs::OpenOptions::new().read(true).share_mode(1).open(file)?;
+    framework_cloud::verify(file, &input)?;
+    let path=wide(file);
+    let verb=wide("runas");
+    unsafe {
+        let mut request: SHELLEXECUTEINFOW=std::mem::zeroed();
+        request.cbSize=std::mem::size_of_val(&request) as u32;
+        request.fMask=SEE_MASK_NOCLOSEPROCESS;
+        request.lpVerb=verb.as_ptr();
+        request.lpFile=path.as_ptr();
+        request.nShow=1;
+        if ShellExecuteExW(&mut request)==0||request.hProcess.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        drop(input);
+        let mut code=0;
+        let success=WaitForSingleObject(request.hProcess,u32::MAX)==0 &&
+            GetExitCodeProcess(request.hProcess,&mut code)!=0;
+        let error=io::Error::last_os_error();
+        CloseHandle(request.hProcess);
+        if success {Ok(code)} else {Err(error)}
     }
-    if format!("{:x}", hash.finalize()) != SHA256 {
-        return Err(io::Error::other("Файл отличается от проверенного пакета Microsoft."));
-    }
-    if !open(owner, "runas", file) {
-        return Err(io::Error::other("Установка не запущена. Проверь разрешение Windows."));
-    }
-    Ok(())
 }
 
 

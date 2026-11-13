@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -11,7 +11,7 @@ namespace ServiceTool
    try
    {
     var source=new YandexBundleSource();var files=source.Scan(CancellationToken.None);
-    var file=files.Single(f=>f.Path=="/!ПОЯСНЕНИЕ.txt");
+    var file=files.Single(f=>f.Path=="/_libraries/!ПОЯСНЕНИЕ.txt");
     string root=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"online-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
     new BundleTransfer(source).Download(file,root,null,x=>{},CancellationToken.None);
     if(YandexBundleSource.Hash(BundleFolders.PackageDestination(root,file.Path),CancellationToken.None)!=file.Sha256)throw new Exception("Online hash mismatch");

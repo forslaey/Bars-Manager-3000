@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,13 +15,27 @@ namespace ServiceTool
         internal string Path;
         internal long Size;
         internal string Sha256;
-        internal string Group { get { return Path.StartsWith("/_wallpers/",StringComparison.OrdinalIgnoreCase)?"Обои":Path.StartsWith("/_soft/",StringComparison.OrdinalIgnoreCase)?"Программы":Path.StartsWith("/_tools/",StringComparison.OrdinalIgnoreCase)?"Утилиты":"Библиотеки"; } }
+        internal string TransferId;
+        internal string Group
+        {
+            get
+            {
+                if (Path.StartsWith("/_soft/_SQL/", StringComparison.OrdinalIgnoreCase) ||
+                    Path.StartsWith("/_sql/", StringComparison.OrdinalIgnoreCase) ||
+                    Path.StartsWith("/SQL/", StringComparison.OrdinalIgnoreCase)) return "SQL";
+                if (Path.StartsWith("/_soft/", StringComparison.OrdinalIgnoreCase)) return "Программы";
+                if (Path.StartsWith("/_tools/", StringComparison.OrdinalIgnoreCase)) return "Утилиты";
+                if (Path.StartsWith("/_wallpers/", StringComparison.OrdinalIgnoreCase)) return "Обои";
+                if (Path.StartsWith("/_barsmanager3000/", StringComparison.OrdinalIgnoreCase)) return "Запускатель";
+                return "Библиотеки";
+            }
+        }
     }
 
     // Public metadata only. No OAuth, no execution of downloaded content.
     internal sealed class YandexBundleSource
     {
-        internal const string PublicLink="https://disk.yandex.ru/d/ZviB19HcrDuQ2w";
+        internal const string PublicLink="https://disk.yandex.ru/d/I0sX3DFWoXUQWQ";
         const string Api="https://cloud-api.yandex.net/v1/disk/public/resources";
         readonly JavaScriptSerializer json=new JavaScriptSerializer { MaxJsonLength=8*1024*1024 };
         internal static string LocalPath(string root,string remote)

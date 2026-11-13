@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -144,6 +144,44 @@ namespace ServiceTool
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         }
+        internal PathFieldFrame(BrandTextBox editor) : this()
+        {
+            Dock=editor.Dock;
+            Anchor=editor.Anchor;
+            Margin=editor.Margin;
+            editor.BorderStyle=BorderStyle.None;
+            editor.AutoSize=true;
+            editor.Dock=DockStyle.None;
+            editor.Anchor=AnchorStyles.Top|AnchorStyles.Left;
+            editor.Margin=Padding.Empty;
+            Controls.Add(editor);
+            Height=editor.PreferredHeight+8;
+            Action refresh=delegate
+            {
+                var colors=editor.Palette??ThemePalette.Create(false);
+                BackColor=editor.BackColor;
+                EdgeColor=colors.InputBorder;
+                FocusColor=colors.Accent;
+                Invalidate();
+            };
+            Layout+=delegate
+            {
+                using(var graphics=CreateGraphics())
+                {
+                    int inset=Math.Max(1,(int)Math.Round(8F*graphics.DpiX/96F));
+                    int height=editor.PreferredHeight;
+                    editor.Bounds=new Rectangle(inset,Math.Max(1,(ClientSize.Height-height)/2),
+                        Math.Max(1,ClientSize.Width-2*inset),height);
+                }
+            };
+            Click+=delegate{editor.Focus();};
+            editor.GotFocus+=delegate{Invalidate();};
+            editor.LostFocus+=delegate{Invalidate();};
+            editor.FontChanged+=delegate{PerformLayout();};
+            editor.BackColorChanged+=delegate{refresh();};
+            editor.PaletteChanged+=delegate{refresh();};
+            refresh();
+        }
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -152,7 +190,7 @@ namespace ServiceTool
         }
     }
 
-    internal sealed class MainForm : Form, IModuleOperation
+    internal sealed class MainForm : BrandWindow, IModuleOperation
     {
         internal bool MenuRequested { get; private set; }
         internal void SuspendSession() { closing=false; timer.Stop(); }
@@ -1804,6 +1842,18 @@ namespace ServiceTool
             if (result != 0)
             {
                 if(result==1053){string explanation="Windows не получила вовремя ответ от службы на команду запуска или управления. Это может быть связано с ошибкой конфигурации, отсутствующей зависимостью, недоступным оборудованием или долгим запуском. Проверь журнал службы за время этой попытки, её конфигурацию, требуемые .NET Runtime / ASP.NET Core Runtime нужной разрядности и подключение оборудования. Сначала обнови статус: после тайм-аута запуск мог продолжиться. Код Windows: 1053.";SetStatus("Служба не ответила вовремя на команду Windows",explanation,Color.Firebrick);AppendLog(serviceName+": "+explanation);return;}
+                if (result == 1064)
+                {
+                    string title = action == "start" ? "Служба не запустилась из-за внутренней ошибки" :
+                        action == "stop" ? "Служба не остановилась из-за внутренней ошибки" :
+                        "Служба сообщила о внутренней ошибке";
+                    string explanation = "Служба столкнулась с ошибкой при обработке команды Windows. " +
+                        "Чтобы узнать причину, нажми «Собрать логи» и проверь записи за время этой попытки. " +
+                        "Если записей нет, проверь журнал «Приложение» в просмотре событий Windows. Код Windows 1064.";
+                    SetStatus(title, explanation, Color.Firebrick);
+                    AppendLog(serviceName + " — " + explanation);
+                    return;
+                }
                 string message = action == "startup" && result == 1003
                     ? "Изменение не завершено; восстановить прежние настройки тоже не удалось. Проверь режим запуска в оснастке Windows."
                     : new Win32Exception(result).Message;

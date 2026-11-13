@@ -13,7 +13,7 @@ namespace ServiceTool
     {
         private readonly ServiceGrid running = new ServiceGrid();
         private readonly LibraryGridScrollBar runningScroll = new LibraryGridScrollBar();
-        private readonly BrandTextBox path = new BrandTextBox { Dock = DockStyle.Fill, ReadOnly = true, Margin = new Padding(0, 3, 0, 3) };
+        private readonly BrandTextBox path = new BrandTextBox { Dock = DockStyle.Fill, ReadOnly = true, Margin = new Padding(0, 3, 0, 10) };
         private readonly Label status;
         private readonly BrandButton collect, cancel, refresh;
         private CancellationTokenSource archive;
@@ -30,7 +30,7 @@ namespace ServiceTool
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            foreach (int height in new[] { 36, 44, 45, 48 })
+            foreach (int height in new[] { 44, 50, 45, 48 })
                 body.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             body.MinimumSize = new Size(0, 345 + body.Margin.Vertical);
             body.Controls.Add(ModuleHeading("Логи программ BARS"), 0, 0);
@@ -99,7 +99,7 @@ namespace ServiceTool
             running.RowsAdded += delegate { fitProcessTable(); };
             running.RowsRemoved += delegate { fitProcessTable(); };
             Shown += delegate { fitProcessTable(); };
-            body.Controls.Add(path, 0, 2);
+            body.Controls.Add(new PathFieldFrame(path), 0, 2);
             var pickers = Buttons(3);
             refresh = Button("Обновить список", false);
             refresh.Click += async delegate { await Scan(); };

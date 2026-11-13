@@ -88,9 +88,9 @@ namespace ServiceTool
             chooseSource.Click += async delegate
             {
                 if (checking || installing || preview) return;
-                using (var dialog = new FolderBrowserDialog { Description = "Выбери папку комплекта или папку с установщиками", ShowNewFolderButton = false })
+                using (var dialog = new FolderBrowserDialog { Description = "Выбери папку комплекта BarsManager3000 или папку _libraries", ShowNewFolderButton = false, SelectedPath = BundleFolders.PickerStart(source) })
                 {
-                    if (Directory.Exists(source)) dialog.SelectedPath = source;
+
                     if (ScopedDialogs.Show(this, dialog) != DialogResult.OK) return;
                     try
                     {
@@ -124,7 +124,7 @@ namespace ServiceTool
             stop.Click += delegate { if (installing && !cancelRequested && ConfirmCancel(false)) RequestCancellation(false); };
             actions.Controls.Add(install, 0, 0); actions.Controls.Add(select, 1, 0); actions.Controls.Add(selectAll, 2, 0); actions.Controls.Add(refresh, 3, 0); actions.Controls.Add(stop, 5, 0); tableLayout.Controls.Add(actions, 0, 1);
             var network=Button("Проверить обновления .NET",false);network.Margin=new Padding(0,0,10,0);
-            network.Click+=async delegate{if(installing||checking)return;bool wasRunning=timer.Enabled;timer.Stop();try{using(var dialog=new DotNetUpdatesForm(()=>{if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){using(var folder=new FolderBrowserDialog()){folder.Description="Выбери папку комплекта или папку с установщиками";if(ScopedDialogs.Show(Form.ActiveForm ?? this, folder)!=DialogResult.OK)return null;source=LibrarySource.NormalizeRoot(folder.SelectedPath);UpdateSource();}}return source;},source)){await ModuleNavigation.ShowOwnedAsync(this, dialog);if(dialog.FilesChanged && !ModuleNavigation.ExitConfirmed)await RefreshAsync(true);}}finally{if(!IsDisposed&&!Disposing)timer.Enabled=wasRunning&&Visible&&!preview&&!installing;}};
+            network.Click+=async delegate{if(installing||checking)return;bool wasRunning=timer.Enabled;timer.Stop();try{using(var dialog=new DotNetUpdatesForm(()=>{if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){using(var folder=new FolderBrowserDialog{SelectedPath=BundleFolders.PickerStart(source),ShowNewFolderButton=false}){folder.Description="Выбери папку комплекта BarsManager3000 или папку _libraries";if(ScopedDialogs.Show(Form.ActiveForm ?? this, folder)!=DialogResult.OK)return null;source=LibrarySource.NormalizeRoot(folder.SelectedPath);UpdateSource();}}return source;},source)){await ModuleNavigation.ShowOwnedAsync(this, dialog);if(dialog.FilesChanged && !ModuleNavigation.ExitConfirmed)await RefreshAsync(true);}}finally{if(!IsDisposed&&!Disposing)timer.Enabled=wasRunning&&Visible&&!preview&&!installing;}};
             actions.Controls.Add(network,4,0);ModuleNavigation.EqualButtons(actions,gridScroll);
             ConfigureGrid(); var gridSlot = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
             gridScroll.LimitTrackToWholeRows=true;gridScroll.UseCardBackground=true; gridScroll.Dock = DockStyle.Right; gridScroll.Width = 14; gridScroll.Bind(grid); gridSlot.Controls.Add(grid); gridSlot.Controls.Add(gridScroll); tableLayout.Controls.Add(gridSlot, 0, 2); tableCard.Controls.Add(tableLayout); body.Controls.Add(tableCard, 0, 1);
@@ -416,7 +416,7 @@ namespace ServiceTool
             if (String.IsNullOrEmpty(source) || !Directory.Exists(source)) source = LibrarySource.AutoDetect(BundleFolders.ExecutableDirectory);
             if (String.IsNullOrEmpty(source) || !Directory.Exists(source))
             {
-                using (var dialog = new FolderBrowserDialog { Description = "Выбери папку комплекта или папку с установщиками BARS", ShowNewFolderButton = false })
+                using (var dialog = new FolderBrowserDialog { Description = "Выбери папку комплекта BarsManager3000 или папку _libraries", ShowNewFolderButton = false, SelectedPath = BundleFolders.PickerStart(source) })
                 { if (ScopedDialogs.Show(this, dialog) != DialogResult.OK) return;
                     try { source = LibrarySource.NormalizeRoot(dialog.SelectedPath); }
                     catch (Exception ex) { Log("Не удалось выбрать папку: " + ex.Message); return; } }
@@ -530,7 +530,7 @@ namespace ServiceTool
             {
                 if (String.IsNullOrEmpty(source) || !Directory.Exists(source))
                 {
-                    using (var dialog = new FolderBrowserDialog { Description = "Выбери папку «Библиотеки», в которой хранятся журналы", ShowNewFolderButton = false })
+                    using (var dialog = new FolderBrowserDialog { Description = "Выбери папку комплекта BarsManager3000 или папку _libraries с журналами", ShowNewFolderButton = false, SelectedPath = BundleFolders.PickerStart(source) })
                     { if (ScopedDialogs.Show(this, dialog) != DialogResult.OK) return; source = LibrarySource.NormalizeRoot(dialog.SelectedPath); UpdateSource(); }
                 }
                 string folder = LibraryJournal.Folder(source); Directory.CreateDirectory(folder);

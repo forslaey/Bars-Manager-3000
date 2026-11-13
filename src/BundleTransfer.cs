@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Net;
 using System.Threading;
@@ -16,7 +16,7 @@ namespace ServiceTool
         // Parts are owned by this manager and tied to the remote content hash.
         internal static string PartPath(string root,BundleRemoteFile file)
         {
-            return YandexBundleSource.LocalPath(root,"/.bars-download/"+file.Sha256+"/"+file.Path.TrimStart('/')+".part");
+            return YandexBundleSource.LocalPath(root,"/.bars-download/"+(file.Sha256??file.TransferId)+"/"+file.Path.TrimStart('/')+".part");
         }
         internal void Download(BundleRemoteFile file,string root,string originalHash,Action<long> progress,CancellationToken token)
         { Download(file,root,originalHash,progress,token,null,null); }
@@ -65,7 +65,7 @@ namespace ServiceTool
             if(File.Exists(part)&&(File.GetAttributes(part)&FileAttributes.ReparsePoint)!=0)throw new IOException("Временный файл является ссылкой");
             long offset=File.Exists(part)?new FileInfo(part).Length:0;
             if(offset>file.Size){File.Move(part,part+".invalid-"+Guid.NewGuid().ToString("N"));offset=0;}
-            if(offset==file.Size&&File.Exists(part)&&!String.Equals(YandexBundleSource.Hash(part,token),file.Sha256,StringComparison.OrdinalIgnoreCase))
+            if(offset==file.Size&&File.Exists(part)&&file.Sha256!=null&&!String.Equals(YandexBundleSource.Hash(part,token),file.Sha256,StringComparison.OrdinalIgnoreCase))
             {
                 // Quarantine only this manager's failed part; preserve it for diagnosis.
                 File.Move(part,part+".invalid-"+Guid.NewGuid().ToString("N"));offset=0;
@@ -112,8 +112,8 @@ namespace ServiceTool
             }
             token.ThrowIfCancellationRequested();
             if(new FileInfo(part).Length!=file.Size)throw new BundleTransientException("Передача оборвалась до получения полного файла: "+file.Path,null);
-            if(stage!=null)stage("Проверка SHA-256");
-            if(!String.Equals(YandexBundleSource.Hash(part,token),file.Sha256,StringComparison.OrdinalIgnoreCase))
+            if(stage!=null)stage(file.Sha256==null?"Проверка архива":"Проверка SHA-256");
+            if(file.Sha256!=null&&!String.Equals(YandexBundleSource.Hash(part,token),file.Sha256,StringComparison.OrdinalIgnoreCase))
             {
                 File.Move(part,part+".invalid-"+Guid.NewGuid().ToString("N"));
                 throw new BundleTransientException("SHA-256 не совпадает; повреждённая копия сохранена в карантине",null);
@@ -124,8 +124,8 @@ namespace ServiceTool
             Directory.CreateDirectory(Path.GetDirectoryName(destination));
             lock(BundlePublication.Gate)
             {
-                BundleMaintenance.ValidateAgainstLocal(root,part,file,token);
-                if(originalHash!=null)BundlePackageIdentity.ValidateUpgrade(destination,part,file.Path);
+                if(file.Group=="Утилиты"&&ToolArchives.Supports(file.Path)&&!ToolArchives.HasReadableDirectory(part,file.Path,token))throw new InvalidDataException("Скачанный архив не удалось прочитать."); BundleMaintenance.ValidateAgainstLocal(root,part,file,token);
+                if(originalHash!=null&&!(file.Group=="Утилиты"&&ToolArchives.Supports(file.Path)))BundlePackageIdentity.ValidateUpgrade(destination,part,file.Path);
                 if(stage!=null)stage("Публикация");
                 BundlePublication.Publish(part,destination,originalHash,token,null);
             }

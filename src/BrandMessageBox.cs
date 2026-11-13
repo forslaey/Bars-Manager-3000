@@ -26,8 +26,21 @@ namespace ServiceTool
             }
         }
     }
-    internal sealed class BrandMessageDialog : Form
+    internal sealed class BrandMessageDialog : BrandWindow
     {
+        internal void SetButtonText(DialogResult result,string text)
+        {
+            foreach(Control control in Controls)
+                if(RenameButton(control,result,text))return;
+        }
+        private static bool RenameButton(Control control,DialogResult result,string text)
+        {
+            var button=control as Button;
+            if(button!=null&&button.DialogResult==result){button.Text=text;return true;}
+            foreach(Control child in control.Controls)
+                if(RenameButton(child,result,text))return true;
+            return false;
+        }
         internal BrandMessageDialog(string text,string caption,MessageBoxButtons buttons,MessageBoxIcon icon,MessageBoxDefaultButton defaultButton,ThemePalette colors,bool compact=false)
         {
             SuspendLayout();AutoScaleMode=AutoScaleMode.None;AutoScaleDimensions=new SizeF(96,96);
@@ -38,10 +51,10 @@ namespace ServiceTool
             Size measured;
             using(var bitmap=new Bitmap(1,1))using(var graphics=Graphics.FromImage(bitmap))
                 measured=TextRenderer.MeasureText(graphics,text,Font,new Size(compact?390:550,Int32.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix);
-            ClientSize=compact?new Size(520,Math.Max(140,Math.Min(400,measured.Height+104))):new Size(640,Math.Max(208,Math.Min(560,measured.Height+126)));
+            ClientSize=compact?new Size(520,Math.Max(164,Math.Min(440,measured.Height+122))):new Size(640,Math.Max(208,Math.Min(560,measured.Height+126)));
             var layout=new BufferedLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(22),ColumnCount=1,RowCount=2,BackColor=colors.Canvas};
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,48));
-            var content=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(0,0,0,18)};
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,54));
+            var content=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(0,0,0,10)};
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,44));content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var symbol=new Label{Text=icon==MessageBoxIcon.Warning?"!":icon==MessageBoxIcon.Error?"×":icon==MessageBoxIcon.Question?"?":"i",Font=new Font("Segoe UI",20F,FontStyle.Bold),ForeColor=icon==MessageBoxIcon.Warning?Color.FromArgb(210,153,15):colors.Accent,Dock=DockStyle.Fill,TextAlign=compact?ContentAlignment.MiddleCenter:ContentAlignment.TopCenter,Margin=Padding.Empty,AccessibleName=icon.ToString()};
             var message=new JournalTextBox{Text=text,Dock=DockStyle.Fill,BackColor=colors.Canvas,ForeColor=colors.Text,Font=Font,TabStop=false};

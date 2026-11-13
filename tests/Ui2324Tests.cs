@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -26,10 +26,10 @@ namespace ServiceTool
                 {
                     Show(dialog);var confirmation=Field<BrandTextBox>(dialog,"confirmation");var languages=Field<List<Label>>(dialog,"languages");var language=languages.Single();
                     Check(languages.Count==1&&language.Font.Bold,"One bold keyboard indicator");dialog.UpdateKeyboardState("ru",false);Check(language.Text=="РУС","Russian state");dialog.UpdateKeyboardState("en",false);Check(language.Text=="ENG","English state");
-                    Point end=confirmation.PointToScreen(new Point(confirmation.Width,confirmation.Height));Point label=language.PointToScreen(new Point(language.Width,0));Check(Math.Abs(end.X-label.X)<=2&&label.Y>=end.Y,"Indicator below confirmation aligned to input right edge end="+end+" label="+label);
+                    var frame=confirmation.Parent; Point end=frame.PointToScreen(new Point(frame.Width,frame.Height));Point label=language.PointToScreen(new Point(language.Width,0));Check(Math.Abs(end.X-label.X)<=2&&label.Y>=end.Y,"Indicator below confirmation aligned to input right edge end="+end+" label="+label);
                     foreach(var eye in All(dialog).OfType<PasswordEyeButton>())
                     {
-                        var row=(TableLayoutPanel)eye.Parent;var box=(BrandTextBox)row.GetControlFromPosition(0,0);Check(eye.Left-box.Right>=8,"Eye has separate gap");
+                        var row=(TableLayoutPanel)eye.Parent;var box=(PathFieldFrame)row.GetControlFromPosition(0,0);Check(eye.Left-box.Right>=8,"Eye has separate gap");
                     }
                     var notice=All(dialog).OfType<Label>().Single(l=>l.Name=="passwordNotice");Check(notice.TextAlign==ContentAlignment.MiddleLeft&&notice.ForeColor==language.ForeColor,"Notice left aligned with matching theme warning color");
                     Check(Field<BrandButton>(dialog,"ok").Height<=60,"Normal dialog button height");Capture(dialog,"remote2324-"+id+"-"+dark);
@@ -50,7 +50,7 @@ namespace ServiceTool
                 using(var form=new UserGuideForm())
                 {
                     form.SetTheme(dark,false);Show(form);var reader=Field<GuideReader>(form,"reader");var search=Field<BrandTextBox>(form,"search");var sections=Field<GuideSectionListBox>(form,"sections");
-                    Check(search.Left==0&&search.Height<=search.PreferredHeight+1,"Thin left-aligned search");Check(All(form).OfType<Label>().All(l=>!l.Text.StartsWith("Выбери раздел")),"Old instruction prompt removed");
+                    Check(search.Parent is PathFieldFrame&&search.Left>0&&search.Height<=search.PreferredHeight+1,"Thin left-aligned search");Check(All(form).OfType<Label>().All(l=>!l.Text.StartsWith("Выбери раздел")),"Old instruction prompt removed");
                     for(int i=0;i<sections.Items.Count;i++){sections.SelectedIndex=i;Application.DoEvents();Check(reader.TextLength>0&&reader.SelectionLength==0&&reader.Visible,"Section text visible without transient selection");}
                     reader.Text=String.Join("\n",Enumerable.Range(0,150).Select(i=>"Строка проверки прокрутки "+i));Application.DoEvents();reader.ScrollTo(reader.MaximumScroll);Application.DoEvents();Check(reader.ScrollPosition>0,"Custom reader scroll reaches lower text");Check(!Field<GuideReaderScrollBar>(form,"readerScroll").ThumbBounds.IsEmpty,"Custom scrollbar has thumb");reader.ScrollTo(0);Check(reader.ScrollPosition==0,"Scroll returns to top");
                     Check(reader.ScrollBars==RichTextBoxScrollBars.None,"No native white scrollbar");sections.SelectedIndex=0;Application.DoEvents();Capture(form,"guide2324-"+dark);

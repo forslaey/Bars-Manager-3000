@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -7,6 +7,32 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
+    internal abstract class BrandWindow : Form
+    {
+        private const int ThickFrame=0x00040000, DialogFrame=0x00000001;
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                var parameters=base.CreateParams;
+                if(FormBorderStyle!=FormBorderStyle.None)
+                {
+                    parameters.Style|=ThickFrame;
+                    parameters.ExStyle&=~DialogFrame;
+                }
+                return parameters;
+            }
+        }
+        protected override void WndProc(ref Message message)
+        {
+            bool fixedFrame=FormBorderStyle!=FormBorderStyle.None&&FormBorderStyle!=FormBorderStyle.Sizable&&FormBorderStyle!=FormBorderStyle.SizableToolWindow;
+            if(fixedFrame&&message.Msg==0x0112&&(message.WParam.ToInt64()&0xfff0)==0xf000)
+                return;
+            base.WndProc(ref message);
+            if(fixedFrame&&message.Msg==0x0084&&message.Result.ToInt64()>=10&&message.Result.ToInt64()<=17)
+                message.Result=(IntPtr)18;
+        }
+    }
     internal static class NativeWindowTheme
     {
         [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
@@ -24,6 +50,10 @@ namespace ServiceTool
                 int value = dark ? 1 : 0;
                 if (DwmSetWindowAttribute(form.Handle, 20, ref value, sizeof(int)) < 0)
                     DwmSetWindowAttribute(form.Handle, 19, ref value, sizeof(int));
+                int caption=dark?0x001e241b:0x00f8f9f7;
+                int text=dark?0x00f4f7f3:0x002f3537;
+                DwmSetWindowAttribute(form.Handle,35,ref caption,sizeof(int));
+                DwmSetWindowAttribute(form.Handle,36,ref text,sizeof(int));
             }
             catch (DllNotFoundException) { }
             catch (EntryPointNotFoundException) { }
@@ -522,34 +552,19 @@ namespace ServiceTool
     internal sealed class BrandTextBox : TextBox
     {
         private ThemePalette palette;
-        public ThemePalette Palette { get { return palette; } set { palette=value; Invalidate(); PaintBorder(); } }
-        public BrandTextBox() { BorderStyle=BorderStyle.FixedSingle; }
-        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetWindowDC(IntPtr handle);
-        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr handle, IntPtr dc);
-        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); PaintBorder(); }
-        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); PaintBorder(); }
-        protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
-        protected override void WndProc(ref Message message)
+        internal event EventHandler PaletteChanged;
+        public ThemePalette Palette
         {
-            base.WndProc(ref message);
-            if (message.Msg == 0x000F || message.Msg == 0x0085 || message.Msg == 0x0317 || message.Msg == 0x0318) PaintBorder(message.Msg==0x0317 ? message.WParam : IntPtr.Zero);
-        }
-        private void PaintBorder(IntPtr printDc = default(IntPtr))
-        {
-            if (!IsHandleCreated || IsDisposed || BorderStyle != BorderStyle.FixedSingle) return;
-            ThemePalette p = Palette ?? ThemePalette.Create(false);
-            IntPtr dc = printDc==IntPtr.Zero ? GetWindowDC(Handle) : printDc;
-            if (dc == IntPtr.Zero) return;
-            try
+            get { return palette; }
+            set
             {
-                using (Graphics graphics = Graphics.FromHdc(dc))
-                using (Pen edge = new Pen(Enabled && Focused ? p.Accent : p.InputBorder))
-                    graphics.DrawRectangle(edge, 0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
+                palette=value;
+                var changed=PaletteChanged;
+                if(changed!=null)changed(this,EventArgs.Empty);
             }
-            finally { if(printDc==IntPtr.Zero)ReleaseDC(Handle, dc); }
         }
+        public BrandTextBox() { BorderStyle=BorderStyle.None; }
     }
-
     // Keep the native popup and keyboard behavior with a palette-aware border.
     internal sealed class BrandComboBox : ComboBox
     {
@@ -956,6 +971,7 @@ namespace ServiceTool
     internal sealed class PathPickerRow : System.Windows.Forms.Panel
     {
         private readonly BrandTextBox field;
+        private readonly PathFieldFrame fieldFrame;
         private readonly BrandButton picker;
         private readonly int buttonWidth;
         private System.Drawing.Size pickerSize;
@@ -973,7 +989,8 @@ namespace ServiceTool
             field.Anchor=picker.Anchor=System.Windows.Forms.AnchorStyles.Top|System.Windows.Forms.AnchorStyles.Left;
             field.Margin=picker.Margin=System.Windows.Forms.Padding.Empty;
             pickerSize=new System.Drawing.Size(buttonWidth,40);picker.Size=pickerSize;
-            Controls.Add(field);Controls.Add(picker);
+            fieldFrame=new PathFieldFrame(field);
+            Controls.Add(fieldFrame);Controls.Add(picker);
         }
         protected override void OnLayout(System.Windows.Forms.LayoutEventArgs e)
         {
@@ -986,7 +1003,7 @@ namespace ServiceTool
                 int height=System.Math.Min(ClientSize.Height,pickerSize.Height);
                 int pathWidth=System.Math.Max(1,FillAvailableWidth?ClientSize.Width-gap-width:System.Math.Min(measure.Width,ClientSize.Width-gap-width));
                 picker.SetBounds(pathWidth+gap,ClientSize.Height-height,width,height);
-                field.SetBounds(0,ClientSize.Height-1-pickerDrop-measure.Height,pathWidth,measure.Height);
+                fieldFrame.SetBounds(0,ClientSize.Height-1-pickerDrop-measure.Height,pathWidth,measure.Height);
             }
             finally{arranging=false;}
         }

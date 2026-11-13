@@ -12,7 +12,7 @@ namespace ServiceTool
  internal enum BundleCloud {Yandex,Google,Both}
  internal sealed class GoogleBundleSource
  {
-  internal const string FolderId="1aLtXICafISqfm8kjcQA9lQMwUSEIEJnp";
+  internal const string FolderId="1Zj2h8ImggKBSRuAv3e_X4ZIvLeAbvdL6";
   readonly Dictionary<string,string> ids=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
   internal static string ReadText(string url,CancellationToken token)
   {
@@ -29,10 +29,10 @@ namespace ServiceTool
    string data=Regex.Replace(match.Groups[1].Value,@"\\x([0-9a-fA-F]{2})",m=>((char)Convert.ToInt32(m.Groups[1].Value,16)).ToString());
    data=data.Replace(@"\'","'").Replace(@"\/","/");
    var all=new JavaScriptSerializer {MaxJsonLength=16*1024*1024,RecursionLimit=256}.DeserializeObject(data) as object[];
-   if(all==null||all.Length<2||all[0]==null||all[1]!=null)throw new InvalidDataException("Каталог Google неполный или требует дополнительную страницу; загрузка остановлена");
+   if(all==null||all.Length<2||all[1]!=null||(all[0]!=null&&!(all[0] is object[])))throw new InvalidDataException("Каталог Google неполный или требует дополнительную страницу; загрузка остановлена");
    return all[0] as object[]??new object[0];
   }
-  internal List<BundleRemoteFile> Scan(IEnumerable<BundleRemoteFile> manifest,CancellationToken token,Action<string> log)
+  internal List<BundleRemoteFile> Scan(IEnumerable<BundleRemoteFile> manifest,CancellationToken token,Action<string> log,bool independentTools=false,bool toolsOnly=false)
   {
    ids.Clear();var expected=manifest.ToDictionary(f=>f.Path,StringComparer.OrdinalIgnoreCase);var result=new List<BundleRemoteFile>();
    var pending=new Queue<string[]>();pending.Enqueue(new[]{FolderId,""});var seen=new HashSet<string>();var paths=new HashSet<string>(StringComparer.OrdinalIgnoreCase);int count=0;
@@ -45,15 +45,24 @@ namespace ServiceTool
      string path=directory[1]+"/"+name;YandexBundleSource.LocalPath(Path.Combine(Path.GetTempPath(),"bars-google-check"),path);
      if(!paths.Add(path)||++count>20000)throw new InvalidDataException("Повтор или слишком большой каталог Google");
      if(path.Equals("/.bars-download",StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Источник использует служебную папку");
-     if(type=="application/vnd.google-apps.folder"){if(!path.Equals("/_soft",StringComparison.OrdinalIgnoreCase)&&!path.Equals("/Журнал установки библиотек",StringComparison.OrdinalIgnoreCase))pending.Enqueue(new[]{id,path});continue;}
-     if(path.StartsWith("/_soft/",StringComparison.OrdinalIgnoreCase))continue;
-     long size=Convert.ToInt64(row[13]);BundleRemoteFile reference;
+     if(type=="application/vnd.google-apps.folder"){if(toolsOnly&&!(directory[1].Length==0&&name.Equals("_tools",StringComparison.OrdinalIgnoreCase)))continue;if(!path.Equals("/Журнал установки библиотек",StringComparison.OrdinalIgnoreCase))pending.Enqueue(new[]{id,path});continue;}
+
+          long size=Convert.ToInt64(row[13]);BundleRemoteFile reference;
+     if(independentTools&&path.StartsWith("/_tools/",StringComparison.OrdinalIgnoreCase))
+     {
+      if(directory[1].Equals("/_tools",StringComparison.OrdinalIgnoreCase)&&ToolArchives.Supports(path))
+      {
+       ids[path]=id;
+       result.Add(new BundleRemoteFile {Path=path,Size=size,TransferId=Guid.NewGuid().ToString("N")});
+      }
+      continue;
+     }
      if(!expected.TryGetValue(path,out reference)||reference.Size!=size){if(log!=null)log("Google: файл не подтверждён каталогом SHA-256 и пропущен: "+path);continue;}
      ids[path]=id;result.Add(new BundleRemoteFile {Path=path,Size=size,Sha256=reference.Sha256});
     }
    }
    }
-   if(result.Count==0)throw new InvalidDataException("Нет файлов Google с подтверждёнными размером и SHA-256");return result;
+   return result;
   }
   static string ReadLimited(StreamReader reader,CancellationToken token){var builder=new StringBuilder();var buffer=new char[4096];int n;while((n=reader.Read(buffer,0,buffer.Length))>0){token.ThrowIfCancellationRequested();if(builder.Length+n>1024*1024)throw new IOException("Слишком большой ответ подтверждения Google");builder.Append(buffer,0,n);}return builder.ToString();}
   internal static Uri ConfirmationLink(string html)
@@ -94,10 +103,33 @@ namespace ServiceTool
   internal List<BundleRemoteFile> Scan(BundleCloud cloud,CancellationToken token,Action<string> log,IEnumerable<BundleRemoteFile> expected=null)
   {
    if(cloud!=BundleCloud.Google)YandexFiles=yandex.Scan(token);
-   if(cloud!=BundleCloud.Yandex)GoogleFiles=google.Scan(cloud==BundleCloud.Both?YandexFiles:expected??YandexFiles??Baseline(),token,log);
-   if(cloud==BundleCloud.Both){var g=GoogleFiles.ToDictionary(f=>f.Path,StringComparer.OrdinalIgnoreCase);foreach(var file in YandexFiles.Where(f=>f.Group!="Программы"))if(!g.ContainsKey(file.Path))log("Нет подтверждённой копии на Google: "+file.Path);log("Каталоги зеркал сверены по путям и размерам. Содержимое Google проверяется по SHA-256 после скачивания.");}
-   if(cloud==BundleCloud.Google)log("Google проверяется по встроенному каталогу SHA-256. Новые файлы требуют сверки с Яндексом; совпадение размера не подтверждает содержимое облака.");
+   if(cloud!=BundleCloud.Yandex)
+   {
+    var reference=(cloud==BundleCloud.Both?YandexFiles:expected??YandexFiles??Baseline()).ToList();
+    GoogleFiles=google.Scan(reference,token,log,expected==null&&cloud==BundleCloud.Google);
+    if(cloud==BundleCloud.Google)
+    {
+     var confirmed=new HashSet<string>(GoogleFiles.Select(f=>f.Path),StringComparer.OrdinalIgnoreCase);
+     foreach(var file in reference.Where(f=>(expected!=null||f.Group!="Утилиты")&&!confirmed.Contains(f.Path)))
+      log("На Google Диске нет подтверждённой копии. Проверь Яндекс Диск: "+file.Path);
+    }
+   }
+   if(cloud==BundleCloud.Both){var g=GoogleFiles.ToDictionary(f=>f.Path,StringComparer.OrdinalIgnoreCase);foreach(var file in YandexFiles)if(!g.ContainsKey(file.Path))log("Нет подтверждённой копии на Google: "+file.Path);log("Каталоги зеркал сверены по путям и размерам. Содержимое Google проверяется по SHA-256 после скачивания.");}
+   if(cloud==BundleCloud.Google)log("Для разделов комплекта со сверкой зеркал используется эталонный SHA-256. Архивы утилит Google читаются из его собственного каталога.");
    return cloud==BundleCloud.Google?GoogleFiles:YandexFiles;
+  }
+  internal List<BundleRemoteFile> ScanGoogleSql(CancellationToken token,Action<string> log)
+  {
+   List<BundleRemoteFile> reference;
+   try{reference=yandex.Scan(token);YandexFiles=reference;}
+   catch(Exception ex){token.ThrowIfCancellationRequested();if(!IsNetworkFailure(ex))throw;log("Яндекс недоступен. Google проверяется по встроенному каталогу SHA-256; новые наборы могут отсутствовать.");var baseline=Baseline();Scan(BundleCloud.Google,token,log);return baseline.Where(f=>f.Group!="Утилиты").Concat(GoogleFiles.Where(f=>f.Group=="Утилиты")).ToList();}
+   Scan(BundleCloud.Google,token,log);
+   return reference.Where(f=>f.Group!="Утилиты").Concat(GoogleFiles.Where(f=>f.Group=="Утилиты")).ToList();
+  }
+  internal List<BundleRemoteFile> ScanGoogleTools(CancellationToken token,Action<string> log)
+  {
+   GoogleFiles=google.Scan(new BundleRemoteFile[0],token,null,true,true);
+   return GoogleFiles;
   }
   internal static bool IsNetworkFailure(Exception ex){return ex is WebException||ex is IOException;}
   internal bool Ready(BundleCloud cloud){return cloud==BundleCloud.Google?GoogleFiles!=null:YandexFiles!=null;}

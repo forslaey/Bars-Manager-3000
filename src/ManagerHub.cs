@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal abstract class ManagerModuleForm : Form
+    internal abstract class ManagerModuleForm : BrandWindow
     {
         protected ThemePalette Colors;
         protected readonly TableLayoutPanel Root;

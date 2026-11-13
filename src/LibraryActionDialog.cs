@@ -1,18 +1,18 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 namespace ServiceTool
 {
-    internal sealed class LibraryActionDialog : Form
+    internal sealed class LibraryActionDialog : BrandWindow
     {
         internal LibraryOperation Operation { get; private set; }
         internal LibraryActionDialog(ThemePalette colors, Icon icon, IEnumerable<LibraryCheck> selected)
         {
             var items = selected.ToList();
             NativeWindowTheme.Bind(this,()=>colors.Dark);
-            Text = "Действие с компонентами"; Icon = icon; Font = new Font("Segoe UI", 10);
+            Text = "Действие с компонентами"; Icon = icon ?? BrandAssets.LoadIcon(); Font = new Font("Segoe UI", 10);
             AutoScaleDimensions = new SizeF(96, 96); AutoScaleMode = AutoScaleMode.Dpi;
             ClientSize = new Size(980, 540); MinimumSize = new Size(980, 540); StartPosition = FormStartPosition.CenterParent;
             BackColor = colors.Canvas; ForeColor = colors.Text; DoubleBuffered = true; MinimizeBox = MaximizeBox = false;

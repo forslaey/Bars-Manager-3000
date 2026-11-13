@@ -10,6 +10,8 @@ namespace ServiceTool
         private Point touchStart,touchLast;
         private double touchRemainder;
         private int touchRow=-1,touchColumn=-1;
+        internal event EventHandler<DataGridViewCellEventArgs> TouchCellTapped;
+        internal event Action TouchTapInterrupted;
         internal bool TouchScrollingEnabled {get{return touchEnabled;}set{touchEnabled=value;if(IsHandleCreated)ConfigureTouch();ResetTouch();}}
         [StructLayout(LayoutKind.Sequential)] private struct GestureConfig {public uint Id,Want,Block;}
         [StructLayout(LayoutKind.Sequential)] private struct GestureInfo {public uint Size,Flags,Id;public IntPtr Target;public short X,Y;public uint Instance,Sequence;public ulong Arguments;public uint ExtraSize;}
@@ -37,7 +39,7 @@ namespace ServiceTool
         internal bool TouchMouse(int message,Point point,bool fromTouch)
         {
             if(!touchEnabled)return false;
-            if(!fromTouch){if(message==0x201||message==0x203)ResetTouch();return false;}
+            if(!fromTouch){if(message==0x201||message==0x203){ResetTouch();InterruptTouchTap();}return false;}
             if(message==0x201||message==0x203)
             {
                 ResetTouch();touchDown=true;touchStart=touchLast=point;
@@ -59,15 +61,23 @@ namespace ServiceTool
                     // continues to be committed immediately by the original grid.
                     base.OnMouseDown(new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0));
                     base.OnMouseUp(new MouseEventArgs(MouseButtons.Left,1,point.X,point.Y,0));
+                    var tapped=TouchCellTapped;
+                    if(tapped!=null)tapped(this,new DataGridViewCellEventArgs(hit.ColumnIndex,hit.RowIndex));
                 }
+                else InterruptTouchTap();
                 return true;
             }
             return false;
         }
+        private void InterruptTouchTap()
+        {
+            var interrupted=TouchTapInterrupted;
+            if(interrupted!=null)interrupted();
+        }
         internal void TouchPan(Point point,bool begin,bool end)
         {
             if(!touchEnabled||!Enabled)return;
-            if(begin){panActive=true;touchMoved=true;touchLast=point;touchRemainder=0;}
+            if(begin){InterruptTouchTap();panActive=true;touchMoved=true;touchLast=point;touchRemainder=0;}
             else if(panActive){touchRemainder+=touchLast.Y-point.Y;touchLast=point;ScrollTouchRows();}
             if(end){panActive=false;touchRemainder=0;}
         }

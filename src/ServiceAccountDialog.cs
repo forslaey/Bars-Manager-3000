@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal sealed class ServiceAccountDialog : Form
+    internal sealed class ServiceAccountDialog : BrandWindow
     {
         private readonly ServiceInstallProfile original;
         private readonly bool installing;
@@ -75,7 +75,7 @@ namespace ServiceTool
             layout.Controls.Add(userRow, 1, 6);
             layout.Controls.Add(MakeLabel("Пароль Windows:", colors.Muted), 0, 7);
             ConfigureTextBox(password); password.UseSystemPasswordChar = true; password.MaxLength = 4096;
-            layout.Controls.Add(password, 1, 7);
+            layout.Controls.Add(new PathFieldFrame((BrandTextBox)password), 1, 7);
             remember.Text = "Запомнить пароль на этом компьютере";
             remember.Dock = DockStyle.Fill; remember.Margin = Padding.Empty;
             remember.ForeColor = colors.Text; remember.BackColor = colors.Canvas;
@@ -141,8 +141,8 @@ namespace ServiceTool
         private void ConfigureTextBox(TextBox box)
         {
             box.Dock = DockStyle.Fill; box.Margin = new Padding(0, 5, 0, 5);
-            box.BackColor = colors.Surface; box.ForeColor = colors.Text;
-            box.BorderStyle = BorderStyle.FixedSingle;
+            box.BackColor = colors.SurfaceAlt; box.ForeColor = colors.Text;
+
             BrandTextBox input = box as BrandTextBox; if (input != null) input.Palette = colors;
         }
 

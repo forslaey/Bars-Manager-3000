@@ -1,4 +1,4 @@
-﻿param([string] $BuildDirectory, [switch] $Sign, [string] $ReferenceAssemblies, [switch] $UtilitySmoke, [switch] $SoftwareSmoke, [switch] $Audit, [switch] $LayoutAudit)
+param([string] $BuildDirectory, [switch] $Sign, [string] $ReferenceAssemblies, [switch] $UtilitySmoke, [switch] $SoftwareSmoke, [switch] $Audit, [switch] $LayoutAudit, [switch] $FindingsAudit)
 $ErrorActionPreference = 'Stop'
 $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $taskCompiler)) {
@@ -32,7 +32,7 @@ foreach ($taskArchitecture in @('x86','x64')) {
 $taskFailures = New-Object 'System.Collections.Generic.List[string]'
 function Invoke-TaskTests([string] $taskName, [string] $taskMain, [string[]] $taskInputs) {
     $taskOutput = Join-Path $taskBuild ($taskName + '.exe')
-    $taskArguments = @('/nologo', '/target:exe', '/platform:anycpu', '/utf8output', '/codepage:65001', "/out:$taskOutput", "/main:$taskMain", '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Xml.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.IO.Compression.dll', '/reference:System.IO.Compression.FileSystem.dll', '/reference:System.Configuration.Install.dll', '/reference:System.ServiceProcess.dll', '/reference:System.Security.dll', '/reference:System.Web.Extensions.dll', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png", "/resource:$(Join-Path $taskAssets 'BundleManifest.json'),BARS.BundleManifest.json")
+    $taskArguments = @('/nologo', '/target:exe', '/platform:anycpu', '/utf8output', '/codepage:65001', "/out:$taskOutput", "/main:$taskMain", '/reference:System.dll', '/reference:System.Core.dll', '/reference:System.Xml.dll', '/reference:System.Drawing.dll', '/reference:System.Windows.Forms.dll', '/reference:System.IO.Compression.dll',  '/reference:System.Configuration.Install.dll', '/reference:System.ServiceProcess.dll', '/reference:System.Security.dll', '/reference:System.Web.Extensions.dll', "/win32manifest:$(Join-Path $taskSource 'app.manifest')", "/resource:$(Join-Path $taskAssets 'BarsHeader.png'),BARS.Logo.png", "/resource:$(Join-Path $taskAssets 'BarsHeaderDark.png'),BARS.Logo.Dark.png", "/resource:$(Join-Path $taskAssets 'Bars.ico'),BARS.Icon.ico", "/resource:$(Join-Path $taskAssets 'AnyDesk.png'),BARS.AnyDesk.png", "/resource:$(Join-Path $taskAssets 'RuDesktop.png'),BARS.RuDesktop.png", "/resource:$(Join-Path $taskAssets 'BundleManifest.json'),BARS.BundleManifest.json")
     $taskArguments = @('/noconfig','/nostdlib+',"/reference:$(Join-Path $ReferenceAssemblies 'mscorlib.dll')") + @($taskArguments | ForEach-Object {
         if ($_.StartsWith('/reference:')) { "/reference:$(Join-Path $ReferenceAssemblies $_.Substring(11))" } else { $_ }
     })
@@ -51,6 +51,11 @@ function Invoke-TaskTests([string] $taskName, [string] $taskMain, [string[]] $ta
 }
 
 $taskUiSources = @(Get-ChildItem -LiteralPath $taskSource -File -Filter '*.cs' | ForEach-Object FullName)
+if ($FindingsAudit) {
+    Invoke-TaskTests 'FullAuditFindingsTests' 'ServiceTool.FullAuditFindingsTests' ($taskUiSources + (Join-Path $taskTests 'FullAuditFindingsTests.cs'))
+    if ($taskFailures.Count) { throw ("Не пройдены проверки: " + ($taskFailures -join ", ")) }
+    return
+}
 if ($LayoutAudit) {
     foreach ($name in @('LogArchiveUiTests','ResponsiveLayoutTests','DownloadProgressTests')) {
         Invoke-TaskTests $name ("ServiceTool." + $name) ($taskUiSources + (Join-Path $taskTests ($name + '.cs')))
@@ -115,6 +120,7 @@ Invoke-TaskTests 'ProductTests' 'ServiceTool.ProductTests' ($taskUiSources + (Jo
 Invoke-TaskTests 'RegressionTests' 'ServiceTool.RegressionTests' ($taskUiSources + (Join-Path $taskTests 'RegressionTests.cs'))
 
 Invoke-TaskTests 'TouchGridTests' 'ServiceTool.TouchGridTests' ($taskUiSources + (Join-Path $taskTests 'TouchGridTests.cs'))
+Invoke-TaskTests 'SqlManagerTests' 'ServiceTool.SqlManagerTests' ($taskUiSources + (Join-Path $taskTests 'SqlManagerTests.cs'))
 Invoke-TaskTests 'BundleTests' 'ServiceTool.BundleTests' ($taskUiSources + (Join-Path $taskTests 'BundleTests.cs'))
 Invoke-TaskTests 'OpeningProgressTests' 'ServiceTool.OpeningProgressTests' ($taskUiSources + (Join-Path $taskTests 'OpeningProgressTests.cs'))
 Invoke-TaskTests 'DownloadProgressTests' 'ServiceTool.DownloadProgressTests' ($taskUiSources + (Join-Path $taskTests 'DownloadProgressTests.cs'))

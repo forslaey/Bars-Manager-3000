@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -30,7 +30,7 @@ namespace ServiceTool
                         new SoftwareManagerForm(true), new ToolsDeploymentForm(true),
                         new WindowsFeaturesForm(true, true), new InitialSystemSettingsForm(true) };
                     Size[] limits = { new Size(1160,860), new Size(1440,1040), new Size(1520,1040),
-                        new Size(1280,1040), new Size(520,612), new Size(760,590), new Size(1280,960) };
+                        new Size(1280,1040), new Size(568,612), new Size(760,590), new Size(1280,960) };
                     for (int i = 0; i < forms.Length; i++) using (var form = forms[i])
                     {
                         var module = form as ManagerModuleForm;
@@ -64,14 +64,14 @@ namespace ServiceTool
                         Application.DoEvents();form.PerformLayout();Application.DoEvents();
                         var content = Children(form).OfType<TableLayoutPanel>().First();
                         var frame = (ScrollableControl)content.Parent;
-                        bool compact = i==0 || i==4 || i==5;
-                        Check(Children(form).OfType<BoundedContentPanel>().Any()==compact, "Launcher, utilities and Windows components use compact content");
+                        bool compact = i==0 || i==5;
+                        Check(Children(form).OfType<BoundedContentPanel>().Any()==compact, "Only launcher and Windows components use compact content");
                         int initialWidth = content.Width;
                         int initialFrameWidth = frame.ClientSize.Width;
                         foreach (Size size in new[] { new Size(1920,1080), new Size(3840,2160), new Size(2560,1440), new Size(1080,1920), new Size(1200,1920), original, new Size(3840,2160), original })
                         {
                             form.ClientSize = new Size((int)(size.Width*scale), (int)(size.Height*scale));
-                            Application.DoEvents(); form.PerformLayout();Application.DoEvents();
+                            Application.DoEvents(); form.PerformLayout();frame.PerformLayout();for(int settle=0;settle<4;settle++)Application.DoEvents();
                             string context = form.GetType().Name + " / " + scale + " / " + size;
                             if(compact)Check(content.Width <= limits[i].Width*scale+1 && content.Height <= limits[i].Height*scale+1, "Unbounded content: " + context);
                             else Check(content.Width>=frame.ClientSize.Width-1 && content.Height>=frame.ClientSize.Height-1, "Module no longer fills window: " + context + " content="+content.Bounds+" parent="+frame.ClientRectangle);

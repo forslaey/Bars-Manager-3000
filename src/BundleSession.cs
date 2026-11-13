@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,6 +9,14 @@ namespace ServiceTool
     {
         static readonly object gate=new object();
         static string PathIn(string root,string name){return YandexBundleSource.LocalPath(root,"/.bars-download/"+name);}
+        internal static void Cleanup(string root)
+        {
+            lock(gate)
+            {
+                string folder=Path.GetDirectoryName(PathIn(root,"placeholder"));
+                if(Directory.Exists(folder)) Directory.Delete(folder,true);
+            }
+        }
         internal static void Log(string root,string text)
         {
             lock(gate)
@@ -24,7 +32,7 @@ namespace ServiceTool
         {
             string path=PathIn(root,"queue.xml");Directory.CreateDirectory(Path.GetDirectoryName(path));string temp=PathIn(root,"queue-"+Guid.NewGuid().ToString("N")+".tmp");
             var doc=new XmlDocument();var node=doc.CreateElement("queue");node.SetAttribute("source",YandexBundleSource.PublicLink);doc.AppendChild(node);
-            foreach(var file in files){var item=doc.CreateElement("file");item.SetAttribute("path",file.Path);item.SetAttribute("sha256",file.Sha256);node.AppendChild(item);}
+            foreach(var file in files.Where(file=>file.Sha256!=null)){var item=doc.CreateElement("file");item.SetAttribute("path",file.Path);item.SetAttribute("sha256",file.Sha256);node.AppendChild(item);}
             try{doc.Save(temp);string previous=File.Exists(path)?YandexBundleSource.Hash(path,System.Threading.CancellationToken.None):null;BundlePublication.Publish(temp,path,previous,System.Threading.CancellationToken.None,null);}finally{if(File.Exists(temp))File.Delete(temp);}
         }
         internal static HashSet<string> Load(string root)

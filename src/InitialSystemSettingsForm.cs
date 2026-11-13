@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
@@ -77,7 +77,7 @@ namespace ServiceTool
                     if (IsDisposed) return;
                     int height = actions.Controls.Cast<Control>().Max(button =>
                     {
-                        int width = Math.Max(1, button.Width - 12);
+                        int width = Math.Max(1, button.Width - 16);
                         return TextRenderer.MeasureText(button.Text, button.Font, new Size(width, Int32.MaxValue),
                             TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height + 8;
                     });

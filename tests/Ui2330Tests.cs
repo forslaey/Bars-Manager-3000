@@ -47,7 +47,7 @@ namespace ServiceTool
                     if(f is ToolsDeploymentForm)
                     {
                         var captions=All(f).OfType<InputCaptionLabel>().OrderBy(c=>c.Top).ToArray();var inputs=All(f).OfType<BrandTextBox>().OrderBy(c=>c.PointToScreen(Point.Empty).Y).ToArray();
-                        for(int n=0;n<2;n++){Check(captions[n].PointToScreen(Point.Empty).X==inputs[n].PointToScreen(Point.Empty).X,"Tools caption left aligned");Check(captions[n].Height>=captions[n].Font.Height&&Math.Abs(Gap(captions[n],inputs[n])-fieldGap.Value)<=1,"Tools caption geometry matches software: "+Gap(captions[n],inputs[n])+" / "+fieldGap);}
+                        for(int n=0;n<2;n++){var frame=inputs[n].Parent; var label=captions.OrderBy(c=>c.PointToScreen(Point.Empty).Y).ElementAt(n); Check(label.Right<=frame.Parent.ClientSize.Width && Math.Abs(label.PointToScreen(Point.Empty).Y+label.Height/2-frame.PointToScreen(Point.Empty).Y-frame.Height/2)<=5*scale,"Tools caption centered beside frame");}
                         if(scale==1F)Capture(f,"tools-"+dark);
                     }
                     if(f is InitialSystemSettingsForm)

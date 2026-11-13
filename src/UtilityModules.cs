@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -57,16 +57,8 @@ namespace ServiceTool
                 if(Scanning){CancelRequested=true;if(Session!=null)Session.Cancel();Busy=false;return;}
                 e.Cancel = true;
                 if (closeAfterOperation) return;
-                bool canCancel = this is ToolsDeploymentForm;
-                string message = canCancel ? "Отменить операцию с утилитами и закрыть окно?" :
-                    "Действие Windows нужно завершить. Закрыть окно после завершения?";
-                if (!ModuleNavigation.ExitConfirmed && BrandMessageBox.ConfirmStop(this, message) != DialogResult.Yes) return;
+                if (!ModuleNavigation.ExitConfirmed && BrandMessageBox.ConfirmStop(this, "Действие Windows нужно завершить. Закрыть окно после завершения?") != DialogResult.Yes) return;
                 closeAfterOperation = true;
-                if (canCancel)
-                {
-                    CancelRequested = true;
-                    if (Session != null) Session.Cancel();
-                }
             };
         }
         protected virtual void Progress(string text)
@@ -252,111 +244,157 @@ namespace ServiceTool
             if (restart) await Restart();
         }
     }
-    internal sealed class ToolsDeploymentForm : UtilityModuleForm
+    internal sealed class ToolsDeploymentForm : BundleDownloadForm
     {
-        private readonly BrandTextBox sourceLabel;
-        private readonly BrandTextBox destination;
-        private readonly BrandButton chooseSource,chooseTarget,deploy,remove,cancel;
-        private readonly BrandCheckBox shortcuts=new BrandCheckBox();
         private readonly bool preview;
-        private string source;
-        internal ToolsDeploymentForm(bool previewMode) : base("Распаковка утилит",new Size(520,500))
+        private volatile bool CancelRequested;
+        private LibrarySession Session;
+        private System.Threading.CancellationTokenSource archiveCancellation;
+        internal ToolsDeploymentForm(bool previewMode)
+            : base(BundleFolders.DefaultRoot,toolsOnly:true,localSource:previewMode?null:ToolsDeployment.FindSource())
         {
-            HideThemeSelector();FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;preview=previewMode; MinimumSize=SizeFromClientSize(new Size(520,500));ClientSize=new Size(520,500);
-            Root.RowStyles[0].Height=96;Root.Padding=new Padding(26,12,26,18);
-            Body.RowStyles[0].Height=52;Body.RowStyles[2].Height=48;Body.RowStyles[3].Height=54;
-            Body.GetControlFromPosition(0,0).Margin=new Padding(0,8,0,12);
-            var card=new Card {Dock=DockStyle.Fill,Padding=new Padding(16,16,16,8),Margin=new Padding(0,0,0,8)};
-            var content=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=6,Margin=Padding.Empty};
-            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,180));
-            foreach(float height in new[]{(float)PathFieldMetrics.CaptionHeight,(float)PathFieldMetrics.PickerHeight,12F,(float)PathFieldMetrics.CaptionHeight,(float)PathFieldMetrics.PickerHeight,44F})content.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
-            var sourceCaption=Caption("Будет взято из:",false);content.Controls.Add(sourceCaption,0,0);content.SetColumnSpan(sourceCaption,2);
-            sourceLabel=new BrandTextBox {Text=preview?@"C:\Библиотеки\_tools":"Выбери папку с утилитами",ReadOnly=true,AutoSize=false,Palette=Colors};
-            chooseSource=Button("Выбрать папку…",false);chooseSource.Click+=delegate{Choose();};var sourceRow=new PathPickerRow(sourceLabel,chooseSource,168){Dock=DockStyle.Fill,FillAvailableWidth=true};content.Controls.Add(sourceRow,0,1);content.SetColumnSpan(sourceRow,2);
-            var targetCaption=Caption("Путь распаковки:",false);content.Controls.Add(targetCaption,0,3);content.SetColumnSpan(targetCaption,2);
-            destination=new BrandTextBox {AutoSize=false,Palette=Colors,Text=ToolsDeployment.DefaultTarget};
-            chooseTarget=Button("Выбрать путь…",false);chooseTarget.Click+=delegate{ChooseTarget();};var targetRow=new PathPickerRow(destination,chooseTarget,168){Dock=DockStyle.Fill,FillAvailableWidth=true};content.Controls.Add(targetRow,0,4);content.SetColumnSpan(targetRow,2);
-            shortcuts.Text=PathFieldMetrics.ShortcutCaption;shortcuts.Checked=true;shortcuts.Dock=DockStyle.Fill;shortcuts.Margin=new Padding(0,16,0,0);shortcuts.Palette=Colors;content.Controls.Add(shortcuts,0,5);content.SetColumnSpan(shortcuts,2);
-            card.Controls.Add(content);Body.Controls.Add(card,0,1);
-            var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=5,RowCount=1,Margin=Padding.Empty};
-            for (int column = 0; column < 5; column++)
-                actions.ColumnStyles.Add(column % 2 == 0 ? new ColumnStyle(SizeType.Percent, 100F / 3) : new ColumnStyle(SizeType.Absolute, 12));
-            actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            deploy=Button("Распаковать",true);deploy.Margin=Padding.Empty;deploy.Click+=async delegate{await Deploy();};actions.Controls.Add(deploy,0,0);
-            remove=Button("Удалить",false);remove.Margin=Padding.Empty;remove.Click+=async delegate{await Remove();};actions.Controls.Add(remove,2,0);
-            cancel=Button("Отменить",false);cancel.Margin=Padding.Empty;cancel.Enabled=false;cancel.Click+=delegate
-            {
-                CancelRequested=true;
-                cancel.Enabled=false;
-                if(Session!=null)Session.Cancel();
-                Activity.Text="Отменяем распаковку…";
-            };
-            actions.Controls.Add(cancel,4,0);Body.Controls.Add(actions,0,2);
-            if(!preview)try{source=ToolsDeployment.FindSource();if(source!=null&&Directory.Exists(source))sourceLabel.Text=source;}catch(Exception ex){Activity.Text=OperationMessage.FinishSentence(ex.Message);}
-            OperationView=new DownloadProgressView { InlineDetails = true };
-            var footer=Body.GetControlFromPosition(0,3);Body.SetRow(footer,4);Body.SetRow(actions,3);Body.RowCount=5;Body.RowStyles.Insert(2,new RowStyle(SizeType.Absolute,106));
-            OperationView.Dock=DockStyle.Fill;OperationView.Margin=new Padding(0,8,0,8);Body.Controls.Add(OperationView,0,2);
-            MinimumSize=SizeFromClientSize(new Size(520,612));ClientSize=new Size(520,612);
-            LimitContent(new Size(520, 612));
-            SetTheme(Colors.Dark,false);
+            preview=previewMode;
+            deployFromWorkspace=Deploy;
+            cancelToolDeployment=CancelDeployment;
+            RemoveTools=Remove;
+            UpdateState();
         }
-        protected override void OnThemeChanged(){base.OnThemeChanged();shortcuts.Palette=Colors;}
-        private void Lock(bool busy)
-        {if(busy){CancelRequested=false;OperationView.BeginOperation("Подготавливаем распаковку или удаление…",true,3);}else cancel.Enabled=false;if(!busy&&OperationView.Snapshot.Active)OperationView.FinishOperation(Activity.Text,success:true);Busy=busy;chooseSource.Enabled=chooseTarget.Enabled=deploy.Enabled=remove.Enabled=destination.Enabled=shortcuts.Enabled=!busy;Back.Enabled=!busy||ManagerApplicationContext.ActiveContext!=null;}
-        private bool Choose()
+
+        private async Task<LibraryInstallResult> Execute(string action,string data,string path)
         {
-            using(var dialog=new FolderBrowserDialog {Description="Выбери папку _tools или папку Библиотеки",ShowNewFolderButton=false})
+            var report=ToolProgress.OperationReporter;
+            using(await WindowsOperationQueue.EnterAsync(()=>report(WindowsOperationQueue.WaitingMessage),()=>CancelRequested))
+            using(var session=await Task.Run(()=>LibrarySession.Start(()=>CancelRequested)))
             {
-                if(ScopedDialogs.Show(this, dialog)!=DialogResult.OK)return false;string path=dialog.SelectedPath;if(Directory.Exists(Path.Combine(path,"_tools")))path=Path.Combine(path,"_tools");
-                try{ToolsDeployment.Discover(path);source=path;sourceLabel.Text=source;Activity.Text="Комплект утилит найден.";return true;}catch(Exception ex){Failure(ex);return false;}
+                Session=session;
+                try{return await Task.Run(()=>session.ExecuteSystem(action,data,path,report));}
+                finally{Session=null;}
             }
         }
-        private void ChooseTarget()
+        internal static string[] LocalPackages(string folder)
         {
-            using(var dialog=new FolderBrowserDialog {Description="Выбери папку для утилит",ShowNewFolderButton=true})
-            {if(ScopedDialogs.Show(this, dialog)!=DialogResult.OK)return;string path=dialog.SelectedPath;destination.Text=Path.GetFileName(path).Equals("_tools",StringComparison.OrdinalIgnoreCase)?path:Path.Combine(path,"_tools");}
+            var archives=Directory.GetFiles(folder).Where(path=>ToolArchives.Supports(path)&&!Path.GetFileName(path).StartsWith(".")).ToArray();
+            var archiveFolders=new HashSet<string>(archives.Select(Path.GetFileNameWithoutExtension),StringComparer.OrdinalIgnoreCase);
+            return Directory.GetDirectories(folder).Where(path=>!archiveFolders.Contains(Path.GetFileName(path)))
+                .Concat(archives).Select(Path.GetFileName).Where(name=>!name.StartsWith("."))
+                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name=>name).ToArray();
         }
-        private async Task Deploy()
+
+        private void CancelDeployment()
         {
-            if(Busy||preview)return;if(!(source!=null&&Directory.Exists(source))&&!Choose())return;
-            string target;try{target=ToolsDeployment.TargetFolder(destination.Text);ToolsDeployment.Discover(source);}catch(Exception ex){Failure(ex);return;}
-            if(BrandMessageBox.Show(this,"Распаковать утилиты в "+target+"?\r\n"+(shortcuts.Checked?"Создадим ярлыки на рабочем столе.":"Ярлыки не создаются.")+"\r\nСуществующие настройки сохраняются, прежняя папка остаётся в резервной копии.",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-            Lock(true);cancel.Enabled=true;
+            CancelRequested=true;
+            if(archiveCancellation!=null)archiveCancellation.Cancel();
+            if(Session!=null)Session.Cancel();
+        }
+
+        private async Task Deploy(string packageSource,string[] packages,Dictionary<string,HashSet<string>> shortcutSelection,DownloadProgressView progress)
+        {
+            if(preview||packages.Length==0)return;
+            string target;
             try
             {
-                var result=await Execute("tools-deploy",source,target);
-                cancel.Enabled=false;
+                target=ToolsDeployment.TargetFolder(ToolDestination.Text);
+                string from=Path.GetFullPath(packageSource).TrimEnd((char)92)+(char)92;
+                string to=target.TrimEnd((char)92)+(char)92;
+                if(from.StartsWith(to,StringComparison.OrdinalIgnoreCase)||to.StartsWith(from,StringComparison.OrdinalIgnoreCase))
+                    throw new IOException("Папка комплекта и путь распаковки должны быть раздельными.");
+                ToolsDeployment.SafePath(target);
+            }
+            catch(Exception ex){progress.Stage(OperationMessage.FinishSentence(ex.Message),failed:true);return;}
+
+
+            CancelRequested=false;progress.BeginOperation("Подготавливаем распаковку…");
+            archiveCancellation=new System.Threading.CancellationTokenSource();
+            ToolProgress.SetWork(3+packages.Count(name=>ToolArchives.Supports(name)&&File.Exists(Path.Combine(packageSource,name))));
+            try
+            {
+                var folders=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var variants=ToolVariants;
+                var exclusions=new List<string>();
+                var launchers=new List<BarsTool>();
+                var missingShortcuts=new List<string>();
+                foreach(string package in packages)
+                {
+                    string path=YandexBundleSource.LocalPath(packageSource,"/"+package);
+                    if(File.Exists(path)&&ToolArchives.Supports(path))
+                    {
+                        string folder=Path.Combine(packageSource,Path.GetFileNameWithoutExtension(path));
+                        var report=ToolProgress.OperationReporter;
+                        folder=await Task.Run(()=>ToolArchives.Extract(path,archiveCancellation.Token,p=>{
+                            LibraryCancellation.Check(()=>CancelRequested);
+                            if(p.Total>0)report("BARS_FRACTION|"+p.Bytes+"|"+p.Total+"|Распаковываем "+package+"…");
+                        },replace:true));
+                        folders.Add(Path.GetFileName(folder));ToolProgress.CompleteStep();
+                    }
+                    else folders.Add(package);
+                    string folderName=File.Exists(path)?Path.GetFileNameWithoutExtension(path):package;
+                    HashSet<string> selectedVersions;
+                    if(variants.TryGetValue(package,out selectedVersions))
+                    {
+                        var candidates=ToolsDeployment.ShortcutCandidates(Path.Combine(packageSource,folderName),ToolsDeployment.ShortcutExecutable(package))
+                            .Select(candidate=>candidate.Replace((char)92,(char)47)).ToArray();
+                        var roots=selectedVersions.Select(version=>Path.GetDirectoryName(version).Replace((char)92,(char)47)).ToArray();
+                        foreach(var candidate in candidates.Where(candidate=>!selectedVersions.Contains(candidate)))
+                        {
+                            string branch=Path.GetDirectoryName(candidate).Replace((char)92,(char)47);
+                            if(branch.Length!=0&&!roots.Any(root=>root.Equals(branch,StringComparison.OrdinalIgnoreCase)||root.StartsWith(branch+"/",StringComparison.OrdinalIgnoreCase)))
+                                exclusions.Add(folderName+"/"+branch);
+                            else if(branch.Length==0)exclusions.Add(folderName+"/"+candidate);
+                        }
+                    }
+                    HashSet<string> selectedShortcuts;
+                    if(shortcutSelection.TryGetValue(package,out selectedShortcuts))
+                    {
+                        string directory=File.Exists(path)?Path.GetFileNameWithoutExtension(path):package;
+                        string executable=ToolsDeployment.ShortcutExecutable(package);
+                        var candidates=await Task.Run(()=>ToolsDeployment.ShortcutCandidates(Path.Combine(packageSource,directory),executable));
+                        var chosen=candidates.Where(candidate=>selectedShortcuts.Contains(candidate.Replace(Path.DirectorySeparatorChar,(char)47))).ToArray();
+                        if(chosen.Length<selectedShortcuts.Count)missingShortcuts.Add(package);
+                        foreach(string candidate in chosen)
+                        {
+                            string name=directory;
+                            if(candidates.Length>1)name+=" - "+Path.GetDirectoryName(candidate).Replace(Path.DirectorySeparatorChar,' ');
+                            launchers.Add(new BarsTool{Name=name,Directory=directory,Executable=candidate});
+                        }
+                    }
+                }
+                LibraryCancellation.Check(()=>CancelRequested);
+                ToolsDeployment.Discover(packageSource,folders);
+                string request=new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new ToolCopyRequest{Source=packageSource,Packages=folders.ToArray(),ExcludedDirectories=exclusions.ToArray()});
+                var result=await Execute("tools-deploy-selected",request,target);
+
                 if(result.ExitCode==1602)throw new OperationCanceledException();
-                if(result.ExitCode!=0)throw new IOException(result.Message);
-                OperationView.CompleteStep();ToolsDeployment.EnableAdministratorLaunch(source,target);OperationView.CompleteStep();
-                ToolsDeployment.ShortcutsAt(source,target,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),shortcuts.Checked);
-                OperationView.CompleteStep();Activity.Text=shortcuts.Checked?"Утилиты установлены, ярлыки созданы.":"Утилиты установлены без создания ярлыков.";
+                if(result.ExitCode==1602)throw new OperationCanceledException();if(result.ExitCode!=0)throw new IOException(result.Message);
+                ToolProgress.CompleteStep();ToolsDeployment.EnableAdministratorLaunch(packageSource,target,folders);ToolProgress.CompleteStep();
+                ToolsDeployment.ShortcutsAt(packageSource,target,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),true,folders,launchers);
+                ToolProgress.CompleteStep();ToolProgress.FinishOperation(missingShortcuts.Count>0?"Утилиты распакованы. Без ярлыков: "+String.Join(", ",missingShortcuts)+".":launchers.Count>0?"Утилиты распакованы. Ярлыки созданы.":"Утилиты распакованы без создания ярлыков.",success:true);
             }
             catch(OperationCanceledException)
             {
-                Activity.Text="Распаковка отменена.";
-                OperationView.FinishOperation(Activity.Text,cancelled:true);
+
+                ToolProgress.FinishOperation("Распаковка отменена.",cancelled:true);
             }
-            catch(Exception ex){Failure(ex);}finally{Lock(false);}
+            catch(Exception ex){progress.FinishOperation("Не выполнено: "+ex.Message,failed:true);}finally{archiveCancellation.Dispose();archiveCancellation=null;}
         }
         private async Task Remove()
         {
-            if(Busy||preview)return;string target;List<BarsTool> tools;
+            if(preview)return;string target;List<BarsTool> tools;
             try
             {
-                target=ToolsDeployment.TargetFolder(destination.Text);
-                if(source!=null&&Path.GetFullPath(source).TrimEnd('\\').Equals(target.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("Выбран исходный комплект. Укажи место установленных утилит");
+                target=ToolsDeployment.TargetFolder(ToolDestination.Text);
+                if(ToolSource!=null&&Path.GetFullPath(ToolSource).TrimEnd('\\').Equals(target.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("Выбран исходный комплект. Укажи место установленных утилит");
                 tools=ToolsDeployment.Installed(target);if(tools.Count==0)throw new IOException("В выбранной папке утилиты не найдены");
             }
-            catch(Exception ex){Failure(ex);return;}
+            catch(Exception ex){ToolProgress.Stage(OperationMessage.FinishSentence(ex.Message),failed:true);return;}
             if(BrandMessageBox.Show(this,"Удалить из "+target+":\r\n"+String.Join("\r\n",tools.Select(t=>t.Directory))+"?\r\n\r\nНастройки и журналы внутри этих папок тоже будут удалены. Посторонние файлы и резервные копии сохранятся.","Удаление утилит",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
-            Lock(true);
+            CancelRequested=false;ToolProgress.BeginOperation("Удаляем утилиты…",true,3);
             try
             {
-                var result=await Execute("tools-remove",String.Join("\n",tools.Select(t=>t.Directory)),target);if(result.ExitCode!=0)throw new IOException(result.Message);
-                OperationView.CompleteStep();ToolsDeployment.RemoveReferences(target,tools,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));OperationView.CompleteStep();OperationView.CompleteStep();Activity.Text="Утилиты и их ярлыки удалены.";
+                var result=await Execute("tools-remove",String.Join("\n",tools.Select(t=>t.Directory)),target);if(result.ExitCode==1602)throw new OperationCanceledException();if(result.ExitCode!=0)throw new IOException(result.Message);
+                ToolProgress.CompleteStep();ToolsDeployment.RemoveReferences(target,tools,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));ToolProgress.CompleteStep();ToolProgress.CompleteStep();ToolProgress.FinishOperation("Утилиты и их ярлыки удалены.",success:true);
             }
-            catch(Exception ex){Failure(ex);}finally{Lock(false);}
+            catch(OperationCanceledException){ToolProgress.FinishOperation("Удаление отменено.",cancelled:true);}
+            catch(Exception ex){ToolProgress.FinishOperation("Не выполнено: "+ex.Message,failed:true);}
         }
     }
     internal static class RestartOffer

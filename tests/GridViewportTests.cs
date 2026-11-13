@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -14,6 +14,16 @@ namespace ServiceTool
    foreach(bool dark in new[]{false,true})foreach(float scale in new[]{1F,1.25F,1.5F,2F})using(var form=new Form {ClientSize=new Size(620,380)}){
     var palette=ThemePalette.Create(dark);var slot=new Panel {Dock=DockStyle.Fill};var grid=new ServiceGrid {Dock=DockStyle.Fill,AllowUserToAddRows=false,RowHeadersVisible=false,BackgroundColor=palette.Surface,AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill,ScrollBars=ScrollBars.None};grid.Columns.Add("a","Компонент");var scroll=new LibraryGridScrollBar {Dock=DockStyle.Right,Width=14,Palette=palette};scroll.Bind(grid);slot.Controls.Add(grid);slot.Controls.Add(scroll);form.Controls.Add(slot);form.Show();if(scale!=1)form.Scale(new SizeF(scale,scale));Pump();
     foreach(int rows in new[]{0,1,80,2,0,100,1}){grid.Rows.Clear();for(int n=0;n<rows;n++)grid.Rows.Add("Fixture "+n);Pump();scroll.UpdateViewport();Pump();bool needed=rows>10;Check(scroll.Visible==needed,"Scrollbar follows row count "+rows);Check(slot.BackColor==palette.Canvas&&scroll.BackColor==palette.Canvas,"Matched viewport backgrounds");Check(grid.Width+(scroll.Visible?scroll.Width:0)==slot.ClientSize.Width,"No unclaimed horizontal lane");}
+    grid.Rows.Clear();for(int n=0;n<80;n++)grid.Rows[grid.Rows.Add("Variant "+n)].Height=72;
+    for(int n=0;n<80;n++)if(n%3!=0)grid.Rows[n].Visible=false;
+    Pump();scroll.UpdateViewport();
+    var wheel=typeof(LibraryGridScrollBar).GetMethod("OnMouseWheel",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic);
+    wheel.Invoke(scroll,new object[]{new MouseEventArgs(MouseButtons.None,0,0,0,-120)});
+    Check(grid.FirstDisplayedScrollingRowIndex==9,"Wheel counts visible rows when variants are collapsed: "+grid.FirstDisplayedScrollingRowIndex);
+    for(int n=0;n<20;n++)wheel.Invoke(scroll,new object[]{new MouseEventArgs(MouseButtons.None,0,0,0,-120)});
+    Check(grid.Rows[grid.FirstDisplayedScrollingRowIndex].Visible,"Wheel stays on visible rows at the bottom");
+    for(int n=0;n<80;n++)if(n%3==0&&n!=0)grid.Rows[n].Visible=false;
+    Pump();scroll.UpdateViewport();Check(!scroll.Visible,"Scrollbar disappears after collapse to one visible row");
     form.Close();
    }
    foreach(bool dark in new[]{false,true})foreach(Form form in new Form[]{new MainForm(null,true),new LibraryManagerForm(true),new InitialSystemSettingsForm(true),new SoftwareManagerForm(true),new DotNetUpdatesForm(()=>null),new BundleDifferencesForm(new[]{new[]{"one.exe","Нет в папке"}})})using(form){

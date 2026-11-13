@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
@@ -108,7 +108,11 @@ namespace ServiceTool
         }
         internal static void StandardFooter(TableLayoutPanel row, params Button[] buttons)
         { StandardFooterWithGap(row,10,buttons); }
+        internal static void RightAlignedFooter(TableLayoutPanel row, params Button[] buttons)
+        { LayoutFooter(row,10,true,buttons); }
         internal static void StandardFooterWithGap(TableLayoutPanel row,int gap, params Button[] buttons)
+        { LayoutFooter(row,gap,false,buttons); }
+        private static void LayoutFooter(TableLayoutPanel row,int gap,bool rightAligned,Button[] buttons)
         {
             var labels = row.Controls.Cast<Control>().Where(control => !(control is Button)).ToArray();
             row.SuspendLayout();
@@ -118,7 +122,7 @@ namespace ServiceTool
             row.ColumnCount = row.RowCount = 1;
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var footer = new FooterPanel(labels, buttons, gap) { Padding = row.Padding, Dock = DockStyle.Fill, Margin = Padding.Empty };
+            var footer = new FooterPanel(labels, buttons, gap, rightAligned) { Padding = row.Padding, Dock = DockStyle.Fill, Margin = Padding.Empty };
             row.Padding = Padding.Empty;
             row.Controls.Add(footer, 0, 0);
             row.ResumeLayout(true);
@@ -129,11 +133,13 @@ namespace ServiceTool
             private readonly Control[] labels;
             private readonly Button[] buttons;
             private bool arranging;
+            private readonly bool rightAligned;
 
             private float gapBase;
-            internal FooterPanel(Control[] labels, Button[] buttons,int gap)
+            internal FooterPanel(Control[] labels, Button[] buttons,int gap,bool rightAligned)
             {
                 gapBase=gap;
+                this.rightAligned=rightAligned;
                 this.labels = labels;
                 this.buttons = buttons;
                 foreach (var control in labels.Cast<Control>().Concat(buttons))
@@ -163,17 +169,18 @@ namespace ServiceTool
                     float scale = 1F;
                     if (IsHandleCreated) using (var graphics = CreateGraphics()) scale = graphics.DpiX / 96F;
                     int gap = Math.Max(1, (int)Math.Round(gapBase));
-                    int width = labels.Length == 0
+                    bool fill = !rightAligned && labels.Length == 0;
+                    int width = fill
                         ? Math.Max(1, (area.Width - gap * (buttons.Length - 1)) / buttons.Length)
                         : Math.Min((int)Math.Round(FooterButtonWidth * scale),
                             Math.Max(1, (area.Width - gap * (buttons.Length - 1)) / buttons.Length));
                     int height = Math.Min(area.Height, (int)Math.Round(FooterButtonHeight * scale));
-                    int x = labels.Length == 0 ? area.Left : area.Right - width * buttons.Length - gap * (buttons.Length - 1);
+                    int x = fill ? area.Left : area.Right - width * buttons.Length - gap * (buttons.Length - 1);
                     int y = area.Top + (area.Height - height) / 2;
                     var labelBounds = new Rectangle(area.Left, area.Top, Math.Max(0, x - area.Left - gap), area.Height);
                     foreach (var label in labels)
                         if (label.Bounds != labelBounds) label.Bounds = labelBounds;
-                    int extra = labels.Length == 0 ? area.Width - width * buttons.Length - gap * (buttons.Length - 1) : 0;
+                    int extra = fill ? area.Width - width * buttons.Length - gap * (buttons.Length - 1) : 0;
                     int buttonIndex = 0;
                     foreach (var button in buttons)
                     {

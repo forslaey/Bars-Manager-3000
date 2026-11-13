@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Security.AccessControl;
@@ -12,7 +12,7 @@ namespace ServiceTool
         {
             string fixture="$auditDrive=[pscustomobject]@{IsReady=$true;DriveType=[IO.DriveType]::Fixed;DriveFormat='NTFS';RootDirectory=[pscustomobject]@{FullName='"+root.Replace("'","''")+"'}};\n";
             string script=fixture+BarsFolderPermissions.Script(false).Replace("foreach($drive in [IO.DriveInfo]::GetDrives())","foreach($drive in @($auditDrive))");
-            return WindowsComponents.Run(script,delegate{}).Message;
+            return WindowsComponents.Run(script.Replace("catch{"+(char)36+"auditErrors++}","catch{"+(char)36+"auditErrors++; Write-Output "+(char)36+"_.Exception.Message}"),Console.WriteLine).Message;
         }
         public static int Main()
         {
@@ -26,7 +26,7 @@ namespace ServiceTool
                     foreach(string sid in new[]{"S-1-5-32-545","S-1-5-32-544","S-1-5-18"})acl.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(sid),FileSystemRights.FullControl,InheritanceFlags.ContainerInherit|InheritanceFlags.ObjectInherit,PropagationFlags.None,AccessControlType.Allow));
                     Directory.SetAccessControl(path,acl);Directory.CreateDirectory(Path.Combine(path,"nested"));File.WriteAllText(Path.Combine(path,"nested","file.txt"),"fixture");
                 }
-                var full=WindowsComponents.Parse(Query(root));Check(full["Count"]=="2"&&full["Errors"]=="0"&&full["Restricted"]=="0","Root and inherited children all verified");Check(Int32.Parse(full["Checked"])>=6,"Entire fixture tree audited");
+                string raw=Query(root);Console.WriteLine(raw);var full=WindowsComponents.Parse(raw);Check(full["Count"]=="2"&&full["Errors"]=="0"&&full["Restricted"]=="0","Root and inherited children all verified: "+String.Join(", ",full.Select(pair=>pair.Key+"="+pair.Value)));Check(Int32.Parse(full["Checked"])>=6,"Entire fixture tree audited");
                 string child=Path.Combine(root,"DataKrat","nested","file.txt");var restricted=new FileSecurity();restricted.SetAccessRuleProtection(true,false);
                 restricted.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User,FileSystemRights.FullControl,AccessControlType.Allow));File.SetAccessControl(child,restricted);
                 var partial=WindowsComponents.Parse(Query(root));Check(Int32.Parse(partial["Restricted"])>=1,"Restricted nested file detected even when roots have full access");

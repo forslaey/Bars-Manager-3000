@@ -83,7 +83,7 @@ namespace ServiceTool
                 File.WriteAllText(Path.Combine(target, "unrelated.txt"), "keep");
                 ToolsDeployment.CopyToTarget(source, target, ignored => { }, () => false);
                 Check(File.ReadAllText(Path.Combine(target, folders[0], "settings.ini")) == "user config", "Existing settings not overwritten");
-                Check(File.Exists(Path.Combine(target, "unrelated.txt")) && Directory.GetDirectories(Path.GetDirectoryName(target), "_tools-backup-*").Length == 1, "Old tree backup and unrelated content retained");
+                Check(File.Exists(Path.Combine(target, "unrelated.txt")) && Directory.GetDirectories(Path.GetDirectoryName(target), "_tools-backup-*").Length == 0, "No obsolete backup remains and unrelated content is retained");
                 int pulses = 0; bool cancelled = false;
                 try { ToolsDeployment.CopyToTarget(source, target, ignored => pulses++, () => pulses >= 2); }
                 catch (OperationCanceledException) { cancelled = true; }
@@ -172,10 +172,10 @@ namespace ServiceTool
                     {
                         var path = Children(form).OfType<BrandTextBox>().Single(b=>!b.ReadOnly);
                         Check(buttons.Any(b=>b.Text=="Распаковать")&&buttons.Any(b=>b.Text=="Удалить")&&buttons.Any(b=>b.Text=="Отменить")&&!buttons.Any(b=>b.Text=="Путь по умолчанию"),"Utilities install/remove without default-path button");
-                        Check(Children(form).OfType<BrandCheckBox>().Single().Checked,"Desktop shortcuts default to enabled");
+                        Check(Children(form).OfType<ToolsWorkspaceGrid>().Single()!=null,"Shortcuts are selected per utility in the workspace");
                         Check(path.Text == ToolsDeployment.DefaultTarget, "Unpack path prefilled with C:\\DataKrat\\_tools and editable");
                         Check(!Children(form).OfType<Label>().Any(l => l.Text.Contains("Ярлыки с иконками EXE")), "Descriptive block removed from utilities window");
-                        Check(!Children(form).OfType<BrandComboBox>().Any(), "Drive-only picker replaced by a full path");
+                        Check(Children(form).OfType<BrandComboBox>().Single().Items.Count==2, "Only the two cloud sources use a dropdown");
                     }
                     using (var image = new Bitmap(form.Width, form.Height)) form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
                     form.Close();

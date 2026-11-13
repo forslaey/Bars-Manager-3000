@@ -8,7 +8,7 @@ using System.Windows.Forms;
 
 namespace ServiceTool
 {
-    internal sealed class WallpaperForm : Form
+    internal sealed class WallpaperForm : BrandWindow
     {
         private static readonly Dictionary<string, HashSet<string>> ShownImages =
             new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);

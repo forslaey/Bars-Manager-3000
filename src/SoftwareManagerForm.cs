@@ -29,6 +29,8 @@ namespace ServiceTool
         private bool busy,checking,closeAfter,fittingRows,fitRowsPending;
         private volatile bool cancelled;
         private LibrarySession session;
+        private BrandButton sqlTab;
+        private SqlManagerPage sqlPage;
         internal bool MenuRequested {get;private set;}
         internal override void ResumeSession() { MenuRequested=false; closeAfter=false; base.ResumeSession(); }
         internal SoftwareManagerForm(bool previewMode) : this(previewMode,SoftwareSources.Latest) {}
@@ -68,7 +70,7 @@ namespace ServiceTool
             options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));options.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             remote.Dock=DockStyle.Fill;remote.Margin=Padding.Empty;remote.Palette=Colors;
             remote.Text="Настроить неконтролируемый доступ AnyDesk / RuDesktop";remote.Checked=false;
-            options.Controls.Add(remote,0,0);body.Controls.Add(options,0,2);
+            options.ColumnCount=2;options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,196));options.Controls.Add(remote,0,0);body.Controls.Add(options,0,2);
             var actions=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=new Padding(0,0,0,10)};for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F/3));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));actions.RowStyles.Add(new RowStyle(SizeType.Percent,50));
             install=Button("Установить",true);install.Click+=async delegate{await Install();};remove=Button("Удалить",false);remove.Destructive=false;remove.Click+=async delegate{await RemoveSelected();};access=Button("Настроить удалённый доступ",false);access.Margin=Padding.Empty;access.Click+=async delegate{await ConfigureSelected();};
             refresh=Button("Проверить версии в сети",false);refresh.Click+=async delegate{await RefreshPackages(true);};associations=Button("Приложения по умолчанию",false);associations.Click+=delegate{OpenDefaultApps();};
@@ -85,18 +87,43 @@ namespace ServiceTool
             // Only unusually short screens or large text require scrolling it.
             var journalArea=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};journalArea.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));journalArea.RowStyles.Add(new RowStyle(SizeType.Absolute,112));journalArea.RowStyles.Add(new RowStyle(SizeType.Percent,100));journalArea.Controls.Add(transfer,0,0);journalArea.Controls.Add(logCard,0,1);
             var outer=new CompactJournalLayout(body,1,grid,journalArea,footer,176,54);Root.Controls.Add(outer,0,1);
+            sqlTab=Button("SQL Server и SQL Server Management Studio",false);
+            sqlTab.Dock=DockStyle.Fill;
+            sqlTab.Margin=Padding.Empty;
+            options.Controls.Add(sqlTab,1,0);
+            access.SizeChanged+=delegate
+            {
+                if(access.Width>0&&options.ColumnStyles[1].Width!=access.Width)options.ColumnStyles[1].Width=access.Width;
+            };
+            sqlTab.Click+=async delegate
+            {
+                if(busy&&!checking)return;
+                if(sqlPage==null)
+                {
+                    sqlPage=new SqlManagerPage(this,()=>source,delegate
+                    {
+                        Root.Controls.Remove(sqlPage);Root.Controls.Add(outer,0,1);SetTheme(Colors.Dark,false);
+                    },Colors);
+                    float scale=CurrentAutoScaleDimensions.Width/96F;
+                    if(scale>0&&Math.Abs(scale-1F)>.01F)sqlPage.Scale(new SizeF(scale,scale));
+                    Disposed+=delegate{if(!sqlPage.IsDisposed)sqlPage.Dispose();if(!outer.IsDisposed)outer.Dispose();};
+                }
+                Root.Controls.Remove(outer);Root.Controls.Add(sqlPage,0,1);SetTheme(Colors.Dark,false);
+                await sqlPage.RefreshLocal(source);
+            };
             try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){transfer.Stage("Не выполнено: "+ex.Message,failed:true);Log(ex.Message);}
             SetTheme(Colors.Dark,false);
             UpdateRows();
-            Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else {if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){string root=await BundleDownloadForm.Offer(this,null);if(IsDisposed||ModuleNavigation.ExitConfirmed)return;if(!String.IsNullOrEmpty(root))source=SoftwarePackageStorage.Folder(root);}await RefreshPackages();}grid.PerformLayout();body.PerformLayout();};
+            Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else {if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){string root=await BundleDownloadForm.Offer(this,null,programs:true);if(IsDisposed||ModuleNavigation.ExitConfirmed)return;if(!String.IsNullOrEmpty(root))source=SoftwarePackageStorage.Folder(root);}await RefreshPackages();}grid.PerformLayout();body.PerformLayout();};
             FormClosing+=delegate(object sender,FormClosingEventArgs e)
             {
+                if(sqlPage!=null&&!sqlPage.CanClose(ModuleNavigation.ExitConfirmed)){e.Cancel=true;return;}
                 if(!busy)return;if(checking){cancelled=true;if(session!=null)session.Cancel();return;}e.Cancel=true;
                 if(cancelled){closeAfter=true;return;}
                 if(ModuleNavigation.ExitConfirmed || BrandMessageBox.Show(this,LibraryManagerForm.CancelWarning+"\r\n\r\nЗакрыть окно после отмены?","Завершение работы",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes)RequestCancel(true);else MenuRequested=false;
             };
         }
-        string IModuleOperation.ActiveOperation { get { return busy && !checking ? "Установка программ: операция с программами" : null; } }
+        string IModuleOperation.ActiveOperation { get { return sqlPage!=null&&sqlPage.Installing?"SQL Server и SSMS: мастер установки":busy && !checking ? "Установка программ: операция с программами" : null; } }
         private void ConfigureGrid()
         {
             grid.Dock=DockStyle.Fill;grid.Margin=Padding.Empty;grid.BorderStyle=BorderStyle.None;
@@ -162,6 +189,7 @@ namespace ServiceTool
         }
         protected override void OnThemeChanged()
         {
+            if(sqlPage!=null)sqlPage.ApplyTheme(Colors);
             transfer.Palette=Colors;transfer.Invalidate();remote.Palette=Colors;journal.BackColor=Colors.Surface;journal.ForeColor=Colors.Text;
             gridScroll.Palette=Colors;gridScroll.BackColor=Colors.Canvas;grid.BackgroundColor=Colors.Canvas;grid.GridColor=Colors.Border;
             grid.DefaultCellStyle.BackColor=Colors.Surface;grid.DefaultCellStyle.ForeColor=Colors.Text;grid.DefaultCellStyle.SelectionBackColor=Colors.Selection;grid.DefaultCellStyle.SelectionForeColor=Colors.SelectionText;
@@ -173,9 +201,9 @@ namespace ServiceTool
         private void LogProgress(string text){Progress(text);if(IsDisposed||!IsHandleCreated)return;try{BeginInvoke((MethodInvoker)delegate{Log(text);});}catch(InvalidOperationException){}}
         private bool ChooseSource()
         {
-            using(var dialog=new FolderBrowserDialog{Description="Выбери _soft или папку Библиотеки",ShowNewFolderButton=false})
+            using(var dialog=new FolderBrowserDialog{Description="Выбери папку комплекта BarsManager3000 или папку _soft",SelectedPath=BundleFolders.PickerStart(source),ShowNewFolderButton=false})
             {
-                if(!String.IsNullOrWhiteSpace(source))dialog.SelectedPath=Directory.Exists(source)?source:Path.GetDirectoryName(source);
+
                 if(ScopedDialogs.Show(this, dialog)!=DialogResult.OK)return false;
                 source=SoftwarePackageStorage.Folder(dialog.SelectedPath);sourceLabel.Text=source;return true;
             }
@@ -184,7 +212,7 @@ namespace ServiceTool
         private void Lock(bool value)
         {
             if(value){if(checking)transfer.BeginOperation("Проверяем список программ…",false);else transfer.BeginOperation("Подготавливаем работу с выбранными программами…");}
-            busy=value;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=!value;cancel.Enabled=value;
+            busy=value;if(sqlTab!=null)sqlTab.Enabled=!value||checking;folderButton.Enabled=refresh.Enabled=install.Enabled=remove.Enabled=access.Enabled=associations.Enabled=back.Enabled=!value;cancel.Enabled=value;
 
             back.Enabled=!value||checking||ManagerApplicationContext.ActiveContext!=null;UpdateActions();
             if(!value&&!IsDisposed){if(transfer.Snapshot.Active)transfer.FinishOperation(cancelled?"Операция отменена":"Операция остановлена. Результат — в журнале.",cancelled:cancelled);if(transfer.Snapshot.Complete||transfer.Snapshot.Failed)activity.Text=transfer.Snapshot.Stage;UpdateRows();if(closeAfter)BeginInvoke((MethodInvoker)delegate{Close();});}
@@ -353,7 +381,7 @@ namespace ServiceTool
             UpdateRows();Log("Проверка завершена. Для отсутствующих программ доступны установщики");
         }
     }
-    internal sealed class SoftwareRemoteDialog : Form
+    internal sealed class SoftwareRemoteDialog : BrandWindow
     {
         private readonly BrandTextBox input=new BrandTextBox(),confirmation=new BrandTextBox();
         private readonly string id;
@@ -365,7 +393,7 @@ namespace ServiceTool
         internal SoftwareRemoteDialog(ThemePalette colors,Icon icon,string appId)
         {
             NativeWindowTheme.Bind(this,()=>colors.Dark);
-            SuspendLayout();id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?null:(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(660,400);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
+            SuspendLayout();id=appId;Text="Неконтролируемый доступ к "+SoftwareCatalog.Find(id).Name;Icon=icon==null?BrandAssets.LoadIcon():(Icon)icon.Clone();AutoScaleDimensions=new SizeF(96,96);AutoScaleMode=AutoScaleMode.None;ClientSize=new Size(660,400);Font=new Font("Segoe UI",10);BackColor=colors.Canvas;ForeColor=colors.Text;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=MinimizeBox=false;
             var layout=new BufferedLayoutPanel {Dock=DockStyle.Fill,Padding=new Padding(24,18,24,18),ColumnCount=1,RowCount=10};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));foreach(int h in new[]{70,24,38,24,38,24,26,0,76,44})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
             var heading=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,64));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             heading.Controls.Add(new FlushLabel {WrapLines=true,InkLeft=g=>0,Text="Постоянный пароль для "+SoftwareCatalog.Find(id).Name+".\r\nПодключение без подтверждения на этом компьютере.",Dock=DockStyle.Fill,ForeColor=colors.Text,TextAlign=ContentAlignment.MiddleLeft,Margin=Padding.Empty},0,0);
@@ -393,7 +421,7 @@ namespace ServiceTool
                 Password = input.Text;
                 DialogResult = DialogResult.OK;
             };
-            actions.Controls.Add(ok,2,0);layout.Controls.Add(actions,0,9);Controls.Add(layout);var validationHost=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};layout.Controls.Remove(languageRow);languageRow.Controls.Remove(language);validationHost.Controls.Add(language);language.Dock=DockStyle.None;language.Anchor=AnchorStyles.Top|AnchorStyles.Right;language.Padding=Padding.Empty;languageRow.Dispose();layout.Controls.Add(validationHost,0,5);layout.SetRowSpan(validationHost,2);validationHost.Controls.Add(validation);validation.BringToFront();bool validationQueued=false;Action placeValidation=()=>{if(!confirmation.IsHandleCreated||!validationHost.IsHandleCreated||IsDisposed)return;int upper=PointToClient(confirmation.PointToScreen(new Point(0,confirmation.Height))).Y;int lower=PointToClient(validationHost.PointToScreen(new Point(0,validationHost.Height))).Y;int height=validation.Font.Height;int left=PointToClient(confirmation.PointToScreen(Point.Empty)).X;validation.Bounds=new Rectangle(validationHost.PointToClient(PointToScreen(new Point(left,upper+(lower-upper-height)/2))).X,validationHost.PointToClient(PointToScreen(new Point(left,upper+(lower-upper-height)/2))).Y,confirmation.Width,height);using(var graphics=language.CreateGraphics()){int languageWidth=TextRenderer.MeasureText(graphics,"ENG",language.Font,Size.Empty,TextFormatFlags.SingleLine).Width+12;int languageHeight=language.Font.Height+6;var fieldBottom=validationHost.PointToClient(confirmation.PointToScreen(new Point(confirmation.Width,confirmation.Height)));language.Bounds=new Rectangle(fieldBottom.X-languageWidth,Math.Max(0,fieldBottom.Y+2),languageWidth,languageHeight);validation.Width=Math.Max(1,language.Left-validation.Left-8);}language.BringToFront();};Action queueValidation=()=>{if(validationQueued||!IsHandleCreated||IsDisposed)return;validationQueued=true;BeginInvoke((MethodInvoker)delegate{validationQueued=false;placeValidation();});};layout.Layout+=delegate{queueValidation();};Shown+=delegate{queueValidation();};CancelButton=cancel;AcceptButton=ok;
+            actions.Controls.Add(ok,2,0);layout.Controls.Add(actions,0,9);Controls.Add(layout);var validationHost=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty};layout.Controls.Remove(languageRow);languageRow.Controls.Remove(language);validationHost.Controls.Add(language);language.Dock=DockStyle.None;language.Anchor=AnchorStyles.Top|AnchorStyles.Right;language.Padding=Padding.Empty;languageRow.Dispose();layout.Controls.Add(validationHost,0,5);layout.SetRowSpan(validationHost,2);validationHost.Controls.Add(validation);validation.BringToFront();bool validationQueued=false;Action placeValidation=()=>{if(!confirmation.IsHandleCreated||!validationHost.IsHandleCreated||IsDisposed)return;var confirmationFrame=confirmation.Parent;int upper=PointToClient(confirmationFrame.PointToScreen(new Point(0,confirmationFrame.Height))).Y;int lower=PointToClient(validationHost.PointToScreen(new Point(0,validationHost.Height))).Y;int height=validation.Font.Height;int left=PointToClient(confirmationFrame.PointToScreen(Point.Empty)).X;validation.Bounds=new Rectangle(validationHost.PointToClient(PointToScreen(new Point(left,upper+(lower-upper-height)/2))).X,validationHost.PointToClient(PointToScreen(new Point(left,upper+(lower-upper-height)/2))).Y,confirmationFrame.Width,height);using(var graphics=language.CreateGraphics()){int languageWidth=TextRenderer.MeasureText(graphics,"ENG",language.Font,Size.Empty,TextFormatFlags.SingleLine).Width+12;int languageHeight=language.Font.Height+6;var fieldBottom=validationHost.PointToClient(confirmationFrame.PointToScreen(new Point(confirmationFrame.Width,confirmationFrame.Height)));language.Bounds=new Rectangle(fieldBottom.X-languageWidth,Math.Max(0,fieldBottom.Y+2),languageWidth,languageHeight);validation.Width=Math.Max(1,language.Left-validation.Left-8);}language.BringToFront();};Action queueValidation=()=>{if(validationQueued||!IsHandleCreated||IsDisposed)return;validationQueued=true;BeginInvoke((MethodInvoker)delegate{validationQueued=false;placeValidation();});};layout.Layout+=delegate{queueValidation();};Shown+=delegate{queueValidation();};CancelButton=cancel;AcceptButton=ok;
             keyboardTips.IsBalloon=true;keyboardTips.ToolTipIcon=ToolTipIcon.Warning;keyboardTips.ToolTipTitle="Caps Lock включён";keyboardTimer.Interval=200;keyboardTimer.Tick+=delegate{UpdateKeyboard();};Shown+=delegate{keyboardTimer.Start();};InputLanguageChanged+=delegate{UpdateKeyboard();};
             AutoScaleMode=AutoScaleMode.Dpi;ResumeLayout(true);
         }
@@ -432,7 +460,7 @@ namespace ServiceTool
         {
             var row=new BufferedLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty};
             row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,10));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,40));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,36));row.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-            box.Anchor=AnchorStyles.Left|AnchorStyles.Right;box.Dock=DockStyle.None;row.Controls.Add(box,0,0);
+            box.Anchor=AnchorStyles.Left|AnchorStyles.Right;box.Dock=DockStyle.None;row.Controls.Add(new PathFieldFrame(box),0,0);
             var eye=new PasswordEyeButton{Dock=DockStyle.Fill,Margin=new Padding(0,0,0,4),Palette=colors};eyes.Add(eye);eye.Click+=delegate{eye.Revealed=!eye.Revealed;box.UseSystemPasswordChar=!eye.Revealed;eye.AccessibleName=eye.Revealed?"Скрыть пароль":"Показать пароль";eye.Invalidate();box.Focus();};row.Controls.Add(eye,2,0);
             var warning=new Label{Dock=DockStyle.Fill,Text="⚠",Font=new Font("Segoe UI Symbol",13),ForeColor=Color.Goldenrod,TextAlign=ContentAlignment.MiddleCenter,Margin=Padding.Empty,Visible=false};caps.Add(warning);keyboardTips.SetToolTip(warning,"Caps Lock включён. Проверь регистр букв пароля.");row.Controls.Add(warning,3,0);
             return row;

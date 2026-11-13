@@ -12,7 +12,7 @@ namespace ServiceTool
         internal string FilePath { get; private set; }
         internal static string Folder(string libraryRoot)
         {
-            if (String.IsNullOrWhiteSpace(libraryRoot)) throw new InvalidOperationException("Сначала выбери папку «Библиотеки».");
+            if (String.IsNullOrWhiteSpace(libraryRoot)) throw new InvalidOperationException("Сначала выбери папку комплекта BarsManager3000 или папку _libraries.");
             return Path.Combine(Path.GetFullPath(libraryRoot), FolderName);
         }
         internal static string ActionName(LibraryOperation operation)
