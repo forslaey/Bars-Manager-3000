@@ -24,7 +24,7 @@ namespace ServiceTool
             foreach(bool dark in new[]{false,true})foreach(float scale in new[]{1F,1.25F,1.5F,2F})
             {
 
-                string[] names={"Менеджер служб","Менеджер системных библиотек Windows","Программы для рабочего места пользователя","Первичные системные настройки","Распаковка утилит","Компоненты Windows"};
+                string[] names={"Менеджер служб","Менеджер системных библиотек Windows","Программы для рабочего места пользователя","Первичные системные настройки","Утилиты и прошивки","Компоненты Windows"};
                 Form[] forms={new MainForm(null,true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new InitialSystemSettingsForm(true),new ToolsDeploymentForm(true),new WindowsFeaturesForm(true,true)};
                 int? fieldGap=null;
                 for(int i=0;i<forms.Length;i++)using(var f=forms[i])

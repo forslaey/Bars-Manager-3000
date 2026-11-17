@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Windows.Forms;
 namespace ServiceTool
 {
@@ -21,6 +24,93 @@ namespace ServiceTool
         private static int count;
         private static IEnumerable<Control> Children(Control parent) {foreach(Control c in parent.Controls){yield return c;foreach(var item in Children(c))yield return item;}}
         private static void Check(bool ok,string message){count++;if(!ok)throw new Exception(message);}
+
+        private static void WaitForUi(Func<bool> ready, string activity)
+        {
+            var elapsed = Stopwatch.StartNew();
+            do
+            {
+                Application.DoEvents();
+                if (ready()) return;
+                Thread.Sleep(10);
+            }
+            while (elapsed.Elapsed < TimeSpan.FromSeconds(10));
+            throw new TimeoutException(activity);
+        }
+
+        private static void ShowWindow(Form form, float scaleBeforeShown = 1F)
+        {
+            bool shown = false;
+            form.Shown += delegate { shown = true; };
+            form.Show();
+            if (scaleBeforeShown != 1F)
+                form.Scale(new SizeF(scaleBeforeShown, scaleBeforeShown));
+            WaitForUi(() => shown && form.Visible && form.IsHandleCreated, "Waiting for Shown");
+
+            // Finish startup work before measuring the controls or closing the window.
+            string readyButton = form is ToolsDeploymentForm ? "Выбрать папку" :
+                form is ApplicationLogsForm ? "Обновить список" : null;
+            if (readyButton != null)
+            {
+                var button = Children(form).OfType<BrandButton>().Single(item => item.Text == readyButton);
+                WaitForUi(() => button.Enabled, "Waiting for startup scan to finish");
+            }
+        }
+
+        private static void RunWindow<T>(Func<T> create, bool dark, float scale, Action<T> inspect) where T : Form
+        {
+            string context = typeof(T).Name + " / dark=" + dark + " / " + scale;
+            T window = null;
+            Exception failure = null;
+            string phase = "construct";
+            try
+            {
+                window = create();
+                phase = "show and inspect";
+                inspect(window);
+                phase = "close";
+                window.Close();
+            }
+            catch (Exception error)
+            {
+                failure = new InvalidOperationException(context + " / " + phase, error);
+            }
+            try
+            {
+                if (window != null && !window.IsDisposed) window.Dispose();
+            }
+            catch (Exception error)
+            {
+                var cleanup = new InvalidOperationException(context + " / dispose", error);
+                if (failure != null) throw new AggregateException(failure, cleanup);
+                throw cleanup;
+            }
+            if (failure != null) throw failure;
+        }
+
+        private static Point CaptionInset(FormBorderStyle style, bool dark, float scale)
+        {
+            Point inset = Point.Empty;
+            RunWindow(() => new CaptionFixture(style), dark, scale, window =>
+            {
+                window.ClientSize = new Size(420, 300);
+                window.Show();
+                NativeWindowTheme.Apply(window, dark);
+                if (scale != 1F) window.Scale(new SizeF(scale, scale));
+                Application.DoEvents();
+                inset = window.PointToScreen(Point.Empty) - new Size(window.Location);
+            });
+            return inset;
+        }
+
+        private static ToolsDeploymentForm CreateToolsFixture()
+        {
+            string source = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "layout-fixture", "_tools");
+            Directory.CreateDirectory(Path.Combine(source, "Fixture utility"));
+            var form = new ToolsDeploymentForm(true);
+            typeof(BundleDownloadForm).GetField("localTools", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(form, source);
+            return form;
+        }
         private static void CheckInputFrames(Form form)
         {
             foreach(var field in Children(form).OfType<BrandTextBox>())
@@ -35,37 +125,46 @@ namespace ServiceTool
         }
         [STAThread] internal static int Main()
         {
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+            Control.CheckForIllegalCrossThreadCalls = true;
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            // Keep the UI synchronization context active while nested DoEvents calls
+            // process layout and asynchronous Shown handlers.
+            using (var context = new ApplicationContext())
+            {
+                int result = 1;
+                EventHandler run = null;
+                run = delegate
+                {
+                    Application.Idle -= run;
+                    try { result = RunChecks(); }
+                    finally { context.ExitThread(); }
+                };
+                Application.Idle += run;
+                try { Application.Run(context); }
+                finally { Application.Idle -= run; }
+                return result;
+            }
+        }
+
+        private static int RunChecks()
+        {
             try
             {
-                Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
                 foreach(bool dark in new[]{false,true}) foreach(float scale in new[]{1F,1.25F,1.5F,2F})
                 {
-                    using(var fixedWindow=new CaptionFixture(FormBorderStyle.FixedDialog))
-                    using(var resizeWindow=new CaptionFixture(FormBorderStyle.Sizable))
-                    {
-                        foreach(var window in new[]{fixedWindow,resizeWindow})
-                        {
-                            window.ClientSize=new Size(420,300);
-                            window.Show();
-                            NativeWindowTheme.Apply(window,dark);
-                            if(scale!=1F)window.Scale(new SizeF(scale,scale));
-                        }
-                        Application.DoEvents();
-                        Check(fixedWindow.PointToScreen(Point.Empty)-new Size(fixedWindow.Location)==
-                            resizeWindow.PointToScreen(Point.Empty)-new Size(resizeWindow.Location),
-                            "Fixed and resizable windows use equal native caption insets");
-                    }
+                    Check(CaptionInset(FormBorderStyle.FixedDialog,dark,scale)==CaptionInset(FormBorderStyle.Sizable,dark,scale),
+                        "Fixed and resizable windows use equal native caption insets");
                     var palette=ThemePalette.Create(dark);
-                    foreach(var extra in new Form[]{new BundleDownloadForm(null),new ApplicationLogsForm(),new ServiceProbeForm("Fixture",true),new UserGuideForm()})
-                    using(extra)
+                    Action<ManagerModuleForm> inspectExtra = extra =>
                     {
-                        ((ManagerModuleForm)extra).SetTheme(dark,false);
+                        extra.SetTheme(dark,false);
                         extra.StartPosition=FormStartPosition.Manual;
                         extra.Location=new Point(-22000,-22000);
                         extra.ShowInTaskbar=false;
-                        extra.Show();
-                        if(scale!=1F)extra.Scale(new SizeF(scale,scale));
-                        Application.DoEvents();
+                        ShowWindow(extra,scale);
                         CheckInputFrames(extra);
                         if(extra is BundleDownloadForm&&scale==1F)
                         using(var image=new Bitmap(extra.Width,extra.Height))
@@ -73,12 +172,16 @@ namespace ServiceTool
                             extra.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
                             image.Save(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"bundle-input-"+dark+".png"));
                         }
-                    }
-                    var forms=new Form[]{new ManagerHub(),new InitialSystemSettingsForm(true),new LibraryManagerForm(true),new SoftwareManagerForm(true),new ToolsDeploymentForm(true),new WindowsFeaturesForm(true,true),new MainForm(null,true),new AboutDialog(palette,null),new ServiceAccountDialog(palette,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false),new SoftwareRemoteDialog(palette,null,"anydesk"),new SoftwareRemoteDialog(palette,null,"rudesktop"),new LibraryActionDialog(palette,null,new LibraryCheck[0]),new LogArchiveDialog(palette,"Служба BARS",new List<LogDateFolder>(),DateTime.Today)};
-                    foreach(var form in forms) using(form)
+                    };
+                    RunWindow<BundleDownloadForm>(() => new BundleDownloadForm(null), dark, scale, inspectExtra);
+                    RunWindow<ApplicationLogsForm>(() => new ApplicationLogsForm(), dark, scale, inspectExtra);
+                    RunWindow<ServiceProbeForm>(() => new ServiceProbeForm("Fixture",true), dark, scale, inspectExtra);
+                    RunWindow<UserGuideForm>(() => new UserGuideForm(), dark, scale, inspectExtra);
+
+                    Action<Form> inspectForm = form =>
                     {
                         var module=form as ManagerModuleForm;if(module!=null)module.SetTheme(dark,false);var services=form as MainForm;if(services!=null)services.SetTheme(dark,false);
-                        form.StartPosition=FormStartPosition.Manual;form.Location=form is SoftwareRemoteDialog ? Screen.PrimaryScreen.WorkingArea.Location : new Point(-22000,-22000);form.ShowInTaskbar=false;form.Show();Application.DoEvents();
+                        form.StartPosition=FormStartPosition.Manual;form.Location=form is SoftwareRemoteDialog ? Screen.PrimaryScreen.WorkingArea.Location : new Point(-22000,-22000);form.ShowInTaskbar=false;ShowWindow(form);
                         if(form is SoftwareManagerForm)
                         {
                             var flags=BindingFlags.Instance|BindingFlags.NonPublic;
@@ -167,15 +270,27 @@ namespace ServiceTool
                         if(form is LibraryManagerForm && scale==1F)
                         {
                             Children(form).OfType<Button>().Single(b=>b.Text=="Компоненты").PerformClick();
-                            Application.DoEvents();
+                            WaitForUi(() => form.OwnedForms.OfType<WindowsFeaturesForm>().Any(), "Waiting for Windows components");
                             var child=form.OwnedForms.OfType<WindowsFeaturesForm>().Single();
                             Check(child.Owner==form&&!child.Modal&&child.Enabled&&!form.Enabled,"Windows components lock only the owning module");
                             Children(child).OfType<Button>().Single(b=>b.Text=="Назад").PerformClick();
-                            Application.DoEvents();
+                            WaitForUi(() => child.IsDisposed && form.Enabled, "Waiting for Windows components to close");
                             Check(form.Visible&&!form.IsDisposed&&form.Enabled,"Nested return keeps component manager open");
                         }
-                        form.Close();
-                    }
+                    };
+                    RunWindow<ManagerHub>(() => new ManagerHub(), dark, scale, inspectForm);
+                    RunWindow<InitialSystemSettingsForm>(() => new InitialSystemSettingsForm(true), dark, scale, inspectForm);
+                    RunWindow<LibraryManagerForm>(() => new LibraryManagerForm(true), dark, scale, inspectForm);
+                    RunWindow<SoftwareManagerForm>(() => new SoftwareManagerForm(true), dark, scale, inspectForm);
+                    RunWindow<ToolsDeploymentForm>(CreateToolsFixture, dark, scale, inspectForm);
+                    RunWindow<WindowsFeaturesForm>(() => new WindowsFeaturesForm(true,true), dark, scale, inspectForm);
+                    RunWindow<MainForm>(() => new MainForm(null,true), dark, scale, inspectForm);
+                    RunWindow<AboutDialog>(() => new AboutDialog(palette,null), dark, scale, inspectForm);
+                    RunWindow<ServiceAccountDialog>(() => new ServiceAccountDialog(palette,ServiceInstallProfile.Default(@"C:\fixture\HttpService.exe"),false), dark, scale, inspectForm);
+                    RunWindow<SoftwareRemoteDialog>(() => new SoftwareRemoteDialog(palette,null,"anydesk"), dark, scale, inspectForm);
+                    RunWindow<SoftwareRemoteDialog>(() => new SoftwareRemoteDialog(palette,null,"rudesktop"), dark, scale, inspectForm);
+                    RunWindow<LibraryActionDialog>(() => new LibraryActionDialog(palette,null,new LibraryCheck[0]), dark, scale, inspectForm);
+                    RunWindow<LogArchiveDialog>(() => new LogArchiveDialog(palette,"Служба BARS",new List<LogDateFolder>(),DateTime.Today), dark, scale, inspectForm);
                 }
                 Console.WriteLine("PASS: "+count+" actual button paint-area / centered layout checks in modules and dialogs; both themes, simulated 100/125/150/200%. No installer or system changes.");return 0;
             }

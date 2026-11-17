@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ServiceTool
@@ -29,6 +32,20 @@ namespace ServiceTool
         private static void Require(bool condition,string message)
         {
             if(!condition)throw new InvalidOperationException(message);
+        }
+
+        private static void CreateZip(string path,string name,string value)
+        {
+            using(var archive=new System.IO.Compression.ZipArchive(File.Create(path),System.IO.Compression.ZipArchiveMode.Create))
+            using(var writer=new StreamWriter(archive.CreateEntry(name,System.IO.Compression.CompressionLevel.NoCompression).Open()))
+                writer.Write(value);
+        }
+
+        private static void WaitFor(Func<bool> condition)
+        {
+            var timer=System.Diagnostics.Stopwatch.StartNew();
+            while(!condition()&&timer.ElapsedMilliseconds<5000){Application.DoEvents();Thread.Sleep(10);}
+            Require(condition(),"Timed out waiting for tool workspace.");
         }
 
         [STAThread]
@@ -87,6 +104,24 @@ namespace ServiceTool
                     bool rejected=false;
                     try{ToolArchives.ValidateDownload(path,path,token);}catch(InvalidDataException){rejected=true;}
                     Require(rejected,"Damaged ZIP payload with valid directory was accepted.");
+                    string[] contents;
+                    Require(ToolArchives.Inspect(path,token,out contents)==ToolArchives.ReadState.Damaged,"Local ZIP with bad CRC was marked ready.");
+                    string prior=Directory.CreateDirectory(Path.Combine(root,"sample")).FullName;
+                    File.WriteAllText(Path.Combine(prior,"old.txt"),"previous");
+                    rejected=false;
+                    try{PackageZipExtraction.Extract(path,token,null,true);}catch(InvalidDataException){rejected=true;}
+                    Require(rejected&&File.Exists(Path.Combine(prior,"old.txt"))&&!File.Exists(Path.Combine(prior,"file.txt")),
+                        "Corrupt ZIP replaced the existing destination.");
+                    Require(!Directory.GetDirectories(root,".s*").Any(),"Partial extraction was left behind.");
+                });
+                Probe("ZIP64 central directory",delegate
+                {
+                    string path=Path.Combine(root,"zip64.zip");
+                    using(var zip=new System.IO.Compression.ZipArchive(File.Create(path),System.IO.Compression.ZipArchiveMode.Create))
+                        for(int i=0;i<=UInt16.MaxValue;i++)zip.CreateEntry("file-"+i+".txt");
+                    string[] items;
+                    Require(ToolArchives.Inspect(path,CancellationToken.None,out items)==ToolArchives.ReadState.Ready&&items.Length==65536,
+                        "ZIP64 lost entries during managed validation.");
                 });
                 Probe("7z validation, wrapper and replacement",delegate
                 {
@@ -106,6 +141,95 @@ namespace ServiceTool
                     Require(ToolArchives.NormalizeEntries(path,ToolArchives.Entries(path,token)).Contains("file.txt"),"7z wrapper did not normalize.");
                     string output=ToolArchives.Extract(path,token,null,true);
                     Require(File.ReadAllText(Path.Combine(output,"file.txt"))=="new payload","7z replacement did not publish the extracted payload.");
+                });
+                Probe("same archive stem, independent payloads and destinations",delegate
+                {
+                    var token=CancellationToken.None;
+                    string source=Directory.CreateDirectory(Path.Combine(root,"collision","_tools")).FullName;
+                    string target=Path.Combine(root,"installed","_tools");
+                    string wrapper=Directory.CreateDirectory(Path.Combine(root,"shared")).FullName;
+                    File.WriteAllText(Path.Combine(wrapper,"second.txt"),"7z");
+                    string packed=Path.Combine(source,"shared.7z");
+                    var start=new System.Diagnostics.ProcessStartInfo("tar.exe","-a -cf \""+packed+"\" -C \""+root+"\" shared")
+                    {UseShellExecute=false,CreateNoWindow=true};
+                    using(var process=System.Diagnostics.Process.Start(start))
+                    {
+                        if(!process.WaitForExit(10000)){process.Kill();throw new IOException("Fixture creation timed out.");}
+                        Require(process.ExitCode==0,"7z fixture creation failed.");
+                    }
+                    CreateZip(Path.Combine(source,"shared.zip"),"shared/first.txt","zip");
+                    Directory.CreateDirectory(Path.Combine(source,"shared (ZIP)"));
+                    var destinations=ToolsDeploymentForm.ArchiveDestinations(source);
+                    Require(destinations.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count()==2&&destinations["shared.zip"]!="shared (ZIP)",
+                        "An archive destination collides with an existing folder.");
+                    foreach(var archive in destinations)
+                    {
+                        string extracted=ToolArchives.Extract(Path.Combine(source,archive.Key),token,null,true,archive.Value);
+                        File.WriteAllText(Path.Combine(extracted,ToolsDeployment.ArchiveOriginFile),archive.Key);
+                    }
+                    var rows=ToolsDeploymentForm.LocalPackages(source);
+                    Require(rows.Length==3&&rows.Contains("shared (ZIP)"),"Generated folders duplicated or hid an independent package in the catalog.");
+                    ToolsDeployment.CopyToTarget(source,target,ignored=>{},()=>false,
+                        new HashSet<string>(destinations.Values,StringComparer.OrdinalIgnoreCase));
+                    Require(File.ReadAllText(Path.Combine(target,destinations["shared.zip"],"first.txt"))=="zip"&&
+                        File.ReadAllText(Path.Combine(target,destinations["shared.7z"],"second.txt"))=="7z","One archive replaced the other.");
+                    string zipOutput=Path.Combine(target,destinations["shared.zip"]);
+                    Require(ToolsDeployment.ArchiveOrigin(zipOutput)=="shared.zip","The deployed directory lost its archive identity.");
+                    File.WriteAllText(Path.Combine(zipOutput,ToolsDeployment.ArchiveOriginFile),"other.zip");
+                    bool rejected=false;
+                    try{ToolsDeployment.CopyToTarget(source,target,ignored=>{},()=>false,new HashSet<string>{destinations["shared.zip"]});}
+                    catch(IOException){rejected=true;}
+                    Require(rejected&&ToolsDeployment.ArchiveOrigin(zipOutput)=="other.zip","Deployment overwrote an unrelated folder.");
+                    File.Delete(packed);
+                    Require(ToolsDeploymentForm.ArchiveDestinations(source)["shared.zip"]==destinations["shared.zip"],
+                        "Removing a competing archive changed the remaining package destination.");
+                });
+                Probe("replacement removes obsolete variants and preserves settings",delegate
+                {
+                    string source=Path.Combine(root,"replace-source","_tools");
+                    string target=Path.Combine(root,"replace-target","_tools");
+                    string old=Directory.CreateDirectory(Path.Combine(target,"R-Tool","v1")).FullName;
+                    string existing=Directory.CreateDirectory(Path.Combine(target,"R-Tool","v2")).FullName;
+                    string selected=Directory.CreateDirectory(Path.Combine(source,"R-Tool","v2")).FullName;
+                    Directory.CreateDirectory(Path.Combine(source,"R-Tool","v1"));
+                    File.WriteAllText(Path.Combine(old,"R-Tool.exe"),"old variant");
+                    File.WriteAllText(Path.Combine(existing,"user.ini"),"user");
+                    File.WriteAllText(Path.Combine(selected,"user.ini"),"default");
+                    File.WriteAllText(Path.Combine(existing,"R-Tool.runtimeconfig.json"),"old metadata");
+                    File.WriteAllText(Path.Combine(selected,"R-Tool.runtimeconfig.json"),"new metadata");
+                    File.WriteAllText(Path.Combine(target,"R-Tool","obsolete.dll"),"old DLL");
+                    File.WriteAllText(Path.Combine(target,"keep.txt"),"unrelated");
+                    File.WriteAllText(Path.Combine(selected,"R-Tool.exe"),"updated");
+                    ToolsDeployment.CopyToTarget(source,target,ignored=>{},()=>false,
+                        new HashSet<string>{"R-Tool"},new[]{"R-Tool/v1"});
+                    Require(!Directory.Exists(old)&&!File.Exists(Path.Combine(target,"R-Tool","obsolete.dll")),"Replacement retained obsolete content.");
+                    Require(File.ReadAllText(Path.Combine(existing,"R-Tool.exe"))=="updated"&&
+                        File.ReadAllText(Path.Combine(existing,"R-Tool.runtimeconfig.json"))=="new metadata","Replacement did not refresh binaries and runtime metadata.");
+                    Require(File.ReadAllText(Path.Combine(existing,"user.ini"))=="user"&&File.Exists(Path.Combine(target,"keep.txt")),
+                        "Replacement lost settings or unrelated content.");
+                });
+                Probe("failed workspace recheck keeps the last successful rows",delegate
+                {
+                    string bundle=Directory.CreateDirectory(Path.Combine(root,"recheck")).FullName;
+                    string tools=Directory.CreateDirectory(Path.Combine(bundle,"_tools")).FullName;
+                    CreateZip(Path.Combine(tools,"ready.zip"),"file.txt","valid");
+                    const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+                    using(var form=new BundleDownloadForm(bundle,toolsOnly:true))
+                    {
+                        form.ShowInTaskbar=false;
+                        form.Show();
+                        var grid=(ToolsWorkspaceGrid)typeof(BundleDownloadForm).GetField("toolGrid",flags).GetValue(form);
+                        WaitFor(()=>grid.HasLocal);
+                        typeof(BundleDownloadForm).GetField("scannedRoot",flags).SetValue(form,bundle);
+                        Directory.Move(tools,Path.Combine(bundle,"previous"));
+                        File.WriteAllText(tools,"directory is no longer available");
+                        var recheck=(Task)typeof(BundleDownloadForm).GetMethod("RecheckTools",flags).Invoke(form,null);
+                        WaitFor(()=>recheck.IsCompleted);
+                        recheck.GetAwaiter().GetResult();
+                        var summary=(Label)typeof(BundleDownloadForm).GetField("summary",flags).GetValue(form);
+                        Require(grid.HasLocal&&summary.Text.StartsWith("Не удалось сверить файлы",StringComparison.Ordinal),
+                            "Recheck lost previous rows or reported success after the read failed.");
+                    }
                 });
                 Probe("mixed Google archive rescan",delegate
                 {
@@ -235,7 +359,12 @@ namespace ServiceTool
                 }
                 return failures==0?0:1;
             }
-            finally{Directory.Delete(root,true);}
+            finally
+            {
+                foreach(string file in Directory.GetFiles(root,"*",SearchOption.AllDirectories))File.SetAttributes(file,FileAttributes.Normal);
+                foreach(string directory in Directory.GetDirectories(root,"*",SearchOption.AllDirectories))File.SetAttributes(directory,FileAttributes.Directory);
+                Directory.Delete(root,true);
+            }
         }
     }
 }

@@ -40,11 +40,25 @@ namespace ServiceTool
             catch(Exception ex){System.Diagnostics.Trace.TraceWarning(ex.Message);}
         }
 
-        internal static string Extract(string path,System.Threading.CancellationToken token=default(System.Threading.CancellationToken),Action<TransferProgress> report=null,bool replace=false)
+        internal static string[] Validate(Stream source, System.Threading.CancellationToken token)
+        {
+            using (var archive = new ZipArchive(source, ZipArchiveMode.Read, true))
+            {
+                var entries = archive.Entries;
+                if (entries.Count == 0) throw new InvalidDataException("Архив пуст.");
+                var checksums = ZipIntegrity.ReadChecksums(source, entries.Count, token);
+                var buffer = new byte[64 * 1024];
+                for (int i = 0; i < entries.Count; i++)
+                    ZipIntegrity.CopyEntry(entries[i], checksums[i], null, buffer, token);
+                return entries.Select(entry => entry.FullName.Replace('\\', '/')).ToArray();
+            }
+        }
+
+        internal static string Extract(string path,System.Threading.CancellationToken token=default(System.Threading.CancellationToken),Action<TransferProgress> report=null,bool replace=false,string destinationName=null)
         {
             string parent = Path.GetDirectoryName(path);
             string name = Path.GetFileNameWithoutExtension(path);
-            string target = YandexBundleSource.LocalPath(parent, "/" + name);
+            string target = YandexBundleSource.LocalPath(parent, "/" + (destinationName ?? name));
             if (!replace&&Directory.Exists(target)) throw new IOException("Папка уже существует: " + target + ".");
             string staging = YandexBundleSource.LocalPath(parent, "/.s" + Guid.NewGuid().ToString("N").Substring(0,8));
             Directory.CreateDirectory(staging);
@@ -54,6 +68,7 @@ namespace ServiceTool
                 using (var archive = new ZipArchive(source, ZipArchiveMode.Read))
                 {
                     if (archive.Entries.Count == 0) throw new InvalidDataException("Архив пуст.");
+                    var checksums = ZipIntegrity.ReadChecksums(source, archive.Entries.Count, token);
                     var drive = new DriveInfo(Path.GetPathRoot(staging));
                     long total=archive.Entries.Sum(entry=>entry.Length),written=0;
                     if (drive.IsReady && total > drive.AvailableFreeSpace)
@@ -62,24 +77,29 @@ namespace ServiceTool
                     bool wrapped=archive.Entries.All(entry=>entry.FullName.Replace('\\', '/').StartsWith(prefix,StringComparison.OrdinalIgnoreCase));
                     var buffer=new byte[64*1024];
                     var clock=System.Diagnostics.Stopwatch.StartNew();
-                    foreach (var entry in archive.Entries)
+                    for (int i = 0; i < archive.Entries.Count; i++)
                     {
                         token.ThrowIfCancellationRequested();
+                        var entry = archive.Entries[i];
                         string relative = entry.FullName.Replace('\\', '/');
-                        if(wrapped){relative=relative.Substring(prefix.Length);if(relative.Length==0)continue;}
                         bool directory = relative.EndsWith("/", StringComparison.Ordinal);
+                        if(wrapped)relative=relative.Substring(prefix.Length);
+                        if (directory)
+                        {
+                            ZipIntegrity.CopyEntry(entry, checksums[i], null, buffer, token);
+                            if (relative.Length != 0)
+                                Directory.CreateDirectory(YandexBundleSource.LocalPath(staging, "/" + relative.TrimEnd('/')));
+                            continue;
+                        }
                         string destination = YandexBundleSource.LocalPath(staging, "/" + relative.TrimEnd('/'));
-                        if (directory) { Directory.CreateDirectory(destination); continue; }
                         Directory.CreateDirectory(Path.GetDirectoryName(destination));
-                        using (var input = entry.Open())
                         using (var output = new FileStream(destination, FileMode.CreateNew))
                         {
-                            int count;
-                            while((count=input.Read(buffer,0,buffer.Length))>0)
+                            ZipIntegrity.CopyEntry(entry, checksums[i], output, buffer, token, count =>
                             {
-                                token.ThrowIfCancellationRequested();output.Write(buffer,0,count);written+=count;
+                                written+=count;
                                 if(report!=null&&clock.ElapsedMilliseconds>=80){report(new TransferProgress{Stage="Распаковываем комплект…",File=relative,Bytes=written,Total=total});clock.Restart();}
-                            }
+                            });
                         }
                     }
                     if(report!=null)report(new TransferProgress{Stage="Сохраняем распакованный комплект…",Bytes=written,Total=total});

@@ -53,7 +53,7 @@ namespace ServiceTool
       Check(InkX(title)==InkX(summary),id+" title ink "+InkX(title)+" vs summary "+InkX(summary));
       var source=Field<Label>(form,"sourceLabel");if(!String.IsNullOrEmpty(source.Text))Check(InkX(title)==InkX(source),id+" title and library folder ink");
      }else{
-      string name=form is SoftwareManagerForm?"Программы для рабочего места пользователя":form is ToolsDeploymentForm?"Распаковка утилит":form is WindowsFeaturesForm?"Компоненты Windows":"Первичные системные настройки";
+      string name=form is SoftwareManagerForm?"Программы для рабочего места пользователя":form is ToolsDeploymentForm?"Утилиты и прошивки":form is WindowsFeaturesForm?"Компоненты Windows":"Первичные системные настройки";
       var title=labels.Single(l=>l.Text==name);int target;
       if(form is SoftwareManagerForm||form is InitialSystemSettingsForm)target=Children(form).OfType<ServiceGrid>().Single().PointToScreen(Point.Empty).X;
       else target=Children(form).OfType<Card>().Min(c=>c.PointToScreen(Point.Empty).X);

@@ -152,7 +152,7 @@ namespace ServiceTool
                         var allCards = Children(form).OfType<Card>().ToArray(); Check(allCards.Length==6,"Six launcher cards"); var cards=allCards.GroupBy(c=>c.Parent).Single(group=>group.Count()==4).ToArray(); Check(cards.Length == 4 && cards.Max(c=>c.Width)-cards.Min(c=>c.Width)<=1 && cards.Max(c => c.Height) - cards.Min(c => c.Height) <= 1, "Four equal cards in a complete 2x2 grid: " + String.Join(",", cards.Select(c => c.Height)));
                         var actions = cards.Select(c => Children(c).OfType<BrandButton>().Single()).ToArray();
                         Check(actions.Select(b => b.Size).Distinct().Count() == 1, "All launch actions equal size");
-                        Check(actions.Any(b => b.Text == "Установка программ"), "Programs module is its own launcher card");
+                        Check(actions.Any(b => b.Text == "Прикладные программы"), "Programs module is its own launcher card");
                         Check(buttons.Count(b => b.AccessibleName == "О программе") == 1, "About stays in the launcher only");
                     }
                     else

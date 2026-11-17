@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -118,14 +118,14 @@ namespace ServiceTool
         public ManagerHub() : base("BARS Manager 3000", new Size(900, 770))
         {
             FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false; MinimumSize = new Size(860, 740); ClientSize = new Size(900, 770);
-            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 108;
-            var launcherHeader=(TableLayoutPanel)Root.GetControlFromPosition(0,0);launcherHeader.Padding=new Padding(0,4,0,0);
+            Root.Padding = new Padding(20, 8, 20, 10); Root.RowStyles[0].Height = 84;
+            var launcherHeader=(TableLayoutPanel)Root.GetControlFromPosition(0,0);launcherHeader.Padding=new Padding(0,18,0,0);
             Root.AutoScroll=true;
             // Four modules in an even 2x2 grid, plus a full-width settings card.
             var body = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty, MinimumSize=new Size(0,670) };
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             body.RowStyles.Add(new RowStyle(SizeType.Absolute, 62)); body.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 168)); body.RowStyles.Add(new RowStyle(SizeType.Absolute, 68));
-            var title = new InheritedThemeLabel {Text="ИНСТРУМЕНТЫ BARS",Dock=DockStyle.Fill}; title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleCenter; title.Margin = new Padding(0, 0, 0, 20); body.Controls.Add(title, 0, 0);
+            var title = new InheritedThemeLabel {Text="ИНСТРУМЕНТЫ АВТОМАТИЗАЦИИ",Dock=DockStyle.Fill}; title.Font = new Font("Segoe UI", 17, FontStyle.Bold); title.TextAlign = ContentAlignment.MiddleCenter; title.Margin = new Padding(0, 0, 0, 20); body.Controls.Add(title, 0, 0);
             // Windows components are reached from the component manager.
             var modules = new BufferedLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
             modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); modules.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -135,8 +135,8 @@ namespace ServiceTool
             // Let TableLayoutPanel distribute the viewport once, including DPI rounding.
             modules.Controls.Add(ModuleCard("Менеджер служб", "Установка служб и настройка их запуска.\r\nПроверка состояния и удобный сбор логов.", "Менеджер служб", delegate { OpenModule(() => new MainForm(null, false)); }), 0, 0);
             modules.Controls.Add(ModuleCard("Менеджер библиотек", "Проверка, установка и удаление библиотек.\r\nОбновления .NET и работа с компонентами Windows.", "Менеджер библиотек", delegate { OpenModule(() => new LibraryManagerForm(false)); }), 1, 0);
-            modules.Controls.Add(ModuleCard("Установка программ", "Установка, настройка и удаление программ.\r\nГорячая настройка неконтролируемого доступа.", "Установка программ", delegate { OpenModule(() => new SoftwareManagerForm(false)); }), 0, 1);
-            modules.Controls.Add(ModuleCard("Распаковка утилит", "Распаковка и удаление fiLinn, Piglet и WinSCP.", "Распаковка утилит", delegate { OpenModule(() => new ToolsDeploymentForm(false)); }), 1, 1);
+            modules.Controls.Add(ModuleCard("Прикладные программы", "Установка, настройка и удаление программ.\r\nГорячая настройка неконтролируемого доступа.", "Прикладные программы", delegate { OpenModule(() => new SoftwareManagerForm(false)); }), 0, 1);
+            modules.Controls.Add(ModuleCard("Утилиты и прошивки", "Скачивание, распаковка, удаление фирменных утилит и прошивок.", "Утилиты и прошивки", delegate { OpenModule(() => new ToolsDeploymentForm(false)); }), 1, 1);
             body.Controls.Add(modules, 0, 1);
             var footer=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=new Padding(5,0,5,0),Padding=new Padding(0,12,0,12)};
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,54));

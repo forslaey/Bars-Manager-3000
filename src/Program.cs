@@ -1318,7 +1318,7 @@ namespace ServiceTool
             else if (matches.Count == 0)
             {
                 if (selectedFileKind == ServiceFileKind.OrdinaryProgram)
-                    SetStatus("Выбрана обычная программа", "Открой модуль «Установка программ».", muted);
+                    SetStatus("Выбрана обычная программа", "Открой модуль «Прикладные программы».", muted);
                 else if (selectedFileKind == ServiceFileKind.Unknown)
                     SetStatus("Поддержка установки как службы не подтверждена", "Проверь инструкцию к выбранному файлу.", muted);
                 else if (selectedFileKind == ServiceFileKind.WindowsWidget)
@@ -1451,7 +1451,7 @@ namespace ServiceTool
             ServiceFileKind fileKind = ServiceFileInspection.Identify(executable, installProfile.Mode == ServiceInstallMode.ManagedDotNet);
             if (install && fileKind == ServiceFileKind.OrdinaryProgram)
             {
-                SetStatus("Выбрана обычная программа", "Открой модуль «Установка программ».", muted);
+                SetStatus("Выбрана обычная программа", "Открой модуль «Прикладные программы».", muted);
                 return;
             }
             if (install && fileKind == ServiceFileKind.Unknown &&

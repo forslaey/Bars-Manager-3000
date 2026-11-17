@@ -273,11 +273,55 @@ namespace ServiceTool
         }
         internal static string[] LocalPackages(string folder)
         {
-            var archives=Directory.GetFiles(folder).Where(path=>ToolArchives.Supports(path)&&!Path.GetFileName(path).StartsWith(".")).ToArray();
-            var archiveFolders=new HashSet<string>(archives.Select(Path.GetFileNameWithoutExtension),StringComparer.OrdinalIgnoreCase);
-            return Directory.GetDirectories(folder).Where(path=>!archiveFolders.Contains(Path.GetFileName(path)))
-                .Concat(archives).Select(Path.GetFileName).Where(name=>!name.StartsWith("."))
+            var archives=ArchiveDestinations(folder);
+            var archiveFolders=new HashSet<string>(archives.Values,StringComparer.OrdinalIgnoreCase);
+            archiveFolders.UnionWith(archives.Keys.Select(Path.GetFileNameWithoutExtension));
+            return Directory.GetDirectories(folder).Select(Path.GetFileName).Where(name=>!archiveFolders.Contains(name))
+                .Concat(archives.Keys).Where(name=>!name.StartsWith("."))
                 .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name=>name).ToArray();
+        }
+
+        internal static Dictionary<string,string> ArchiveDestinations(string folder)
+        {
+            var files=new HashSet<string>(Directory.GetFiles(folder).Select(Path.GetFileName),StringComparer.OrdinalIgnoreCase);
+            var directories=new HashSet<string>(Directory.GetDirectories(folder).Select(Path.GetFileName),StringComparer.OrdinalIgnoreCase);
+            var archives=files
+                .Where(name=>ToolArchives.Supports(name)&&!name.StartsWith(".",StringComparison.Ordinal))
+                .OrderBy(name=>name,StringComparer.OrdinalIgnoreCase).ToArray();
+            var owned=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+            foreach(string directory in directories.OrderBy(name=>name,StringComparer.OrdinalIgnoreCase))
+            {
+                string archive=ToolsDeployment.ArchiveOrigin(Path.Combine(folder,directory));
+                if(archive!=null&&files.Contains(archive)&&!owned.ContainsKey(archive))owned.Add(archive,directory);
+            }
+            var stems=archives.GroupBy(Path.GetFileNameWithoutExtension,StringComparer.OrdinalIgnoreCase).ToArray();
+            var reserved=new HashSet<string>(stems.Select(group=>group.Key),StringComparer.OrdinalIgnoreCase);
+            reserved.UnionWith(files);
+            var destinations=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+            foreach(var group in stems)
+            {
+                bool multiple=group.Count()>1;
+                foreach(string archive in group)
+                {
+                    string stem=Path.GetFileNameWithoutExtension(archive);
+                    string label=stem+" ("+Path.GetExtension(archive).Substring(1).ToUpperInvariant()+")";
+                    string destination;
+                    if(!owned.TryGetValue(archive,out destination)||reserved.Contains(destination))
+                    {
+                        destination=stem;
+                        if(multiple||files.Contains(stem))
+                        {
+                            destination=label;
+                            int number=2;
+                            while(reserved.Contains(destination)||directories.Contains(destination))
+                                destination=label+" "+number++;
+                        }
+                    }
+                    reserved.Add(destination);
+                    destinations.Add(archive,destination);
+                }
+            }
+            return destinations;
         }
 
         private void CancelDeployment()
@@ -314,23 +358,28 @@ namespace ServiceTool
                 var launchers=new List<BarsTool>();
                 var missingShortcuts=new List<string>();
                 var cleanupWarnings=new List<string>();
+                var destinations=await Task.Run(()=>ArchiveDestinations(packageSource),archiveCancellation.Token);
                 foreach(string package in packages)
                 {
                     string path=YandexBundleSource.LocalPath(packageSource,"/"+package);
-                    if(File.Exists(path)&&ToolArchives.Supports(path))
+                    string folderName;
+                    if(destinations.TryGetValue(package,out folderName))
                     {
-                        string folder=Path.Combine(packageSource,Path.GetFileNameWithoutExtension(path));
                         var report=ToolProgress.OperationReporter;
-                        folder=await Task.Run(()=>ToolArchives.Extract(path,archiveCancellation.Token,p=>{
+                        string folder=await Task.Run(()=>ToolArchives.Extract(path,archiveCancellation.Token,p=>{
                             if(p.CleanupWarning){cleanupWarnings.Add(p.Stage);return;}
                             LibraryCancellation.Check(()=>CancelRequested);
                             if(p.Total<=0)report(p.Stage);
                             else report("BARS_FRACTION|"+p.Bytes+"|"+p.Total+"|Распаковываем "+package+"…");
-                        },replace:true));
-                        folders.Add(Path.GetFileName(folder));ToolProgress.CompleteStep();
+                        },replace:true,destinationName:folderName));
+                        if(!String.Equals(folderName,Path.GetFileNameWithoutExtension(path),StringComparison.OrdinalIgnoreCase))
+                        {
+                            File.WriteAllText(Path.Combine(folder,ToolsDeployment.ArchiveOriginFile),package);
+                        }
+                        ToolProgress.CompleteStep();
                     }
-                    else folders.Add(package);
-                    string folderName=File.Exists(path)?Path.GetFileNameWithoutExtension(path):package;
+                    else folderName=package;
+                    folders.Add(folderName);
                     HashSet<string> selectedVersions;
                     if(variants.TryGetValue(package,out selectedVersions))
                     {
@@ -348,7 +397,7 @@ namespace ServiceTool
                     HashSet<string> selectedShortcuts;
                     if(shortcutSelection.TryGetValue(package,out selectedShortcuts))
                     {
-                        string directory=File.Exists(path)?Path.GetFileNameWithoutExtension(path):package;
+                        string directory=folderName;
                         string executable=ToolsDeployment.ShortcutExecutable(package);
                         var candidates=await Task.Run(()=>ToolsDeployment.ShortcutCandidates(Path.Combine(packageSource,directory),executable));
                         var chosen=candidates.Where(candidate=>selectedShortcuts.Contains(candidate.Replace(Path.DirectorySeparatorChar,(char)47))).ToArray();
@@ -363,12 +412,16 @@ namespace ServiceTool
                 }
                 LibraryCancellation.Check(()=>CancelRequested);
                 ToolsDeployment.Discover(packageSource,folders);
+                var previousLaunchers=await Task.Run(()=>ToolsDeployment.InstalledLaunchers(target,ToolsDeployment.Installed(target,folders)),archiveCancellation.Token);
                 string request=new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(new ToolCopyRequest{Source=packageSource,Packages=folders.ToArray(),ExcludedDirectories=exclusions.ToArray()});
                 var result=await Execute("tools-deploy-selected",request,target);
 
                 if(result.ExitCode==1602)throw new OperationCanceledException();if(result.ExitCode!=0)throw new IOException(result.Message);
                 ToolProgress.CompleteStep();ToolsDeployment.EnableAdministratorLaunch(packageSource,target,folders);ToolProgress.CompleteStep();
-                ToolsDeployment.ShortcutsAt(packageSource,target,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),true,folders,launchers);
+                string desktop=Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+                var obsoleteLaunchers=previousLaunchers.Where(executable=>!File.Exists(executable)).ToArray();
+                if(obsoleteLaunchers.Length>0)ToolsDeployment.RemoveReferences(obsoleteLaunchers,desktop,onlyOwnedShortcuts:true);
+                ToolsDeployment.ShortcutsAt(packageSource,target,desktop,true,folders,launchers);
                 ToolProgress.CompleteStep();ToolProgress.FinishOperation(cleanupWarnings.Count>0?String.Join(" ",cleanupWarnings):missingShortcuts.Count>0?"Утилиты распакованы. Без ярлыков: "+String.Join(", ",missingShortcuts)+".":launchers.Count>0?"Утилиты распакованы. Ярлыки созданы.":"Утилиты распакованы без создания ярлыков.",success:true);
             }
             catch(OperationCanceledException)

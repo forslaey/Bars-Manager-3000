@@ -1,68 +1,99 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Security.Principal;
-using System.Windows.Forms;
-using Microsoft.Win32;
+using System.Threading;
 
 namespace ServiceTool
 {
-    // Explicitly invoked smoke test: online READ-ONLY query through the real elevated
-    // IPC helper, then real payload copying into an isolated temporary directory.
     internal static class UtilitySmokeTests
     {
-        [STAThread] public static int Main(string[] args)
+        [STAThread] public static int Main()
         {
-            if (args.Length > 0 && args[0] == "--library-worker") return LibrarySession.RunWorker(args);
-            if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator)) { Console.Error.WriteLine("Run from an already elevated test shell; no automatic UAC for smoke tests"); return 5; }
-            Application.EnableVisualStyles();
-            string temp = Path.Combine(Path.GetTempPath(), "bars-real-tools-smoke-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temp);
+            string root=Path.Combine(Path.GetTempPath(),"bars-real-tools-smoke-"+Guid.NewGuid().ToString("N"));
+            string live=Path.Combine(BundleFolders.DefaultRoot,"_tools");
             try
             {
-                using (var session = LibrarySession.Start())
+                string source=Path.Combine(root,"source","_tools"),target=Path.Combine(root,"target","_tools");
+                string desktop=Path.Combine(root,"Desktop");
+                Directory.CreateDirectory(source);
+                var ready=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var launchers=new List<BarsTool>();
+                var archives=ToolsDeploymentForm.ArchiveDestinations(live);
+                foreach(string package in ToolsDeploymentForm.LocalPackages(live))
                 {
-                    var result = session.ExecuteSystem("features-query", "", "", ignored => { });
-                    if (result.ExitCode != 0) throw new Exception(result.Message);
-                    var states = WindowsComponents.Parse(result.Message);
-                    if (!states.ContainsKey("IIS-WebServerRole") || !states.ContainsKey("TelnetClient") || !states.ContainsKey("TFTP")) throw new Exception("Incomplete host feature query");
-                    foreach (var profile in WindowsComponents.Profiles) Console.WriteLine(profile.Name + ": " + WindowsComponents.Status(profile, states));
+                    string original=Path.Combine(live,package);
+                    string name;
+                    if(archives.TryGetValue(package,out name))
+                    {
+                        string[] entries;
+                        var state=ToolArchives.Inspect(original,CancellationToken.None,out entries);
+                        if(state!=ToolArchives.ReadState.Ready)
+                        {
+                            Console.WriteLine("Skipped "+package+": "+state);
+                            continue;
+                        }
+                        string copy=Path.Combine(source,package);
+                        File.Copy(original,copy);
+                        ToolArchives.Extract(copy,CancellationToken.None,null,false,name);
+                    }
+                    else
+                    {
+                        name=package;
+                        CopyFixture(original,Path.Combine(source,name));
+                    }
+                    ready.Add(name);
+                    string executable=ToolsDeployment.ShortcutExecutable(package);
+                    if(executable==null)continue;
+                    var candidates=ToolsDeployment.ShortcutCandidates(Path.Combine(source,name),executable);
+                    for(int i=0;i<candidates.Length;i++)
+                        launchers.Add(new BarsTool{Name=candidates.Length==1?name:name+" "+(i+1),Directory=name,Executable=candidates[i]});
                 }
-                string source = @"C:\Библиотеки\_tools", target = Path.Combine(temp, "DataKrat", "_tools"), desktop = Path.Combine(temp, "Desktop");
-                ToolsDeployment.CopyToTarget(source, target, ignored => { }, () => false);
-                int files = 0;
-                foreach (string file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+                if(ready.Count==0)throw new InvalidDataException("No deployable utility packages at "+live);
+                ToolsDeployment.CopyToTarget(source,target,ignored=>{},()=>false,ready);
+                int files=0;
+                foreach(string package in ready)
+                    foreach(string file in Directory.GetFiles(Path.Combine(source,package),"*",SearchOption.AllDirectories))
+                    {
+                        if(Path.GetFileName(file).Equals("desktop.ini",StringComparison.OrdinalIgnoreCase))continue;
+                        string copied=Path.Combine(target,file.Substring(source.Length+1));
+                        if(SoftwareCatalog.Hash(file)!=SoftwareCatalog.Hash(copied))throw new IOException("Copy differs: "+file);
+                        files++;
+                    }
+                ToolsDeployment.ShortcutsAt(source,target,desktop,true,ready,launchers);
+                foreach(var tool in launchers)
                 {
-                    if (Path.GetFileName(file).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase)) continue;
-                    string destination = Path.Combine(target, file.Substring(source.Length + 1));
-                    using (var sha = SHA256.Create()) using (var original = File.OpenRead(file)) using (var copy = File.OpenRead(destination))
-                        if (!sha.ComputeHash(original).SequenceEqual(sha.ComputeHash(copy))) throw new Exception("Copy differs: " + file);
-                    files++;
+                    if(!File.Exists(Path.Combine(desktop,tool.Name+".lnk")))throw new IOException("Missing shortcut: "+tool.Name);
+                    using(Icon icon=Icon.ExtractAssociatedIcon(Path.Combine(target,tool.Directory,tool.Executable)))
+                        if(icon==null)throw new IOException("No EXE icon: "+tool.Name);
                 }
-                ToolsDeployment.EnableAdministratorLaunch(source, target);
-                using (var user = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, Environment.Is64BitOperatingSystem ? RegistryView.Registry64 : RegistryView.Registry32))
-                using (var layers = user.OpenSubKey(ToolsDeployment.CompatibilityKey))
-                    foreach (var tool in ToolsDeployment.Launchers(source))
-                        if (Convert.ToString(layers.GetValue(Path.Combine(target, tool.Directory, tool.Executable))) != "~ RUNASADMIN") throw new Exception("Administrator property missing: " + tool.Name);
-                ToolsDeployment.ShortcutsAt(source, target, desktop);
-                foreach (var tool in ToolsDeployment.Launchers(source))
-                {
-                    if (!File.Exists(Path.Combine(desktop, tool.Name + ".lnk"))) throw new Exception("Missing shortcut: " + tool.Name);
-                    using (Icon icon = Icon.ExtractAssociatedIcon(Path.Combine(target, tool.Directory, tool.Executable))) if (icon == null) throw new Exception("No EXE icon: " + tool.Name);
-                }
-                Console.WriteLine("PASS: authenticated elevated IPC read-only Windows query; " + files + " real utility files verified by SHA-256; four named shortcuts, four actual EXE icons and four native per-user administrator properties. No feature changes or installer execution."); return 0;
+                Console.WriteLine("PASS: "+ready.Count+" real packages, "+files+" files verified by SHA-256, "+launchers.Count+" shortcuts and EXE icons from "+live);
+                return 0;
             }
-            catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+            catch(Exception ex){Console.Error.WriteLine(ex);return 1;}
             finally
             {
-                using (var user = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, Environment.Is64BitOperatingSystem ? RegistryView.Registry64 : RegistryView.Registry32))
-                using (var layers = user.OpenSubKey(ToolsDeployment.CompatibilityKey, true))
-                    if (layers != null) foreach (string value in layers.GetValueNames()) if (value.StartsWith(temp + "\\", StringComparison.OrdinalIgnoreCase)) layers.DeleteValue(value, false);
-                foreach (string file in Directory.GetFiles(temp, "*", SearchOption.AllDirectories)) File.SetAttributes(file, FileAttributes.Normal);
-                foreach (string directory in Directory.GetDirectories(temp, "*", SearchOption.AllDirectories)) File.SetAttributes(directory, FileAttributes.Directory);
-                Directory.Delete(temp, true);
+                if(Directory.Exists(root))
+                {
+                    foreach(string file in Directory.GetFiles(root,"*",SearchOption.AllDirectories))File.SetAttributes(file,FileAttributes.Normal);
+                    foreach(string folder in Directory.GetDirectories(root,"*",SearchOption.AllDirectories))File.SetAttributes(folder,FileAttributes.Directory);
+                    Directory.Delete(root,true);
+                }
             }
+        }
+
+        private static void CopyFixture(string source,string target)
+        {
+            ToolsDeployment.SafePath(source);
+            Directory.CreateDirectory(target);
+            foreach(string file in Directory.EnumerateFiles(source))
+            {
+                ToolsDeployment.SafePath(file);
+                File.Copy(file,Path.Combine(target,Path.GetFileName(file)));
+            }
+            foreach(string folder in Directory.EnumerateDirectories(source))
+                CopyFixture(folder,Path.Combine(target,Path.GetFileName(folder)));
         }
     }
 }

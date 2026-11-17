@@ -31,7 +31,7 @@ namespace ServiceTool
                 using(var input=File.OpenRead(path))
                 {
                     if(!IsZip(path)&&!File.Exists(WindowsTar()))return ReadState.MissingTool;
-                    entries=Entries(path,token);
+                    entries=IsZip(path)?PackageZipExtraction.Validate(input,token):Entries(path,token);
                     return entries.Length==0?ReadState.Damaged:ReadState.Ready;
                 }
             }
@@ -86,36 +86,15 @@ namespace ServiceTool
             }
 
             using(var input=File.OpenRead(path))
-            using(var zip=new ZipArchive(input,ZipArchiveMode.Read))
-            {
-                if(zip.Entries.Count==0)throw new InvalidDataException("Архив пуст.");
-                var buffer=new byte[65536];
-                foreach(var entry in zip.Entries)
-                {
-                    token.ThrowIfCancellationRequested();
-                    long bytes=0;
-                    using(var contents=entry.Open())
-                    {
-                        int count;
-                        while((count=contents.Read(buffer,0,buffer.Length))>0)
-                        {
-                            token.ThrowIfCancellationRequested();
-                            bytes+=count;
-                            if(bytes>entry.Length)throw new InvalidDataException("Размер записи ZIP не совпадает.");
-                        }
-                    }
-                    if(bytes!=entry.Length)throw new InvalidDataException("Размер записи ZIP не совпадает.");
-                }
-            }
-            if(File.Exists(WindowsTar()))RunTar("-xOf",path,null,token,true);
+                PackageZipExtraction.Validate(input,token);
         }
 
-        internal static string Extract(string path,CancellationToken token,Action<TransferProgress> report,bool replace)
+        internal static string Extract(string path,CancellationToken token,Action<TransferProgress> report,bool replace,string destinationName=null)
         {
-            if(IsZip(path))return PackageZipExtraction.Extract(path,token,report,replace);
+            if(IsZip(path))return PackageZipExtraction.Extract(path,token,report,replace,destinationName);
             string parent=Path.GetDirectoryName(path);
             string name=Path.GetFileNameWithoutExtension(path);
-            string target=YandexBundleSource.LocalPath(parent,"/"+name);
+            string target=YandexBundleSource.LocalPath(parent,"/"+(destinationName??name));
             string staging=YandexBundleSource.LocalPath(parent,"/.s"+Guid.NewGuid().ToString("N").Substring(0,8));
             var entries=Entries(path,token);
             if(entries.Length==0)throw new InvalidDataException("Архив пуст.");

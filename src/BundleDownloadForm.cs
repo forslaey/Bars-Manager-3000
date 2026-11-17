@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -77,16 +77,16 @@ namespace ServiceTool
         }
         internal bool MenuRequested {get;private set;}
         internal override void ResumeSession(){MenuRequested=false;base.ResumeSession();}
-        internal BundleDownloadForm(string libraryRoot=null,bool programs=false,bool sqlOnly=false,bool toolsOnly=false,string localSource=null,Func<string,string[],Dictionary<string,HashSet<string>>,DownloadProgressView,Task> deploy=null,Action cancelDeployment=null):base(toolsOnly?"Распаковка утилит":"Загрузка комплекта",toolsOnly?new Size(1050,730):new Size(650,680))
+        internal BundleDownloadForm(string libraryRoot=null,bool programs=false,bool sqlOnly=false,bool toolsOnly=false,string localSource=null,Func<string,string[],Dictionary<string,HashSet<string>>,DownloadProgressView,Task> deploy=null,Action cancelDeployment=null):base(toolsOnly?"Утилиты и прошивки":"Загрузка комплекта",toolsOnly?new Size(1050,730):new Size(650,680))
         {
             this.toolsOnly=toolsOnly;localTools=localSource;deployFromWorkspace=deploy;cancelToolDeployment=cancelDeployment;
             MinimumSize=SizeFromClientSize(toolsOnly?new Size(660,520):new Size(650,680));ClientSize=toolsOnly?new Size(1050,730):new Size(650,680);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;Root.RowStyles[0].Height=60;if(toolsOnly){FormBorderStyle=FormBorderStyle.Sizable;MaximizeBox=true;}
             var body=new BufferedLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=7,Margin=Padding.Empty};body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
             foreach(float height in new[]{50F,40F,toolsOnly?100F:136F,0F,40F,toolsOnly?0.01F:120F,100F})body.RowStyles.Add(new RowStyle(height==0?SizeType.Percent:SizeType.Absolute,height==0?100:height));
-            body.Controls.Add(ModuleHeading(toolsOnly?"Распаковка утилит":"Загрузка комплекта"),0,0);
+            body.Controls.Add(ModuleHeading(toolsOnly?"Утилиты и прошивки":"Загрузка комплекта"),0,0);
             var path=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,140));path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,168));path.RowStyles.Add(new RowStyle(SizeType.Percent,100));
             var caption=Caption("Папка комплекта",false);path.Controls.Add(caption,0,0);folder.ReadOnly=true;folder.AutoSize=false;folder.Text=libraryRoot==null?BundlePreferences.Load():BundleFolders.BundleRoot(libraryRoot);folder.Dock=DockStyle.None;folder.Anchor=AnchorStyles.Left|AnchorStyles.Right;folder.Margin=Padding.Empty;
-            choose=Button("Выбрать папку",false);choose.Dock=DockStyle.None;choose.Anchor=AnchorStyles.Right;choose.Size=new Size(168,40);choose.Margin=Padding.Empty;if(toolsOnly){choose.Height=34;choose.Anchor=AnchorStyles.None;}choose.Click+=async delegate{using(var dialog=new FolderBrowserDialog {Description=toolsOnly?"Выбери папку комплекта BarsManager3000 или папку _tools":"Выбери папку комплекта BarsManager3000",SelectedPath=BundleFolders.PickerStart(folder.Text)})if(ScopedDialogs.Show(this, dialog)==DialogResult.OK){string picked=dialog.SelectedPath;bool section=toolsOnly&&Path.GetFileName(picked.TrimEnd((char)92,(char)47)).Equals("_tools",StringComparison.OrdinalIgnoreCase);folder.Text=section?Path.GetDirectoryName(picked.TrimEnd((char)92,(char)47)):BundleFolders.BundleRoot(picked);entries.Clear();scannedRoot=null;localTools=null;await RefreshTools();UpdateState();}};
+            choose=Button("Выбрать папку",false);choose.Dock=DockStyle.None;choose.Anchor=AnchorStyles.Right;choose.Size=new Size(168,40);choose.Margin=Padding.Empty;if(toolsOnly){choose.Height=34;choose.Anchor=AnchorStyles.None;}choose.Click+=async delegate{await ChooseSource();};
             var folderFrame=new PathFieldFrame(folder);path.Controls.Add(folderFrame,1,0);path.Controls.Add(choose,2,0);path.Layout+=delegate{
                 using(var graphics=path.CreateGraphics()){
                     int textWidth=TextRenderer.MeasureText(graphics,caption.Text,caption.Font,Size.Empty,TextFormatFlags.NoPadding|TextFormatFlags.SingleLine).Width;
@@ -173,7 +173,7 @@ namespace ServiceTool
                 ModuleNavigation.StandardFooter(upper,scan,start,results,deployTools);
             }
             else ModuleNavigation.StandardFooter(upper, scan, start, results);
-            if(toolsOnly)ModuleNavigation.RightAlignedFooter(lower,pause,stop,removeTools,back,close);
+            if(toolsOnly)ModuleNavigation.StandardFooter(lower,pause,stop,removeTools,back,close);
             else ModuleNavigation.StandardFooter(lower,pause,stop,back,close);
             actions.Controls.Add(upper, 0, 0); actions.SetColumnSpan(upper, 12);
             actions.Controls.Add(lower, 0, 1); actions.SetColumnSpan(lower, 12);body.RowCount=6;body.RowStyles.RemoveAt(6);body.MinimumSize=new Size(0,480);
@@ -183,13 +183,42 @@ namespace ServiceTool
             FormClosing+=delegate(object sender,FormClosingEventArgs e){if(busy){e.Cancel=true;if(extracting){closeAfter=true;if(cancelToolDeployment!=null)cancelToolDeployment();return;}if(!downloading || closeAfter || ModuleNavigation.ExitConfirmed || BrandMessageBox.Show(this,"Остановить загрузку и закрыть окно? Готовые файлы сохранятся.","Загрузка комплекта",MessageBoxButtons.YesNo,MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2)==DialogResult.Yes){closeAfter=true;cancelRequested=true;paused=false;if(cancellation!=null)cancellation.Cancel();}}};
             if(programs||sqlOnly||toolsOnly){libraries.Checked=false;tools.Checked=toolsOnly;software.Checked=programs;sql.Checked=sqlOnly;}SetTheme(Colors.Dark,false);Shown+=async delegate{await RefreshTools();};UpdateState();
         }
+        private async Task ChooseSource()
+        {
+            using(var dialog=new FolderBrowserDialog {Description=toolsOnly?"Выбери папку комплекта BarsManager3000 или папку _tools":"Выбери папку комплекта BarsManager3000",SelectedPath=BundleFolders.PickerStart(folder.Text)})
+            {
+                if(ScopedDialogs.Show(this,dialog)!=DialogResult.OK)return;
+                string picked=dialog.SelectedPath.TrimEnd('\\','/');
+                bool section=toolsOnly&&Path.GetFileName(picked).Equals("_tools",StringComparison.OrdinalIgnoreCase);
+                string root=section?Path.GetDirectoryName(picked):BundleFolders.BundleRoot(dialog.SelectedPath);
+                try
+                {
+                    await RefreshTools(apply:()=>
+                    {
+                        folder.Text=root;
+                        entries.Clear();
+                        scannedRoot=null;
+                        localTools=null;
+                        RootAccepted=false;
+                    },pendingEntries:new Entry[0],pendingFolder:Path.Combine(root,"_tools"));
+                }
+                catch(OperationCanceledException){}
+                catch(Exception ex){ReportToolsReadFailure(ex);}
+                if(!IsDisposed)UpdateState();
+            }
+        }
         private void UpdateToolSelection()
         {
             if(toolGrid==null)return;
             foreach(var entry in entries)entry.Selected=entry.Allowed&&!entry.Done&&toolGrid.WantsDownload(ToolPackage(entry.File));
         }
         private CancellationTokenSource toolRead;
-        private async Task RefreshTools(CancellationToken parent=default(CancellationToken),Action apply=null,IEnumerable<Entry> pendingEntries=null)
+        private sealed class ToolsReadException : IOException
+        {
+            internal ToolsReadException(string local,Exception cause)
+                : base("Не удалось прочитать наборы утилит в "+local+". "+cause.Message,cause){}
+        }
+        private async Task RefreshTools(CancellationToken parent=default(CancellationToken),Action apply=null,IEnumerable<Entry> pendingEntries=null,string pendingFolder=null)
         {
             if(toolGrid==null){parent.ThrowIfCancellationRequested();if(apply!=null)apply();return;}
             var catalog=(pendingEntries??entries).GroupBy(entry=>ToolPackage(entry.File),StringComparer.OrdinalIgnoreCase)
@@ -203,26 +232,38 @@ namespace ServiceTool
             var pending=CancellationTokenSource.CreateLinkedTokenSource(parent);
             toolRead=pending;
             var token=pending.Token;
-            string local=ToolsFolder;
+            string local=pendingFolder??ToolsFolder;
             var names=catalog.Keys.ToArray();
             UpdateState();
             try
             {
                 var packages=await Task.Run(()=>ToolsWorkspaceGrid.ReadPackages(local,names,token),token);
-                parent.ThrowIfCancellationRequested();
-                if(IsDisposed||token.IsCancellationRequested)return;
-                if(apply!=null)apply();
+                token.ThrowIfCancellationRequested();
+                if(IsDisposed)throw new OperationCanceledException();
                 toolGrid.LoadRows(packages,catalog);
+                if(apply!=null)apply();
                 UpdateToolSelection();
             }
-            catch(OperationCanceledException){parent.ThrowIfCancellationRequested();}
-            catch(Exception ex){if(!IsDisposed&&!token.IsCancellationRequested){toolGrid.LoadRows(new ToolsWorkspaceGrid.LocalPackage[0],catalog);Log("Не удалось прочитать наборы утилит. "+ex.Message);}}
+            catch(OperationCanceledException){if(apply!=null)throw;}
+            catch(Exception ex)
+            {
+                if(apply!=null)
+                    throw new ToolsReadException(local,ex);
+                if(!token.IsCancellationRequested)ReportToolsReadFailure(ex);
+            }
             finally
             {
                 if(toolRead==pending)toolRead=null;
                 pending.Dispose();
                 if(!IsDisposed)UpdateState();
             }
+        }
+        private void ReportToolsReadFailure(Exception ex)
+        {
+            if(IsDisposed)return;
+            summary.Text=OperationMessage.FinishSentence("Не удалось прочитать наборы утилит: "+ex.Message);
+            total.Stage(summary.Text,failed:true);
+            Log(summary.Text);
         }
         private async Task DeployTools()
         {
@@ -273,7 +314,12 @@ namespace ServiceTool
                 total.FinishOperation("Локальная сверка завершена.",success:true);
             }
             catch(OperationCanceledException){total.FinishOperation("Сверка отменена.",cancelled:true);}
-            catch(Exception ex){total.FinishOperation("Не удалось сверить файлы: "+ex.Message,failed:true);}
+            catch(Exception ex)
+            {
+                summary.Text=OperationMessage.FinishSentence("Не удалось сверить файлы: "+ex.Message);
+                total.FinishOperation(summary.Text,failed:true);
+                Log(summary.Text);
+            }
             finally{busy=false;cancellation.Dispose();cancellation=null;UpdateState();if(closeAfter)Close();}
         }
         bool GroupSelected(string group){switch(group){case "Библиотеки":return libraries.Checked;case "Утилиты":return tools.Checked;case "Программы":return software.Checked;case "Обои":return wallpapers.Checked;case "SQL":return sql.Checked;default:return false;}}
@@ -395,7 +441,7 @@ namespace ServiceTool
                 total.FinishOperation("Сверка завершена. Скачивание запускается отдельно.",success:true);summary.Text="Проверено: "+entries.Count+". На месте: "+entries.Count(e=>e.Done)+". К загрузке: "+entries.Count(e=>e.Selected)+". Защищено: "+entries.Count(e=>!e.Done&&!e.Allowed)+".";
                 RootAccepted=true;BundlePreferences.Save(root);
             }
-            catch(Exception ex){emptyToolCatalog=false;summary.Text=cancellation.IsCancellationRequested?"Проверка отменена.":OperationMessage.FinishSentence("Не удалось проверить: "+ex.Message);total.Stage(summary.Text,failed:!cancellation.IsCancellationRequested,cancelled:cancellation.IsCancellationRequested);Log(summary.Text);suggestAlternative=!cancellation.IsCancellationRequested;}
+            catch(Exception ex){emptyToolCatalog=false;summary.Text=cancellation.IsCancellationRequested?"Проверка отменена.":OperationMessage.FinishSentence("Не удалось проверить: "+ex.Message);total.Stage(summary.Text,failed:!cancellation.IsCancellationRequested,cancelled:cancellation.IsCancellationRequested);Log(summary.Text);suggestAlternative=!cancellation.IsCancellationRequested&&!(ex is ToolsReadException);}
             finally{busy=false;cancellation.Dispose();cancellation=null;UpdateState();if(closeAfter)Close();}
             if(toolsOnly&&!forcedCloud.HasValue&&(emptyToolCatalog||suggestAlternative)&&!cancelRequested&&!closeAfter&&!IsDisposed)
             {

@@ -99,8 +99,16 @@ namespace ServiceTool
 
         internal static LocalPackage[] ReadPackages(string local,IEnumerable<string> online,System.Threading.CancellationToken token)
         {
-            var names=(Directory.Exists(local)?ToolsDeploymentForm.LocalPackages(local):new string[0]).Concat(online)
-                .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name=>name,StringComparer.CurrentCultureIgnoreCase);
+            token.ThrowIfCancellationRequested();
+            string[] localNames;
+            try
+            {
+                if(File.Exists(local))throw new IOException("Путь к папке _tools занят файлом.");
+                localNames=ToolsDeploymentForm.LocalPackages(local);
+            }
+            catch(DirectoryNotFoundException){localNames=new string[0];}
+            var names=localNames.Concat(online).Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name=>name,StringComparer.CurrentCultureIgnoreCase);
             return names.Select(name=>
             {
                 token.ThrowIfCancellationRequested();

@@ -144,6 +144,15 @@ namespace ServiceTool
             if (!Path.GetFileName(full.TrimEnd('\\')).Equals("_tools", StringComparison.OrdinalIgnoreCase)) full = Path.Combine(full, "_tools");
             return full;
         }
+        internal const string ArchiveOriginFile = ".bars-archive-origin";
+        internal static string ArchiveOrigin(string directory)
+        {
+            var marker=new FileInfo(Path.Combine(directory,ArchiveOriginFile));
+            if(!marker.Exists||marker.Length>1024||(marker.Attributes&FileAttributes.ReparsePoint)!=0||
+                (File.GetAttributes(directory)&FileAttributes.ReparsePoint)!=0)return null;
+            return File.ReadAllText(marker.FullName);
+        }
+
         internal static void Copy(string source, string drive, Action<string> progress, Func<bool> cancelled)
         {
             CopyToTarget(source, Target(drive), progress, cancelled);
@@ -169,12 +178,22 @@ namespace ServiceTool
             try
             {
                 Directory.CreateDirectory(stage);
-                long[] work=new long[]{0,1+(Directory.Exists(target)?CountWork(target):0)+tools.Sum(tool=>CountWork(Path.Combine(source,tool.Directory),excluded))};
-                // Preserve settings and other tools in the staged replacement.
-                if (Directory.Exists(target)) CopyTree(target, stage, false, progress, cancelled,work);
+                var replaced = new HashSet<string>(tools.Select(tool=>Path.Combine(target,tool.Directory)),StringComparer.OrdinalIgnoreCase);
+                var settings = new List<string[]>();
                 foreach (var tool in tools)
                 {
-                    CopyTree(Path.Combine(source, tool.Directory), Path.Combine(stage, tool.Directory), true, progress, cancelled,work,excluded);
+                    string incoming=Path.Combine(source,tool.Directory),installed=Path.Combine(target,tool.Directory);
+                    string origin=ArchiveOrigin(incoming);
+                    if(origin!=null&&Directory.Exists(installed)&&!String.Equals(origin,ArchiveOrigin(installed),StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("Папка "+installed+" уже занята другим набором. Выбери другой путь распаковки.");
+                    CollectSettings(incoming,installed,Path.Combine(stage,tool.Directory),excluded,settings,cancelled);
+                }
+                long[] work = {0,1+(Directory.Exists(target)?CountWork(target,replaced):0)+
+                    tools.Sum(tool=>CountWork(Path.Combine(source,tool.Directory),excluded))+settings.Count};
+                if (Directory.Exists(target)) CopyTree(target, stage, progress, cancelled,work,replaced);
+                foreach (var tool in tools)
+                {
+                    CopyTree(Path.Combine(source, tool.Directory), Path.Combine(stage, tool.Directory), progress, cancelled,work,excluded);
                     string stagedTool=Path.Combine(stage,tool.Directory);
                     string marker=Path.Combine(stagedTool,".bars-utility");
                     if(File.Exists(marker))File.SetAttributes(marker,FileAttributes.Normal);
@@ -190,6 +209,8 @@ namespace ServiceTool
                     File.SetAttributes(ini, FileAttributes.Hidden | FileAttributes.System);
                     File.SetAttributes(stagedTool, File.GetAttributes(stagedTool) | FileAttributes.ReadOnly);
                 }
+                foreach (var setting in settings)
+                    CopyFile(setting[0],setting[1],progress,cancelled,work);
                 LibraryCancellation.Check(cancelled);
                 if (Directory.Exists(target)) { Directory.Move(target, backup); moved = true; }
                 try { Directory.Move(stage, target); published = true; }
@@ -210,28 +231,57 @@ namespace ServiceTool
             }
         }
         private static bool IsSetting(string file)
-        { return new[] { ".ini", ".config", ".json", ".xml", ".settings", ".cst" }.Contains(Path.GetExtension(file).ToLowerInvariant()) && !Path.GetFileName(file).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase); }
+        {
+            string name=Path.GetFileName(file);
+            return new[] { ".ini", ".config", ".json", ".xml", ".settings", ".cst" }.Contains(Path.GetExtension(name).ToLowerInvariant()) &&
+                !name.Equals("desktop.ini",StringComparison.OrdinalIgnoreCase) &&
+                !name.EndsWith(".deps.json",StringComparison.OrdinalIgnoreCase) &&
+                !name.EndsWith(".runtimeconfig.json",StringComparison.OrdinalIgnoreCase) &&
+                !name.EndsWith(".runtimeconfig.dev.json",StringComparison.OrdinalIgnoreCase);
+        }
+        private static void CollectSettings(string source,string old,string stage,ISet<string> excluded,
+            List<string[]> settings,Func<bool> cancelled)
+        {
+            LibraryCancellation.Check(cancelled);
+            if(excluded.Contains(source)||!Directory.Exists(old))return;
+            SafePath(source);
+            SafePath(old);
+            foreach(string file in Directory.EnumerateFiles(old))
+            {
+                string name=Path.GetFileName(file);
+                if(IsSetting(file)&&!excluded.Contains(Path.Combine(source,name))&&!Directory.Exists(Path.Combine(source,name)))
+                    settings.Add(new[]{file,Path.Combine(stage,name)});
+            }
+            foreach(string child in Directory.EnumerateDirectories(source))
+            {
+                string name=Path.GetFileName(child);
+                CollectSettings(child,Path.Combine(old,name),Path.Combine(stage,name),excluded,settings,cancelled);
+            }
+        }
         private static long CountWork(string source,ISet<string> excluded=null){if(excluded!=null&&excluded.Contains(source))return 0;SafePath(source);long count=Directory.GetFiles(source).Count(file=>excluded==null||!excluded.Contains(file));foreach(string child in Directory.GetDirectories(source))count+=CountWork(child,excluded);return count;}
         private static void FileProcessed(long[] work,string file,Action<string> progress){if(work!=null)progress("BARS_FRACTION|"+(++work[0])+"|"+work[1]+"|Обработан файл: "+Path.GetFileName(file));}
-        private static void CopyTree(string source, string target, bool preserveSettings, Action<string> progress, Func<bool> cancelled,long[] work=null,ISet<string> excluded=null)
+        private static void CopyTree(string source, string target, Action<string> progress, Func<bool> cancelled,long[] work,ISet<string> excluded)
         {
-            LibraryCancellation.Check(cancelled); if(excluded!=null&&excluded.Contains(source))return;SafePath(source); Directory.CreateDirectory(target);
+            LibraryCancellation.Check(cancelled); if(excluded.Contains(source))return;SafePath(source); Directory.CreateDirectory(target);
             foreach (string file in Directory.GetFiles(source))
+                if(!excluded.Contains(file))CopyFile(file,Path.Combine(target,Path.GetFileName(file)),progress,cancelled,work);
+            foreach (string directory in Directory.GetDirectories(source)) CopyTree(directory, Path.Combine(target, Path.GetFileName(directory)),progress,cancelled,work,excluded);
+        }
+        private static void CopyFile(string file,string destination,Action<string> progress,Func<bool> cancelled,long[] work)
+        {
+            LibraryCancellation.Check(cancelled);
+            SafePath(file);
+            progress("Копируем: " + Path.GetFileName(file));
+            if(File.Exists(destination))File.SetAttributes(destination,FileAttributes.Normal);
+            using(var input=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.Read))
+            using(var output=new FileStream(destination,FileMode.Create,FileAccess.Write,FileShare.None))
             {
-                LibraryCancellation.Check(cancelled); if(excluded!=null&&excluded.Contains(file))continue; SafePath(file); string destination = Path.Combine(target, Path.GetFileName(file));
-                if (preserveSettings && IsSetting(file) && File.Exists(destination)){FileProcessed(work,file,progress);continue;}
-                progress("Копируем: " + Path.GetFileName(file));
-                if (File.Exists(destination)) File.SetAttributes(destination, FileAttributes.Normal);
-                using (var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var output = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    byte[] buffer = new byte[1024 * 1024]; int count;
-                    while ((count = input.Read(buffer, 0, buffer.Length)) > 0) { LibraryCancellation.Check(cancelled); output.Write(buffer, 0, count); }
-                    output.Flush(true);
-                }
-                FileProcessed(work,file,progress);
+                byte[] buffer=new byte[1024*1024];
+                int count;
+                while((count=input.Read(buffer,0,buffer.Length))>0){LibraryCancellation.Check(cancelled);output.Write(buffer,0,count);}
+                output.Flush(true);
             }
-            foreach (string directory in Directory.GetDirectories(source)) CopyTree(directory, Path.Combine(target, Path.GetFileName(directory)), preserveSettings, progress, cancelled,work,excluded);
+            FileProcessed(work,file,progress);
         }
         private static void DeleteStage(string directory)
         {
@@ -305,7 +355,7 @@ namespace ServiceTool
             }
         }
         // Only recognizable tool directories below the selected _tools folder qualify.
-        internal static List<BarsTool> Installed(string target)
+        internal static List<BarsTool> Installed(string target,ISet<string> selected=null)
         {
             target=Path.GetFullPath(target); if(target.StartsWith(@"\\",StringComparison.Ordinal))throw new IOException("Для удаления выбери локальную папку"); SafePath(target);
             if(!Path.GetFileName(target.TrimEnd('\\')).Equals("_tools",StringComparison.OrdinalIgnoreCase)) throw new IOException("Для удаления выбери папку _tools");
@@ -313,7 +363,7 @@ namespace ServiceTool
             foreach(string folder in Directory.GetDirectories(target).OrderBy(path=>path,StringComparer.OrdinalIgnoreCase))
             {
                 string name=Path.GetFileName(folder);
-                if(name.StartsWith(".")||(File.GetAttributes(folder)&FileAttributes.ReparsePoint)!=0)continue;
+                if(name.StartsWith(".")||(selected!=null&&!selected.Contains(name))||(File.GetAttributes(folder)&FileAttributes.ReparsePoint)!=0)continue;
                 string executable=ShortcutExecutable(name);
                 string marker=Path.Combine(folder,".bars-utility");
                 bool managed=File.Exists(marker)&&(File.GetAttributes(marker)&FileAttributes.ReparsePoint)==0&&
@@ -363,12 +413,15 @@ namespace ServiceTool
         }
         internal static void RemoveReferences(string target,IEnumerable<BarsTool> tools,string desktop)
         {
-            var paths=InstalledLaunchers(target,tools);
+            RemoveReferences(InstalledLaunchers(target,tools),desktop);
+        }
+        internal static void RemoveReferences(IEnumerable<string> paths,string desktop,bool onlyOwnedShortcuts=false)
+        {
             using(var user=RegistryKey.OpenBaseKey(RegistryHive.CurrentUser,Environment.Is64BitOperatingSystem?RegistryView.Registry64:RegistryView.Registry32))
             using(var layers=user.OpenSubKey(CompatibilityKey,true)){if(layers!=null)RemoveAdministratorSettings(layers,paths);}
-            RemoveShortcuts(paths,desktop);
+            RemoveShortcuts(paths,desktop,onlyOwnedShortcuts);
         }
-        internal static void RemoveShortcuts(IEnumerable<string> targets,string desktop)
+        internal static void RemoveShortcuts(IEnumerable<string> targets,string desktop,bool onlyOwned=false)
         {
             if(!Directory.Exists(desktop))return;SafePath(desktop);var expected=new HashSet<string>(targets.Select(Path.GetFullPath),StringComparer.OrdinalIgnoreCase);
             foreach(string link in Directory.GetFiles(desktop,"*.lnk"))
@@ -378,7 +431,13 @@ namespace ServiceTool
                 {
                     shell=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell",true));shortcut=shell.GetType().InvokeMember("CreateShortcut",BindingFlags.InvokeMethod,null,shell,new object[]{link});
                     string previous=Convert.ToString(shortcut.GetType().InvokeMember("TargetPath",BindingFlags.GetProperty,null,shortcut,null));
-                    if(!String.IsNullOrWhiteSpace(previous)&&expected.Contains(Path.GetFullPath(previous)))File.Delete(link);
+                    if(String.IsNullOrWhiteSpace(previous)||!expected.Contains(Path.GetFullPath(previous)))continue;
+                    if(onlyOwned)
+                    {
+                        string description=Convert.ToString(shortcut.GetType().InvokeMember("Description",BindingFlags.GetProperty,null,shortcut,null));
+                        if(!description.StartsWith("Утилита BARS: ",StringComparison.Ordinal))continue;
+                    }
+                    File.Delete(link);
                 }
                 finally{if(shortcut!=null)Marshal.FinalReleaseComObject(shortcut);if(shell!=null)Marshal.FinalReleaseComObject(shell);}
             }
