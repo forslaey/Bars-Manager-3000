@@ -5,9 +5,7 @@
 
 **[Скачать опубликованную программу](https://github.com/forslaey/Bars-Manager-3000/releases/latest)** · **[Руководство](docs/USER-GUIDE.md)** · **[История версий](CHANGELOG.md)**
 
-**Текущий выпуск: [2.3.79](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.79)** — с цифровой подписью. [Изменения и результаты проверок](docs/history/releases/RELEASE-2.3.79.md).
-
-В ветке main подготовлена версия 2.3.80. Встроенная инструкция и [руководство пользователя](docs/USER-GUIDE.md) обновлены для этой версии. [Что изменилось](CHANGELOG.md#2380).
+**Текущий выпуск: [2.3.87](https://github.com/forslaey/Bars-Manager-3000/releases/tag/v2.3.87)** — с цифровой подписью.
 
 ## С чего начать
 
