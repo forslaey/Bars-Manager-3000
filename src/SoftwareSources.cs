@@ -13,6 +13,7 @@ namespace ServiceTool
     internal static class SoftwareSources
     {
         internal static string CacheFolder { get { return Path.Combine(ApplicationStorage.DirectoryPath,"SoftwareCache"); } }
+        internal const string ChromeReleaseUrl = "https://versionhistory.googleapis.com/v1/chrome/platforms/win64/channels/stable/versions/all/releases?filter=endtime%3Dnone%2Cfraction%3D1&order_by=version%20desc&pageSize=1";
         internal static bool Allowed(string id, Uri uri)
         {
             if (uri == null || uri.Scheme != "https" || !uri.IsDefaultPort || !String.IsNullOrEmpty(uri.UserInfo)) return false;
@@ -106,15 +107,32 @@ namespace ServiceTool
         internal static SoftwarePackage ParseChrome(string json)
         {
             var doc=new JavaScriptSerializer{MaxJsonLength=4*1024*1024,RecursionLimit=24}.DeserializeObject(json) as Dictionary<string,object>;
-            object value; if(doc==null||!doc.TryGetValue("versions",out value))throw new InvalidDataException("Google не вернул версии Chrome");
-            var versions=value as object[]; if(versions==null||versions.Length==0)throw new InvalidDataException("Не найдена стабильная версия Chrome");
+            object value; if(doc==null||!doc.TryGetValue("releases",out value))throw new InvalidDataException("Google не вернул сведения о распространении Chrome");
+            var releases=value as object[]; if(releases==null)throw new InvalidDataException("Некорректный список выпусков Chrome");
             string selected=null;
-            foreach(var item in versions){var entry=item as Dictionary<string,object>;object raw;Version v;if(entry==null||!entry.TryGetValue("version",out raw)||!Version.TryParse(Convert.ToString(raw),out v)||v.Revision<0)throw new InvalidDataException("Некорректная версия Chrome");string version=Convert.ToString(raw);if(selected==null||SoftwareCatalog.Compare(version,selected)>0)selected=version;}
+            foreach(var item in releases)
+            {
+                var entry=item as Dictionary<string,object>;
+                object raw;
+                Version version;
+                if(entry==null||!entry.TryGetValue("version",out raw)||!Version.TryParse(Convert.ToString(raw),out version)||version.Revision<0)
+                    throw new InvalidDataException("Некорректная версия Chrome");
+                string candidate=Convert.ToString(raw);
+                if(!entry.TryGetValue("fraction",out raw)||!(raw is int||raw is long||raw is decimal||raw is double))
+                    throw new InvalidDataException("Google не указал долю распространения Chrome");
+                if(Convert.ToDecimal(raw)!=1M)continue;
+                if(!entry.TryGetValue("serving",out raw))throw new InvalidDataException("Google не указал период распространения Chrome");
+                var serving=raw as Dictionary<string,object>;
+                if(serving==null)throw new InvalidDataException("Некорректный период распространения Chrome");
+                if(serving.TryGetValue("endTime",out raw)&&!String.IsNullOrEmpty(Convert.ToString(raw)))continue;
+                if(selected==null||SoftwareCatalog.Compare(candidate,selected)>0)selected=candidate;
+            }
+            if(selected==null)throw new InvalidDataException("Google пока не подтвердил полностью развёрнутый стабильный выпуск Chrome");
             return new SoftwarePackage{Id="chrome",Version=selected,Architecture="x64",File="googlechromestandaloneenterprise64.msi",Url="https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",Source="Релиз на официальном сайте Google Chrome",Sha256=""};
         }
         internal static SoftwarePackage Latest(string id)
         {
-            if(id=="chrome")return ParseChrome(Text(id,"https://versionhistory.googleapis.com/v1/chrome/platforms/win64/channels/stable/versions?pageSize=1"));
+            if(id=="chrome")return ParseChrome(Text(id,ChromeReleaseUrl));
             if (id=="notepad" || id=="7zip") return GitHub(id);
             if (id=="rudesktop") return ParseRuDesktop(Text(id,"https://rudesktop.ru/downloads/"));
             if (id=="anydesk") return ParseAnyDesk(Text(id,"https://download.anydesk.com/changelog.txt"));
@@ -142,7 +160,7 @@ namespace ServiceTool
                 {
                     File.Move(temporary,staged); package=SoftwareCatalog.Describe(remote.Id,staged,remote.Source); package.Url=remote.Url;
                     if (!String.IsNullOrEmpty(remote.Sha256) && !String.Equals(package.Sha256,remote.Sha256,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("SHA-256 скачанного файла не совпал с релизом");
-                    if (remote.Version!="0.0" && SoftwareCatalog.Compare(remote.Version,package.Version)!=0) throw new InvalidDataException("Версия файла не совпала с объявленной");
+                    VerifyReleaseVersion(remote,package.Version);
                     SoftwareTrust.Verify(package,true);
                     ToolsDeployment.SafePath(final); if (File.Exists(final)) File.Replace(staged,final,null); else File.Move(staged,final); package.File=final;
                 }
@@ -153,6 +171,19 @@ namespace ServiceTool
         }
 
         // Cleanup is best-effort and must never replace a download/validation exception.
+        internal static void VerifyReleaseVersion(SoftwarePackage remote,string actual)
+        {
+            if(remote.Version=="0.0")return;
+            int comparison=SoftwareCatalog.Compare(actual,remote.Version);
+            if(remote.Id=="chrome"&&String.IsNullOrEmpty(remote.Sha256))
+            {
+                if(comparison<0)throw new InvalidDataException("Каталог Google показывает Chrome "+remote.Version+
+                    ", а по ссылке на установщик получена версия "+actual+". Пакет обновления не сохранён.");
+                return;
+            }
+            if(comparison!=0)throw new InvalidDataException("Версия файла не совпала с объявленной");
+        }
+
         // Only remove the exact temporary file and an empty private directory, never a tree.
         internal static void CleanupDownload(string file, string directory, Action<string> progress)
         {

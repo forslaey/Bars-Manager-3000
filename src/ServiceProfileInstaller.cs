@@ -346,6 +346,7 @@ namespace ServiceTool
         private static void InstallAssembly(ServiceInstallProfile profile, string password, bool uninstall, CancellationToken cancellation = default(CancellationToken))
         {
             ReadManagedArchitecture(profile.ExecutablePath);
+            if(!uninstall)HttpServiceConfiguration.Prepare(profile.ExecutablePath);
             Directory.SetCurrentDirectory(Path.GetDirectoryName(profile.ExecutablePath));
             // UseNewContext=false preserves our in-memory credentials and suppresses framework
             // InstallLog output. Normal .InstallState transactions are preserved by AssemblyInstaller.

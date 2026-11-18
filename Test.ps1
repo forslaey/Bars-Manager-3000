@@ -79,7 +79,7 @@ if ($Audit) {
 $taskCore = Join-Path $taskSource 'ServiceCore.cs'
 $taskManagement = Join-Path $taskSource 'ServiceManagement.cs'
 Invoke-TaskTests 'CoreTests' 'CoreTests' @($taskCore, (Join-Path $taskTests 'CoreTests.cs'))
-Invoke-TaskTests 'ManagementTests' 'ManagementTests' @($taskCore, $taskManagement, (Join-Path $taskTests 'ManagementTests.cs'))
+Invoke-TaskTests 'ManagementTests' 'ManagementTests' @($taskCore, $taskManagement, (Join-Path $taskSource 'HttpServiceConfiguration.cs'), (Join-Path $taskTests 'ManagementTests.cs'))
 Invoke-TaskTests 'ManagedServiceStoreTests' 'ManagedServiceStoreTests' @($taskCore, (Join-Path $taskSource 'ApplicationStorage.cs'), (Join-Path $taskSource 'ManagedServiceStore.cs'), (Join-Path $taskTests 'ManagedServiceStoreTests.cs'))
 Invoke-TaskTests 'NavigationTests' 'ServiceTool.NavigationTests' ($taskUiSources + (Join-Path $taskTests 'NavigationTests.cs'))
 Invoke-TaskTests 'ReviewRegressionTests' 'ServiceTool.ReviewRegressionTests' ($taskUiSources + (Join-Path $taskTests 'ReviewRegressionTests.cs'))
@@ -117,6 +117,7 @@ Invoke-TaskTests 'JournalScrollTests' 'ServiceTool.JournalScrollTests' ($taskUiS
 Invoke-TaskTests 'LogArchiveTests' 'ServiceTool.LogArchiveTests' @((Join-Path $taskSource 'ServiceLogArchive.cs'), (Join-Path $taskTests 'LogArchiveTests.cs'))
 Invoke-TaskTests 'LogArchiveUiTests' 'ServiceTool.LogArchiveUiTests' ($taskUiSources + (Join-Path $taskTests 'LogArchiveUiTests.cs'))
 Invoke-TaskTests 'ServiceInstallProfileTests' 'ServiceInstallProfileTests' ($taskUiSources + (Join-Path $taskTests 'ServiceInstallProfileTests.cs'))
+Invoke-TaskTests 'HttpServiceConfigurationTests' 'HttpServiceConfigurationTests' ($taskUiSources + (Join-Path $taskTests 'HttpServiceConfigurationTests.cs'))
 Invoke-TaskTests 'ProductTests' 'ServiceTool.ProductTests' ($taskUiSources + (Join-Path $taskTests 'ProductTests.cs'))
 Invoke-TaskTests 'RegressionTests' 'ServiceTool.RegressionTests' ($taskUiSources + (Join-Path $taskTests 'RegressionTests.cs'))
 
@@ -125,7 +126,7 @@ Invoke-TaskTests 'SqlManagerTests' 'ServiceTool.SqlManagerTests' ($taskUiSources
 Invoke-TaskTests 'BundleTests' 'ServiceTool.BundleTests' ($taskUiSources + (Join-Path $taskTests 'BundleTests.cs'))
 Invoke-TaskTests 'OpeningProgressTests' 'ServiceTool.OpeningProgressTests' ($taskUiSources + (Join-Path $taskTests 'OpeningProgressTests.cs'))
 Invoke-TaskTests 'DownloadProgressTests' 'ServiceTool.DownloadProgressTests' ($taskUiSources + (Join-Path $taskTests 'DownloadProgressTests.cs'))
-foreach ($name in @('BundleResultsTests','ServiceRemovalCancellationTests','FooterLiveTests','LauncherFooterVisualTests','UserScreenshotRegressionTests','ServiceEndpointTests')) {
+foreach ($name in @('BundleResultsTests','ServiceRemovalRecoveryTests','ServiceRemovalCancellationTests','FooterLiveTests','LauncherFooterVisualTests','UserScreenshotRegressionTests','ServiceEndpointTests')) {
     Invoke-TaskTests $name ("ServiceTool." + $name) ($taskUiSources + (Join-Path $taskTests ($name + '.cs')))
 }
 Invoke-TaskTests 'BundleTransportTests' 'ServiceTool.BundleTransportTests' ($taskUiSources + (Join-Path $taskTests 'BundleTransportTests.cs'))

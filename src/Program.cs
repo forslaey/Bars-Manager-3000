@@ -1531,6 +1531,10 @@ namespace ServiceTool
                 }
                 if (!install && !await PrepareServiceRemovalAsync(executable, waitCancellation)) return;
                 waitCancellation.ThrowIfCancellationRequested();
+                string[] removalNames=install?new string[0]:matches.ConvertAll(entry=>entry.Name).ToArray();
+                var selectedRemoval=install?null:SelectedService();
+                string selectedRemovalName=selectedRemoval==null?null:selectedRemoval.Name;
+                string recoveredRemovalName=null;
                 int exitCode;
                 bool processStillRunning = false;
                 int procedureProcessId = 0;
@@ -1563,6 +1567,18 @@ namespace ServiceTool
                 }
                 else
                 {
+                    if(install&&String.Equals(Path.GetFileName(executable),"HttpService.exe",StringComparison.OrdinalIgnoreCase))
+                    {
+                        AppendLog("Подготавливаем полный путь к расширению HttpService…");
+                        int prepareCode=await Task.Factory.StartNew(delegate
+                        {
+                            using(var helper=Process.Start(ServiceManagement.BuildHelperStartInfo(
+                                Application.ExecutablePath,executable,"prepare-http","none")))
+                                return WaitForServiceCommand(helper,waitCancellation);
+                        });
+                        if(prepareCode!=0)throw new IOException("Не удалось подготовить конфиг HttpService. Код "+prepareCode+".");
+                        waitCancellation.ThrowIfCancellationRequested();
+                    }
                     AppendLog("Запуск .exe службы BARS: \"" + executable + "\" " + (install ? "-i" : "-u"));
                     ProcessStartInfo startInfo = ServiceActions.BuildStartInfo(executable, install);
                     ProcedureWaitResult completion = await Task.Factory.StartNew(delegate
@@ -1593,6 +1609,41 @@ namespace ServiceTool
                 AppendLog(processStillRunning
                     ? "Ожидание завершено. Процесс процедуры " + procedureProcessId + " ещё не завершился. Проверяем регистрацию…"
                     : "Выполнение работы со службой BARS завершено. Код выхода: " + exitCode + ".");
+                if(!install&&!processStillRunning&&exitCode==1060)
+                {
+                    var current=await Task.Factory.StartNew<ServiceSnapshot>(readCatalog);
+                    waitCancellation.ThrowIfCancellationRequested();
+                    if(closing||closeAfterServiceAction)return;
+                    AcceptSnapshot(current);
+                    var target=ServiceRemovalRecovery.Resolve(current,executable,removalNames,selectedRemovalName);
+                    if(target==null)
+                    {
+                        exitCode=0;
+                        AppendLog("Процедура вернула 1060, повторная проверка подтвердила отсутствие регистрации выбранного EXE.");
+                    }
+                    else
+                    {
+                        string question="Штатная процедура не нашла ожидаемое имя службы. Windows показывает регистрацию «"+
+                            target.Name+"» для выбранного EXE:\r\n"+executable+
+                            "\r\n\r\nУдалить эту регистрацию средствами Windows? Файлы программы и настройки сохранятся.";
+                        if(BrandMessageBox.Show(this,question,"Удаление регистрации службы",MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)
+                            throw new OperationCanceledException();
+                        waitCancellation.ThrowIfCancellationRequested();
+                        if(closing||closeAfterServiceAction)return;
+                        recoveredRemovalName=target.Name;
+                        string expectedPath=ServiceManagement.EncodeExpectedExecutable(executable);
+                        AppendLog("Удаляем подтверждённую регистрацию Windows: "+target.Name+". Путь: "+executable+".");
+                        exitCode=await Task.Factory.StartNew(delegate
+                        {
+                            using(var helper=Process.Start(ServiceManagement.BuildHelperStartInfo(
+                                Application.ExecutablePath,target.Name,"delete-matching",expectedPath)))
+                                return WaitForServiceCommand(helper,waitCancellation);
+                        });
+                        executionDetail="Удаление регистрации «"+target.Name+"» средствами Windows. Код "+exitCode+".";
+                        AppendLog(executionDetail);
+                    }
+                }
                 if(exitCode==unchecked((int)0x80008096))
                 {
                     AppendLog("Не удалось найти совместимую версию фреймворка. Программа службы не дошла до выполнения ключа установки/удаления.");
@@ -1619,13 +1670,16 @@ namespace ServiceTool
                         AcceptSnapshot(snapshot);
                         lastError = null;
                         if (!snapshot.Complete) lastError = new InvalidOperationException(snapshot.Warning);
-                        if (verified && ((install && matches.Count > 0) || (!install && matches.Count == 0))) break;
+                        if (verified && ((install && matches.Count > 0) ||
+                            (!install&&ServiceRemovalRecovery.Removed(snapshot,executable,recoveredRemovalName)))) break;
                     }
                     catch (Exception ex) { lastError = ex; verified = false; catalogCurrent = false; currentServiceNames.Clear(); }
                     if (attempt < 5) await Task.Delay(1000);
                 }
                 if (closing) return;
-                bool expected = verified && (install ? matches.Count > 0 : matches.Count == 0);
+                bool expected = verified && (install ? matches.Count > 0 :
+                    recoveredRemovalName==null?matches.Count==0:!currentServiceNames.Contains(recoveredRemovalName));
+                if(!install&&exitCode==1060&&expected)exitCode=0;
                 if (processStillRunning)
                 {
                     string reason = waitReason == ProcedureWaitReason.RegistrationObserved ? "Регистрация изменилась" :
@@ -1653,7 +1707,9 @@ namespace ServiceTool
                     SetStatus("Процедура завершена, но статус не проверен", lastError == null ? "Повтори проверку статуса." : lastError.Message, Color.DarkOrange);
                 else if (expected)
                     SetStatus(install ? "Установка подтверждена" : "Удаление подтверждено",
-                        install ? "Служба найдена в регистрации Windows. Установка не означает автоматический запуск." : "Прямые ссылки на выбранный .exe в списке служб больше не найдены.", Color.FromArgb(21, 128, 85));
+                        install ? "Служба найдена в регистрации Windows. Установка не означает автоматический запуск." :
+                            recoveredRemovalName==null?"Прямые ссылки на выбранный .exe в списке служб больше не найдены.":
+                            "Регистрация «"+recoveredRemovalName+"» удалена. Файлы программы и настройки сохранены.", Color.FromArgb(21, 128, 85));
                 else
                     SetStatus(install ? "Установка не подтверждена. Проверь конфигурацию службы." : "Результат не подтверждён",
                         install ? "Команда установки завершилась с кодом 0, но Windows не показывает службу с выбранным путём. Проверь конфигурацию службы, её журнал за время установки и список служб Windows." : "Процедура вернула 0, но связанные службы ещё присутствуют. Возможно, удаление ожидает остановки службы или закрытия оснастки.", Color.DarkOrange);
@@ -1803,6 +1859,20 @@ namespace ServiceTool
             {
                 using (action == "stop" ? null : await WindowsOperationQueue.EnterAsync(() => activity.Text = WindowsOperationQueue.WaitingMessage, () => closing))
                 {
+                if(action=="start")
+                {
+                    string registeredExecutable;
+                    if(ExecutablePaths.TryGetExecutable(entry.BinaryPath,out registeredExecutable))
+                    {
+                        try
+                        {
+                            if(HttpServiceConfiguration.Prepare(registeredExecutable,validateOnly:true))
+                                AppendLog("Перед запуском будет сохранён полный путь к расширению HttpService и резервная копия конфига.");
+                        }
+                        catch(UnauthorizedAccessException){AppendLog("Конфиг будет проверен помощником с правами администратора.");}
+                        catch(System.Security.SecurityException){AppendLog("Конфиг будет проверен помощником с правами администратора.");}
+                    }
+                }
                 ProcessStartInfo startInfo = ServiceManagement.BuildHelperStartInfo(Application.ExecutablePath, serviceName, action, mode);
                 result = await Task.Factory.StartNew(delegate
                 {

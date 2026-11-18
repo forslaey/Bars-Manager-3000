@@ -22,6 +22,25 @@ namespace ServiceTool
             try
             {
                 Check(SoftwareCatalog.Apps.Length==5&&!SoftwareCatalog.Apps.Any(a=>a.Id.Contains("atol")),"Only four requested programs, no ATOL");
+                string chromeRollout="{\"releases\":[{\"version\":\"158.0.8127.37\",\"fraction\":0,\"serving\":{}},{\"version\":\"158.0.8127.36\",\"fraction\":0.005,\"serving\":{}},{\"version\":\"158.0.8127.35\",\"fraction\":1,\"serving\":{\"endTime\":\"2026-11-15T00:00:00Z\"}},{\"version\":\"157.0.8103.79\",\"fraction\":1,\"serving\":{\"startTime\":\"2026-11-11T19:50:36Z\"}}]}";
+                var stableChrome=SoftwareSources.ParseChrome(chromeRollout);
+                Check(stableChrome.Version=="157.0.8103.79","Chrome ignores zero, partial and ended rollouts");
+                Check(!SoftwareMaintenance.CanInstall(new SoftwareCheck {State=LibraryState.Installed,Version=stableChrome.Version},stableChrome),"Current fully rolled-out Chrome does not trigger a repeated update");
+                Check(SoftwareMaintenance.CanInstall(new SoftwareCheck {State=LibraryState.Installed,Version="156.0.8078.48"},stableChrome),"Older Chrome can update to a fully rolled-out release");
+                var nextChrome=SoftwareSources.ParseChrome(chromeRollout.Replace("\"fraction\":0,","\"fraction\":1,"));
+                Check(nextChrome.Version=="158.0.8127.37","A new fully rolled-out Chrome release becomes available automatically");
+                Reject(()=>SoftwareSources.ParseChrome("{\"versions\":[{\"version\":\"158.0.8127.37\"}]}"),"Version history alone cannot advertise a Chrome update");
+                Reject(()=>SoftwareSources.ParseChrome("{\"releases\":[{\"version\":\"158.0.8127.37\",\"fraction\":0,\"serving\":{}}]}"),"No complete rollout is not a guessed version");
+                Reject(()=>SoftwareSources.ParseChrome("{\"releases\":[{\"version\":\"158.0.8127.37\",\"serving\":{}}]}"),"Missing rollout fraction is rejected");
+                var chromeRelease=new SoftwarePackage {Id="chrome",Version="158.0.8127.37"};
+                bool oldChromeRejected=false;
+                try{SoftwareSources.VerifyReleaseVersion(chromeRelease,"157.0.8103.79");}
+                catch(InvalidDataException ex){oldChromeRejected=ex.Message.Contains("157.0.8103.79")&&ex.Message.Contains(chromeRelease.Version);}
+                Check(oldChromeRejected,"Outdated official Chrome MSI is rejected with both versions");
+                SoftwareSources.VerifyReleaseVersion(chromeRelease,chromeRelease.Version);
+                SoftwareSources.VerifyReleaseVersion(chromeRelease,"158.0.8127.38");
+                chromeRelease.Sha256=new string('a',64);
+                Reject(()=>SoftwareSources.VerifyReleaseVersion(chromeRelease,"158.0.8127.38"),"Pinned Chrome release still requires exact version");
                 Check(SoftwareCatalog.Compare("26.04","26.4.0.0")==0,"Version normalization");Check(SoftwareCatalog.Compare("8.9.8.1","8.9.8")>0,"Revision comparison");Reject(()=>SoftwareCatalog.Compare("unknown","1.0"),"Unknown versions aren't guessed");
                 string digest=new string('a',64),json="{\"draft\":false,\"prerelease\":false,\"assets\":[{\"name\":\"npp.8.9.8.1.Installer.x64.exe\",\"digest\":\"sha256:"+digest+"\",\"browser_download_url\":\"https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.9.8.1/npp.8.9.8.1.Installer.x64.exe\"}]}";
                 var npp=SoftwareSources.ParseGitHub("notepad",json);Check(npp.Version=="8.9.8.1"&&npp.Architecture=="x64"&&npp.Sha256==digest,"Notepad++ x64 release parsed from GitHub, no website dependency");

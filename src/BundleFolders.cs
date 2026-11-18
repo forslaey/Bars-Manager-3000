@@ -66,8 +66,10 @@ namespace ServiceTool
                 string libraries = File.ReadAllText(saved).Trim().TrimEnd('\\', '/');
                 if (Path.IsPathRooted(libraries) && Path.GetFileName(libraries).Equals("_libraries", StringComparison.OrdinalIgnoreCase))
                 {
-                    string sibling = Path.Combine(Path.GetDirectoryName(libraries), section);
-                    if (Directory.Exists(sibling) || section == "_soft") return sibling;
+                    string root = Path.GetDirectoryName(libraries);
+                    string sibling = Path.Combine(root, section);
+                    if (!Path.GetFileName(root).Equals("Библиотеки", StringComparison.OrdinalIgnoreCase) &&
+                        Directory.Exists(sibling)) return sibling;
                 }
             }
             string local = Path.Combine(executable, section);

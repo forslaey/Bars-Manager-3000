@@ -49,7 +49,25 @@ namespace ServiceTool
     {
         static string FileName {get{return ApplicationStorage.FilePath("bundle-root.txt");}}
         internal static string Load()
-        {try{if(File.Exists(FileName)){string value=File.ReadAllText(FileName).Trim();if(Path.IsPathRooted(value) && !Path.GetFileName(value.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar)).Equals("Библиотеки",StringComparison.OrdinalIgnoreCase))return BundleFolders.BundleRoot(value);}}catch(IOException){}catch(UnauthorizedAccessException){}return BundleFolders.DefaultRoot;}
+        {
+            try
+            {
+                if(File.Exists(FileName))
+                {
+                    string value=File.ReadAllText(FileName).Trim();
+                    if(Path.IsPathRooted(value))
+                    {
+                        string trimmed=value.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);
+                        string root=BundleFolders.BundleRoot(trimmed.Length>Path.GetPathRoot(value).Length?trimmed:value);
+                        if(!String.Equals(Path.GetFileName(root.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar)),
+                            "Библиотеки",StringComparison.OrdinalIgnoreCase))return root;
+                    }
+                }
+            }
+            catch(IOException){}
+            catch(UnauthorizedAccessException){}
+            return BundleFolders.DefaultRoot;
+        }
         internal static void Save(string root)
         {Directory.CreateDirectory(ApplicationStorage.DirectoryPath);File.WriteAllText(Path.Combine(ApplicationStorage.DirectoryPath,"bundle-root.txt"),Path.GetFullPath(root));}
     }

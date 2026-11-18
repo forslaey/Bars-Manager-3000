@@ -114,7 +114,7 @@ namespace ServiceTool
             try{if(!preview)source=SoftwareCatalog.FindFolder();}catch(Exception ex){transfer.Stage("Не выполнено: "+ex.Message,failed:true);Log(ex.Message);}
             SetTheme(Colors.Dark,false);
             UpdateRows();
-            Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else {if(String.IsNullOrEmpty(source)||!Directory.Exists(source)){string root=await BundleDownloadForm.Offer(this,null,programs:true);if(IsDisposed||ModuleNavigation.ExitConfirmed)return;if(!String.IsNullOrEmpty(root))source=SoftwarePackageStorage.Folder(root);}await RefreshPackages();}grid.PerformLayout();body.PerformLayout();};
+            Shown+=async delegate {grid.PerformLayout();FitRows();if(preview)FillPreview();else await RefreshPackages();if(!IsDisposed){grid.PerformLayout();body.PerformLayout();}};
             FormClosing+=delegate(object sender,FormClosingEventArgs e)
             {
                 if(sqlPage!=null&&!sqlPage.CanClose(ModuleNavigation.ExitConfirmed)){e.Cancel=true;return;}
@@ -325,7 +325,7 @@ namespace ServiceTool
             if(remote.Checked)foreach(string id in ids.Where(id=>SoftwareCatalog.Find(id).Remote))using(var dialog=new SoftwareRemoteDialog(Colors,Icon,id)) {if(await ModuleNavigation.ShowOwnedAsync(this, dialog)!=DialogResult.OK)return;secrets[id]=dialog.Password;}
             if(BrandMessageBox.Show(this,InstallConfirmation(ids),Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question,MessageBoxDefaultButton.Button2)!=DialogResult.Yes)return;
             cancelled=false;Lock(true);bool reboot=false;
-            transfer.SetWork(ids.Length*2);var ready=new List<SoftwarePackage>();
+            transfer.SetWork(ids.Length*2);var ready=new List<SoftwarePackage>();string preparationError=null;
             try
             {
                 foreach(string id in ids)
@@ -341,15 +341,26 @@ namespace ServiceTool
                         catch(OperationCanceledException){throw;}
                         catch(Exception ex)
                         {
-                            SoftwarePackage fallback;if(!offline.TryGetValue(id,out fallback))throw new IOException(SoftwareCatalog.Find(id).Name+": загрузка не удалась, проверенного локального пакета нет. "+ex.Message);
-                            Log(SoftwareCatalog.Find(id).Name+": загрузка не удалась. Локальный пакет "+fallback.Version);
-                            if(BrandMessageBox.Show(this,"Использовать локальный "+SoftwareCatalog.Find(id).Name+" "+fallback.Version+" вместо сетевого пакета?",Text,MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)throw new OperationCanceledException();package=fallback;
+                            Log(SoftwareCatalog.Find(id).Name+": загрузка не удалась. "+ex.Message);
+                            if(preparationError==null)preparationError=ex.Message;
+                            transfer.CompleteStep();transfer.CompleteStep();continue;
                         }
                     }
                     SoftwareCatalog.Validate(package,true);
+                    if(!SoftwareMaintenance.CanInstall(current,package))
+                    {
+                        Log(SoftwareCatalog.Find(id).Name+": получен установщик "+package.Version+", в системе "+current.Version+". Обновление не требуется.");
+                        UpdateRows();transfer.CompleteStep();transfer.CompleteStep();continue;
+                    }
                     ready.Add(package);transfer.CompleteStep();
                 }
                 if(cancelled)throw new OperationCanceledException();
+                if(ready.Count==0)
+                {
+                    if(preparationError!=null)
+                        transfer.FinishOperation(ids.Length==1?preparationError:"Не удалось подготовить установщики. Подробности в журнале.",failed:true);
+                    return;
+                }
                 using (await WindowsOperationQueue.EnterAsync(() => Progress(WindowsOperationQueue.WaitingMessage), () => cancelled))
                 using(var active=await Task.Run(()=>LibrarySession.Start(()=>cancelled)))
                 {
@@ -364,6 +375,8 @@ namespace ServiceTool
                         if(result.Reboot){reboot=true;break;}if(!LibraryPlan.Success(result.ExitCode)||result.State!=LibraryState.Installed){break;}
                     }
                 }
+                if(preparationError!=null&&!transfer.Snapshot.Failed&&!cancelled)
+                    transfer.FinishOperation("Часть программ пропущена. Подробности в журнале.",failed:true);
             }
             catch(OperationCanceledException){transfer.Stage("Операция отменена",cancelled:true);Log("Отменено. Проверь программы перед повтором");}catch(Exception ex){transfer.Stage("Очередь остановлена: "+ex.Message,failed:true);Log("Очередь остановлена: "+ex.Message);}
             finally{session=null;if(!cancelled&&transfer.WorkFinished&&!transfer.Snapshot.Failed)transfer.FinishOperation("Установка выбранных программ завершена.",success:true);var state=transfer.Snapshot;if(state.Active&&!state.Complete&&!state.Failed)transfer.FinishOperation(cancelled?"Операция отменена.":"Обработка выбранных программ завершена. Подробности в журнале.",cancelled:cancelled);Lock(false);secrets.Clear();}

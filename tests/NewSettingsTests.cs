@@ -28,7 +28,7 @@ namespace ServiceTool {
    string folderScript=InitialSystemSettings.Script("apply","folders");Check(folderScript.Contains("S-1-5-32-545")&&folderScript.Contains("FullControl")&&folderScript.Contains("ReparsePoint"),"Users full control and reparse point exclusion");
    Check(!folderScript.Contains("takeown")&&!folderScript.Contains("SetOwner"),"No ownership takeover");
    string pass=InitialSystemSettings.Script("defaults","passwords");Check(pass.Contains("defltbase.inf")&&!pass.Contains("/cfg (Join-Path $env:windir"),"Only whitelisted password values extracted from Windows factory template");
-   var chrome=SoftwareSources.ParseChrome("{\"versions\":[{\"version\":\"156.0.8078.48\"},{\"version\":\"155.0.1.9\"}]}");Check(chrome.Version=="156.0.8078.48"&&chrome.Architecture=="x64","Google stable metadata");
+   var chrome=SoftwareSources.ParseChrome("{\"releases\":[{\"version\":\"156.0.8078.48\",\"fraction\":1,\"serving\":{}},{\"version\":\"155.0.1.9\",\"fraction\":1,\"serving\":{}}]}");Check(chrome.Version=="156.0.8078.48"&&chrome.Architecture=="x64","Google fully rolled-out stable metadata");
    Check(SoftwareCatalog.Apps[0].Id=="chrome"&&SoftwareCatalog.Apps.Length==5,"Chrome first");
    Check(SoftwareSources.Allowed("chrome",new Uri(chrome.Url)),"Official Google package allowed");Check(!SoftwareSources.Allowed("chrome",new Uri("https://dl.google.com.evil.example/dl/chrome/install/googlechromestandaloneenterprise64.msi")),"Lookalike domain rejected");
    Check(SoftwareCatalog.PackageId(chrome.File)=="chrome","Chrome recognized offline");

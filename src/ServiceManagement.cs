@@ -132,12 +132,21 @@ namespace ServiceTool
 
         private static void ValidateRequest(string serviceName, string action, string mode)
         {
+            if(action=="prepare-http"&&mode=="none")
+            {
+                if(String.IsNullOrWhiteSpace(serviceName)||!HttpServiceConfiguration.IsAbsolute(serviceName)||
+                    !String.Equals(Path.GetFileName(serviceName),"HttpService.exe",StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("Укажи полный путь к HttpService.exe.");
+                ExecutablePaths.Normalize(serviceName);
+                return;
+            }
             if (String.IsNullOrWhiteSpace(serviceName) || serviceName.Length > 256)
                 throw new ArgumentException("Некорректное системное имя службы.", "serviceName");
             foreach (char ch in serviceName)
                 if (ch < 32 || ch == '/' || ch == '\\')
                     throw new ArgumentException("Некорректное системное имя службы.", "serviceName");
             StrictUtf8.GetByteCount(serviceName);
+            if(action=="delete-matching"){DecodeExpectedExecutable(mode);return;}
             if ((action == "start" || action == "stop" || action == "delete") && mode == "none") return;
             if (action == "startup" && (mode == "auto" || mode == "auto-delayed" || mode == "manual" || mode == "disabled")) return;
             throw new ArgumentException("Недопустимое действие или режим запуска службы.");
@@ -147,13 +156,19 @@ namespace ServiceTool
         public static void Execute(string serviceName, string action, string mode)
         {
             ValidateRequest(serviceName, action, mode);
+            if(action=="prepare-http")
+            {
+                HttpServiceConfiguration.Prepare(serviceName);
+                return;
+            }
             IntPtr scm = OpenSCManager(null, null, 0x0001);
             if (scm == IntPtr.Zero) throw NativeError();
             IntPtr service = IntPtr.Zero;
             try
             {
                 uint access = action == "startup" ? 0x0001u | 0x0002u :
-                    0x0004u | (action == "start" ? 0x0010u : 0x0020u) | (action=="delete"?0x00010000u:0u);
+                    0x0004u | (action == "start" ? 0x0010u|0x0001u : 0x0020u) |
+                    (action=="delete"?0x00010000u:action=="delete-matching"?0x00010000u|0x0001u:0u);
                 service = OpenService(scm, serviceName, access);
                 if (service == IntPtr.Zero) throw NativeError();
                 if (action == "startup")
@@ -171,8 +186,12 @@ namespace ServiceTool
                 }
                 else
                 {
+                    if(action=="delete-matching")
+                        VerifyRemovalExecutable(ReadBinaryPath(service),DecodeExpectedExecutable(mode));
                     ChangeRunningState(service, action == "start");
-                    if(action=="delete"&&!DeleteService(service))throw NativeError();
+                    if(action=="delete-matching")
+                        VerifyRemovalExecutable(ReadBinaryPath(service),DecodeExpectedExecutable(mode));
+                    if((action=="delete"||action=="delete-matching")&&!DeleteService(service))throw NativeError();
                 }
             }
             finally
@@ -208,6 +227,7 @@ namespace ServiceTool
                 if (next == RunningStep.Invalid) throw new Win32Exception(1061);
                 if (next == RunningStep.Start)
                 {
+                    PrepareServiceConfiguration(service);
                     if (!StartService(service, 0, IntPtr.Zero))
                     {
                         int error = Marshal.GetLastWin32Error();
@@ -256,6 +276,52 @@ namespace ServiceTool
                 return new StartupConfiguration { StartType = config.StartType, Delayed = delayed != 0 };
             }
             finally { Marshal.FreeHGlobal(buffer); }
+        }
+
+        private static void PrepareServiceConfiguration(IntPtr service)
+        {
+            string executable;
+            if(ExecutablePaths.TryGetExecutable(ReadBinaryPath(service),out executable))
+                HttpServiceConfiguration.Prepare(executable);
+        }
+
+        internal static string EncodeExpectedExecutable(string executable)
+        {
+            if(String.IsNullOrWhiteSpace(executable)||!HttpServiceConfiguration.IsAbsolute(executable))
+                throw new ArgumentException("Укажи полный путь к EXE.");
+            return Convert.ToBase64String(StrictUtf8.GetBytes(ExecutablePaths.Normalize(executable)));
+        }
+
+        private static string DecodeExpectedExecutable(string encoded)
+        {
+            if(String.IsNullOrEmpty(encoded)||encoded.Length>65536)throw new ArgumentException("Некорректный путь удаления.");
+            byte[] bytes=Convert.FromBase64String(encoded);
+            if(Convert.ToBase64String(bytes)!=encoded)throw new ArgumentException("Некорректное кодирование пути удаления.");
+            string executable=StrictUtf8.GetString(bytes);
+            if(!HttpServiceConfiguration.IsAbsolute(executable))throw new ArgumentException("Укажи полный путь к EXE.");
+            return ExecutablePaths.Normalize(executable);
+        }
+
+        internal static void VerifyRemovalExecutable(string registered,string expected)
+        {
+            if(!ExecutablePaths.Matches(registered,expected))
+                throw new InvalidOperationException("Путь службы изменился после подтверждения. Удаление остановлено.");
+        }
+
+        private static string ReadBinaryPath(IntPtr service)
+        {
+            uint needed;
+            if(!QueryServiceConfig(service,IntPtr.Zero,0,out needed)&&Marshal.GetLastWin32Error()!=122)
+                throw NativeError();
+            if(needed==0||needed>8192)throw new Win32Exception(InvalidParameter);
+            IntPtr buffer=Marshal.AllocHGlobal((int)needed);
+            try
+            {
+                if(!QueryServiceConfig(service,buffer,needed,out needed))throw NativeError();
+                var config=(QueryServiceConfigData)Marshal.PtrToStructure(buffer,typeof(QueryServiceConfigData));
+                return Marshal.PtrToStringUni(config.BinaryPath);
+            }
+            finally{Marshal.FreeHGlobal(buffer);}
         }
 
         private static void WriteStartType(IntPtr service, uint startType)

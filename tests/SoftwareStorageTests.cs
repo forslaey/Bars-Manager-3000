@@ -44,7 +44,7 @@ namespace ServiceTool
                 Check(SoftwarePackageStorage.Folder(soft+"\\")==soft,"Existing _soft path not nested again");
                 Check(!Directory.Exists(soft),"Resolving a folder never creates directories during check");
                 string drive=Area("removable root");Directory.CreateDirectory(Path.Combine(drive,"Библиотеки"));
-                Check(SoftwarePackageStorage.Folder(drive)==Path.Combine(drive,"Библиотеки","_soft"),"Selecting drive/container finds adjacent Библиотеки");
+                Check(SoftwarePackageStorage.Folder(drive)==Path.Combine(drive,"_soft"),"Selecting a container does not pick a legacy child");
                 Check(SoftwarePackageStorage.Folder(@"Z:\Библиотеки")==@"Z:\Библиотеки\_soft","Removable drive letter independent of manager executable");
                 Check(SoftwarePackageStorage.Folder(@"Z:\")==@"Z:\_soft","Drive root remains absolute");
                 Reject(()=>SoftwarePackageStorage.Folder(@"C:relative"),"Drive-relative destination rejected");
@@ -88,6 +88,10 @@ namespace ServiceTool
                 bool downloadFailed=false;try{SoftwarePackageStorage.Download(unavailable,failed,messages.Add,()=>false);}catch(WebException){downloadFailed=true;}
                 Check(downloadFailed&&File.Exists(failedOld),"Network failure preserves prior installers");
                 Check(Directory.GetDirectories(Path.Combine(failed,"_soft"),".bars-download-*").Length==0,"Network failure removes own empty staging directories");
+                string missing=Path.Combine(root,"not-yet-created","BarsManager3000");
+                downloadFailed=false;
+                try{SoftwarePackageStorage.Download(unavailable,missing,messages.Add,()=>false);}catch(WebException){downloadFailed=true;}
+                Check(downloadFailed&&Directory.Exists(Path.Combine(missing,"_soft")),"Missing bundle root is created before contacting the official source");
                 Console.WriteLine("PASS: "+count+" portable _soft publication/rollback/cleanup assertions. Only temporary copies touched; no installer executed.");return 0;
             }
             catch(Exception ex){Console.Error.WriteLine(ex);return 1;}

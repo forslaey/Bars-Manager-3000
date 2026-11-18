@@ -18,7 +18,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $taskReferenceRoot 'mscorlib.dll')))
 $taskCommon += @('/noconfig','/nostdlib+',('/reference:' + (Join-Path $taskReferenceRoot 'mscorlib.dll')))
 $taskCommon += @($taskReferences | ForEach-Object { '/reference:' + (Join-Path $taskReferenceRoot $_) })
 try {
-    $taskHelperSources = @('ServiceCore.cs','ServiceInstallProfile.cs','ServiceProfileInstaller.cs','WindowsAccountInfo.cs','EmbeddedHelpers.cs','ApplicationStorage.cs','AssemblyInfo.cs','Helpers\HelperProgram.cs') | ForEach-Object { Join-Path $taskSource $_ }
+    $taskHelperSources = @('ServiceCore.cs','HttpServiceConfiguration.cs','ServiceInstallProfile.cs','ServiceProfileInstaller.cs','WindowsAccountInfo.cs','EmbeddedHelpers.cs','ApplicationStorage.cs','AssemblyInfo.cs','Helpers\HelperProgram.cs') | ForEach-Object { Join-Path $taskSource $_ }
     foreach ($taskArchitecture in @('x86','x64')) {
         $taskHelper = Join-Path $taskBuild ("Installer.$taskArchitecture.exe")
         & $taskCompiler @taskCommon "/platform:$taskArchitecture" '/main:ServiceTool.HelperProgram' "/out:$taskHelper" @taskHelperSources

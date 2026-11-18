@@ -12,7 +12,7 @@ namespace ServiceTool
         {
             if(String.IsNullOrWhiteSpace(selected))throw new IOException("Выбери папку комплекта BarsManager3000 или папку _soft");
             string value=selected.Trim().Trim('"');
-            if(!Regex.IsMatch(value,@"\A(?:[a-zA-Z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+(?:[\\/]|$))"))throw new IOException("Укажи полный путь к папке Библиотеки или _soft");
+            if(!Regex.IsMatch(value,@"\A(?:[a-zA-Z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+(?:[\\/]|$))"))throw new IOException("Укажи полный путь к папке BarsManager3000 или _soft");
             string full=Path.GetFullPath(value);if(full.Length>Path.GetPathRoot(full).Length)full=full.TrimEnd('\\','/');
             if(Path.GetFileName(full).Equals("_soft",StringComparison.OrdinalIgnoreCase))return full;
             if(Path.GetFileName(full).Equals("_libraries",StringComparison.OrdinalIgnoreCase))return Path.Combine(Path.GetDirectoryName(full),"_soft");
@@ -23,7 +23,6 @@ namespace ServiceTool
         {
             SoftwareCatalog.Find(remote.Id);
             string folder=Folder(selected);ToolsDeployment.SafePath(folder);
-            if(!Directory.Exists(Path.GetDirectoryName(folder)))throw new DirectoryNotFoundException("Папка комплекта недоступна: "+Path.GetDirectoryName(folder));
             Directory.CreateDirectory(folder);ToolsDeployment.SafePath(folder);
             string stage=Path.Combine(folder,".bars-download-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(stage);
             try

@@ -103,9 +103,7 @@ namespace ServiceTool
         internal static string FindFolder()
         {
             string adjacent = BundleFolders.FindSibling("_soft"); if (adjacent != null) return adjacent;
-            string root = LibrarySource.AutoDetect(BundleFolders.ExecutableDirectory);
-            if (root == null) { string saved = ApplicationStorage.FilePath("library-source.txt"); if (File.Exists(saved)) root = File.ReadAllText(saved).Trim(); }
-            return root == null ? null : SoftwarePackageStorage.Folder(root);
+            return SoftwarePackageStorage.Folder(BundlePreferences.Load());
         }
         internal static List<SoftwarePackage> Local(string folder, Action<string> progress, string sourceLabel="Локальный _soft")
         { return Local(folder,progress,sourceLabel,true); }
